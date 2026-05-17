@@ -1,1 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --color-primary: #0F2A60;
+  --color-primary-hover: #0D2047;
+  --color-secondary: #003296;
+  --color-secondary-hover: #0039AA;
+  --font-thai: 'Noto Sans Thai', sans-serif;
+}
+
+@layer base {
+  button {
+    @apply transition-transform duration-100 active:scale-95;
+  }
+}
