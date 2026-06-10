@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus, FaPen, FaTrash, FaUserShield } from "react-icons/fa"
+import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus, FaPen, FaTrash, FaUserShield, FaFileExcel } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
 import { UserFormDialog } from "./UserFormDialog"
 import { RolesDialog } from "./RolesDialog"
+import { ImportDialog } from "./ImportDialog"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
 
 type DialogState = { mode: "create" } | { mode: "edit"; id: number } | null
@@ -45,6 +46,7 @@ export function UsersTable() {
   const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [rolesTarget, setRolesTarget] = useState<UserRow | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
 
   const reload = () => setRefreshKey((k) => k + 1)
 
@@ -133,6 +135,12 @@ export function UsersTable() {
         </div>
         <div className="flex shrink-0 items-center gap-4">
           <span className="text-sm text-slate-400">ทั้งหมด {data.total} คน</span>
+          <button
+            onClick={() => setImportOpen(true)}
+            className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+          >
+            <FaFileExcel className="h-3.5 w-3.5 text-green-600" /> นำเข้า Excel
+          </button>
           <button
             onClick={() => setDialog({ mode: "create" })}
             className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover"
@@ -263,6 +271,10 @@ export function UsersTable() {
           onClose={() => setDialog(null)}
           onSaved={reload}
         />
+      )}
+
+      {importOpen && (
+        <ImportDialog onClose={() => setImportOpen(false)} onImported={reload} />
       )}
 
       {rolesTarget && (
