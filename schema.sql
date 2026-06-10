@@ -32,6 +32,18 @@ CREATE TABLE IF NOT EXISTS user_roles (
   PRIMARY KEY (user_id, role_id)
 );
 
+-- Activity audit log. actor/target emails are snapshots so entries survive
+-- user deletion; no FK so a delete log can reference a just-removed user.
+CREATE TABLE IF NOT EXISTS user_logs (
+  id           SERIAL PRIMARY KEY,
+  actor_id     INTEGER,
+  actor_email  TEXT,
+  action       TEXT NOT NULL,          -- user.create | user.update | user.delete | user.roles | login
+  target_id    INTEGER,
+  target_email TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- The four roles are fixed for this product.
 INSERT INTO roles (name) VALUES ('Admin'), ('Instructor'), ('TA'), ('Student')
 ON CONFLICT (name) DO NOTHING;

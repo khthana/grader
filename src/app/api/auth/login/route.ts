@@ -3,6 +3,7 @@ import { createSessionToken } from "@/lib/auth"
 import { verifyPassword } from "@/lib/password"
 import { getDb } from "@/lib/db"
 import { findUserByEmail } from "@/lib/users/repository"
+import { safeLog } from "@/lib/logs"
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null)
@@ -35,6 +36,14 @@ export async function POST(request: NextRequest) {
     email: user.email,
     name: user.name,
     picture: user.picture ?? undefined,
+  })
+
+  await safeLog(getDb(), {
+    actorId: user.id,
+    actorEmail: user.email,
+    action: "login",
+    targetId: user.id,
+    targetEmail: user.email,
   })
 
   const response = NextResponse.json({ ok: true })

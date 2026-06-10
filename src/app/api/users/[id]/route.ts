@@ -9,6 +9,7 @@ import {
   setUserActive,
 } from "@/lib/users/repository"
 import { validateUserInput, type UserInput } from "@/lib/users/validation"
+import { safeLog } from "@/lib/logs"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -80,6 +81,15 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     firstNameEn: input.firstNameEn,
     lastNameEn: input.lastNameEn,
   })
+
+  await safeLog(db, {
+    actorId: guard.user.id,
+    actorEmail: guard.user.email,
+    action: "user.update",
+    targetId: id,
+    targetEmail: input.email,
+  })
+
   return NextResponse.json(updated)
 }
 
@@ -104,7 +114,17 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   const id = await resolveId(context)
   if (id === null) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
-  const removed = await deleteUser(getDb(), id)
-  if (!removed) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  const db = getDb()
+  const target = await getUserById(db, id)
+  if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 })
+
+  await deleteUser(db, id)
+  await safeLog(db, {
+    actorId: guard.user.id,
+    actorEmail: guard.user.email,
+    action: "user.delete",
+    targetId: id,
+    targetEmail: target.email,
+  })
   return NextResponse.json({ ok: true })
 }

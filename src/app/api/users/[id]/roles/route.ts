@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth-guard"
 import { getDb } from "@/lib/db"
 import { getUserById, setUserRoles, countUsersWithRole } from "@/lib/users/repository"
 import { isRole } from "@/lib/roles"
+import { safeLog } from "@/lib/logs"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -34,6 +35,14 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   }
 
   await setUserRoles(db, id, roles)
+  await safeLog(db, {
+    actorId: guard.user.id,
+    actorEmail: guard.user.email,
+    action: "user.roles",
+    targetId: id,
+    targetEmail: user.email,
+  })
+
   const updated = await getUserById(db, id)
   return NextResponse.json(updated)
 }

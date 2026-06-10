@@ -8,6 +8,7 @@ const HOME: Crumb = { label: "หน้าหลัก", href: "/dashboard" }
 // Path segment → Thai label. "dashboard" is represented by the home crumb.
 const SEGMENT_LABELS: Record<string, string> = {
   users: "จัดการผู้ใช้",
+  logs: "บันทึกกิจกรรม",
   students: "รายชื่อนักศึกษา",
   problems: "โจทย์ปัญหา",
   review: "ตรวจงาน",

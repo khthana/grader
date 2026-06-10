@@ -20,9 +20,10 @@ describe("getSidebarMenu", () => {
   const hrefs = (role: Parameters<typeof getSidebarMenu>[0]) =>
     getSidebarMenu(role).map((item) => item.href)
 
-  it("gives Admin the superset: User Management + the teaching menu", () => {
+  it("gives Admin the superset: User Management + activity log + the teaching menu", () => {
     expect(hrefs("Admin")).toEqual([
       "/users",
+      "/logs",
       "/students",
       "/problems",
       "/review",

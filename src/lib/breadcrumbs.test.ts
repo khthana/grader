@@ -13,6 +13,10 @@ describe("deriveBreadcrumbs", () => {
       { label: "หน้าหลัก", href: "/dashboard" },
       { label: "จัดการผู้ใช้", href: "/users" },
     ])
+    expect(deriveBreadcrumbs("/logs")).toEqual([
+      { label: "หน้าหลัก", href: "/dashboard" },
+      { label: "บันทึกกิจกรรม", href: "/logs" },
+    ])
   })
 
   it("accumulates hrefs for nested paths and keeps order", () => {

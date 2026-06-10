@@ -6,6 +6,7 @@ import {
   FaClipboardCheck,
   FaBook,
   FaTasks,
+  FaHistory,
   FaRegCircle,
 } from "react-icons/fa"
 
@@ -18,6 +19,7 @@ const ICONS: Record<string, IconType> = {
   review: FaClipboardCheck,
   gradebook: FaBook,
   assignments: FaTasks,
+  logs: FaHistory,
 }
 
 export function MenuIcon({ name, className }: { name: string; className?: string }) {

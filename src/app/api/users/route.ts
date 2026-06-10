@@ -10,6 +10,7 @@ import {
 } from "@/lib/users/repository"
 import { validateUserInput, type UserInput } from "@/lib/users/validation"
 import { hashPassword } from "@/lib/password"
+import { safeLog } from "@/lib/logs"
 
 const DEFAULT_PAGE_SIZE = 10
 const MAX_PAGE_SIZE = 100
@@ -82,6 +83,14 @@ export async function POST(request: NextRequest) {
   for (const role of input.roles ?? []) {
     await assignRole(db, user.id, role)
   }
+
+  await safeLog(db, {
+    actorId: guard.user.id,
+    actorEmail: guard.user.email,
+    action: "user.create",
+    targetId: user.id,
+    targetEmail: user.email,
+  })
 
   const detail = await getUserById(db, user.id)
   return NextResponse.json(detail, { status: 201 })
