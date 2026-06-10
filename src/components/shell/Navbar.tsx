@@ -62,7 +62,7 @@ export function Navbar({ name, picture, roles, activeRole }: NavbarProps) {
             <FaChevronDown className="h-3 w-3" />
           </button>
           {roleOpen && (
-            <div className="absolute left-1/2 mt-2 w-48 -translate-x-1/2 rounded-xl bg-white py-1 shadow-xl ring-1 ring-black/5">
+            <div className="content-enter absolute left-1/2 mt-2 w-48 -translate-x-1/2 rounded-xl bg-white py-1 shadow-xl ring-1 ring-black/5">
               {roles.map((role) => (
                 <button
                   key={role}
@@ -83,7 +83,7 @@ export function Navbar({ name, picture, roles, activeRole }: NavbarProps) {
       <div className="relative">
         <button
           onClick={() => setProfileOpen((v) => !v)}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 rounded-full transition-all hover:ring-2 hover:ring-white/50"
         >
           {picture ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -101,7 +101,7 @@ export function Navbar({ name, picture, roles, activeRole }: NavbarProps) {
           <FaChevronDown className="h-3 w-3 text-white/70" />
         </button>
         {profileOpen && (
-          <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white py-1 shadow-xl ring-1 ring-black/5">
+          <div className="content-enter absolute right-0 mt-2 w-56 rounded-xl bg-white py-1 shadow-xl ring-1 ring-black/5">
             <div className="border-b border-slate-100 px-4 py-3">
               <p className="truncate font-thai text-sm font-medium text-slate-800">{name}</p>
               <p className="font-thai text-xs text-slate-400">{activeRole}</p>

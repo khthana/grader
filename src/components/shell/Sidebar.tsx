@@ -24,7 +24,7 @@ export function Sidebar({ menu, collapsed, onToggle }: SidebarProps) {
       <button
         onClick={onToggle}
         aria-label={collapsed ? "ขยายเมนู" : "ย่อเมนู"}
-        className="absolute -right-4 top-8 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-slate-200 hover:bg-slate-50"
+        className="absolute -right-4 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-slate-200 hover:bg-slate-50"
       >
         <FaChevronLeft
           className="h-3 w-3 text-slate-500 transition-transform duration-200"
