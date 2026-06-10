@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus, FaPen, FaTrash } from "react-icons/fa"
+import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus, FaPen, FaTrash, FaUserShield } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
 import { UserFormDialog } from "./UserFormDialog"
+import { RolesDialog } from "./RolesDialog"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
 
 type DialogState = { mode: "create" } | { mode: "edit"; id: number } | null
@@ -43,6 +44,7 @@ export function UsersTable() {
   const [dialog, setDialog] = useState<DialogState>(null)
   const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [rolesTarget, setRolesTarget] = useState<UserRow | null>(null)
 
   const reload = () => setRefreshKey((k) => k + 1)
 
@@ -210,6 +212,13 @@ export function UsersTable() {
                         <FaPen className="h-3.5 w-3.5" />
                       </button>
                       <button
+                        onClick={() => setRolesTarget(u)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"
+                        aria-label="จัดการบทบาท"
+                      >
+                        <FaUserShield className="h-3.5 w-3.5" />
+                      </button>
+                      <button
                         onClick={() => setDeleteTarget(u)}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600"
                         aria-label="ลบ"
@@ -252,6 +261,16 @@ export function UsersTable() {
           mode={dialog.mode}
           userId={dialog.mode === "edit" ? dialog.id : undefined}
           onClose={() => setDialog(null)}
+          onSaved={reload}
+        />
+      )}
+
+      {rolesTarget && (
+        <RolesDialog
+          userId={rolesTarget.id}
+          userName={rolesTarget.name}
+          currentRoles={rolesTarget.roles}
+          onClose={() => setRolesTarget(null)}
           onSaved={reload}
         />
       )}

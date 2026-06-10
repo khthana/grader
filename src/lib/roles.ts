@@ -48,7 +48,11 @@ export function getLandingRoute(role: Role): string {
 // Highest → lowest privilege. Admin is the superset.
 const ROLE_PRIORITY: Role[] = ["Admin", "Instructor", "TA", "Student"]
 
-const ALL_ROLES: Role[] = ["Admin", "Instructor", "TA", "Student"]
+export const ALL_ROLES: Role[] = ["Admin", "Instructor", "TA", "Student"]
+
+export function isRole(value: string): value is Role {
+  return (ALL_ROLES as string[]).includes(value)
+}
 
 export function getAssignableRoles(role: Role): Role[] {
   return role === "Admin" ? [...ALL_ROLES] : []

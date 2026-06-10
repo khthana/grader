@@ -248,6 +248,29 @@ export async function assignRole(
   )
 }
 
+// Replace a user's entire role set with `roles` (assign missing, revoke dropped).
+export async function setUserRoles(
+  db: Queryable,
+  userId: number,
+  roles: string[]
+): Promise<void> {
+  await db.query(`DELETE FROM user_roles WHERE user_id = $1`, [userId])
+  for (const role of roles) {
+    await assignRole(db, userId, role)
+  }
+}
+
+export async function countUsersWithRole(db: Queryable, roleName: string): Promise<number> {
+  const { rows } = await db.query<{ count: number }>(
+    `SELECT COUNT(DISTINCT ur.user_id)::int AS count
+     FROM user_roles ur
+     JOIN roles r ON r.id = ur.role_id
+     WHERE r.name = $1`,
+    [roleName]
+  )
+  return Number(rows[0]?.count ?? 0)
+}
+
 interface UserListRow {
   id: number
   name: string
