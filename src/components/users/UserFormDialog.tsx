@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { FaTimes } from "react-icons/fa"
 import { validateUserInput, type UserInput } from "@/lib/users/validation"
+import { resolveNameFields } from "@/lib/users/name"
 import { useToast } from "@/components/shell/ToastProvider"
 
 const ROLES = ["Admin", "Instructor", "TA", "Student"] as const
@@ -58,10 +59,11 @@ export function UserFormDialog({ mode, userId, onClose, onSaved }: Props) {
         if (!res.ok) throw new Error()
         const d = await res.json()
         if (cancelled) return
+        const { firstNameTh, lastNameTh } = resolveNameFields(d)
         setForm({
           titleTh: d.titleTh ?? "",
-          firstNameTh: d.firstNameTh ?? "",
-          lastNameTh: d.lastNameTh ?? "",
+          firstNameTh,
+          lastNameTh,
           titleEn: d.titleEn ?? "",
           firstNameEn: d.firstNameEn ?? "",
           lastNameEn: d.lastNameEn ?? "",

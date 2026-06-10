@@ -33,6 +33,9 @@ async function main() {
         email: ADMIN_EMAIL,
         name: ADMIN_NAME,
         passwordHash: await hashPassword(ADMIN_PASSWORD),
+        firstNameTh: "ผู้ดูแล",
+        lastNameTh: "ระบบ",
+        idCode: "admin",
       })
       await assignRole(pool, admin.id, "Admin")
       console.log(`✔ seeded admin: ${ADMIN_EMAIL}`)
