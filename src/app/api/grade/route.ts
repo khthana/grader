@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { runTestCases } from "@/lib/piston"
 import { SubmissionRequest, GradeResult } from "@/types"
+import { getUserFromRequest } from "@/lib/auth-guard"
 
 // ข้อมูลโจทย์ตัวอย่าง — ย้ายไป database ทีหลังได้
 const problems = {
@@ -17,6 +18,11 @@ const problems = {
 }
 
 export async function POST(request: NextRequest) {
+  const user = await getUserFromRequest(request)
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  }
+
   try {
     const body: SubmissionRequest = await request.json()
     const { problemId, code } = body
@@ -59,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(gradeResult)
 
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

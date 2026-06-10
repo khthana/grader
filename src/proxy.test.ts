@@ -35,6 +35,15 @@ describe("proxy (route protection)", () => {
     expect(res.headers.get("location")).toBeNull()
   })
 
+  it("requires authentication for the problem editor", () => {
+    const unauth = proxy(request("/problems/hello-world"))
+    expect(unauth.status).toBe(307)
+    expect(new URL(unauth.headers.get("location")!).pathname).toBe("/login")
+
+    const authed = proxy(request("/problems/hello-world", validSession()))
+    expect(authed.headers.get("location")).toBeNull()
+  })
+
   it("treats a tampered session cookie as unauthenticated on a protected route", () => {
     const res = proxy(request("/dashboard", "garbage.token"))
     expect(res.status).toBe(307)
