@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 function GoogleIcon() {
@@ -52,6 +52,12 @@ const MSG_NOT_REGISTERED = 'Your account is not registered in this system. Pleas
 const MSG_SERVER = 'Something went wrong. Please try again later.'
 const MSG_GOOGLE_FAIL = 'Google sign-in was cancelled or failed. Please try again.'
 
+const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
+  google_cancelled: MSG_GOOGLE_FAIL,
+  server_error: MSG_SERVER,
+  not_registered: MSG_NOT_REGISTERED,
+}
+
 interface Errors {
   email?: string
   password?: string
@@ -82,6 +88,14 @@ export default function LoginPage() {
     }
     return errs
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const errorKey = params.get('error')
+    if (errorKey) {
+      setErrors({ general: GOOGLE_ERROR_MESSAGES[errorKey] ?? MSG_GOOGLE_FAIL })
+    }
+  }, [])
 
   async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault()
@@ -120,14 +134,6 @@ export default function LoginPage() {
 
   function handleGoogleLogin() {
     setGoogleLoading(true)
-    // On failure (e.g. popup blocked / redirect error) show the google error.
-    // The actual redirect; on cancellation the callback route should set ?error=google_cancelled
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('error') === 'google_cancelled') {
-      setErrors({ general: MSG_GOOGLE_FAIL })
-      setGoogleLoading(false)
-      return
-    }
     window.location.href = '/api/auth/google'
   }
 

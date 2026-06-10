@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createSessionToken } from '@/lib/auth'
+import { getDb } from '@/lib/db'
+import { findUserByEmail } from '@/lib/users/repository'
 
 interface GoogleTokenResponse {
   access_token: string
@@ -67,13 +70,24 @@ export async function GET(req: NextRequest) {
     return loginWithError('server_error')
   }
 
-  // TODO: validate that user.email is registered in the system,
-  // then create a signed session token and set it as an HttpOnly cookie.
-  // For now we store a minimal session payload (replace with a signed JWT).
-  const session = Buffer.from(JSON.stringify({ email: user.email, name: user.name, picture: user.picture })).toString('base64')
+  let userRecord
+  try {
+    userRecord = await findUserByEmail(getDb(), user.email)
+  } catch {
+    return loginWithError('server_error')
+  }
+  if (!userRecord) {
+    return loginWithError('not_registered')
+  }
+
+  const sessionToken = createSessionToken({
+    email: userRecord.email,
+    name: userRecord.name,
+    picture: userRecord.picture ?? undefined,
+  })
 
   const response = NextResponse.redirect(new URL('/', req.url))
-  response.cookies.set('session', session, {
+  response.cookies.set('session', sessionToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

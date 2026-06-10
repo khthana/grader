@@ -5,6 +5,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 ระบบตรวจและให้คะแนน Python code ของนักศึกษาอัตโนมัติ — นักศึกษาส่ง Python code เข้ามา ระบบรัน ตรวจสอบกับ test cases และให้คะแนนพร้อม feedback
 
+CE-Grader is a **standalone product**. The `DEEP-QA-FRONTEND/` and `DEEP-QA-BACKEND/` repos (siblings of this folder) are **read-only references only** — used for design-system look/feel and UX patterns, never extended or imported at runtime.
+
+## Planned Direction
+An active initiative makes the login fully work and builds the authenticated app around it. Spec: **`requirement/prd_auth_shell_user_management.md`**. Highlights:
+- Build everything **inside this Next.js app** (own API routes — not DEEP-QA-BACKEND).
+- Reimplement a role-based shell (navbar/collapsible sidebar/breadcrumb/toast) + a full-parity User Management page in **plain Tailwind v4 + react-icons** (no MUI/framer-motion/react-router).
+- Auth: keep the HMAC-signed session cookie + Google OAuth flow; back users with **Postgres (raw `pg` + SQL)** + **bcrypt**; add logout, a profile endpoint, post-login landing, and middleware route protection.
+- Roles: **Admin / Instructor / TA / Student** (many-to-many), Admin a superset. Single `users` table (a student is a user with the Student role).
+- Teaching/student feature pages are styled "coming soon" stubs this iteration; only User Management is functional.
+
 ## Commands
 - `npm run dev` — start dev server (Turbopack)
 - `npm run build` — production build
@@ -41,9 +51,9 @@ Problem data is currently duplicated — must be added in **both** places:
 3. Google redirects to `GET /api/auth/callback/google?code=…`
 4. Callback exchanges code for tokens, fetches user profile, sets `session` HttpOnly cookie, redirects to `/`
 5. On cancellation/error, Google redirects with `?error=…` → callback redirects to `/login?error=google_cancelled`
-6. Email/password login: `POST /api/auth/login` (route not yet implemented — placeholder only)
+6. Email/password login: `POST /api/auth/login` — implemented; validates against the user store and sets the `session` cookie
 
-**Session cookie:** Currently stored as base64-encoded JSON (`{ email, name, picture }`). **Not cryptographically signed — must be replaced with a signed JWT (e.g. `jose` library) before production.**
+**Session cookie:** An **HMAC-SHA256-signed** token (`<base64url(payload)>.<signature>`) via `src/lib/auth.ts`, payload `{ email, name, picture, exp }`, 8h expiry. Signed with `SESSION_SECRET`. **User store is currently in-memory (`auth.ts`) and slated to move to Postgres + bcrypt** (see Planned Direction).
 
 ### Environment Variables
 Required in `.env.local`:
