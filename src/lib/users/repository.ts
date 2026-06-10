@@ -15,6 +15,30 @@ export interface NewUser {
   passwordHash?: string | null
   picture?: string | null
   idCode?: string | null
+  titleTh?: string | null
+  firstNameTh?: string | null
+  lastNameTh?: string | null
+  titleEn?: string | null
+  firstNameEn?: string | null
+  lastNameEn?: string | null
+  phone?: string | null
+}
+
+export interface UserDetail {
+  id: number
+  email: string
+  name: string
+  titleTh: string | null
+  firstNameTh: string | null
+  lastNameTh: string | null
+  titleEn: string | null
+  firstNameEn: string | null
+  lastNameEn: string | null
+  phone: string | null
+  idCode: string | null
+  picture: string | null
+  isActive: boolean
+  roles: string[]
 }
 
 export interface UserRecord {
@@ -81,8 +105,11 @@ function toRecord(row: UserRow): UserRecord {
 
 export async function createUser(db: Queryable, input: NewUser): Promise<UserRecord> {
   const { rows } = await db.query<UserRow>(
-    `INSERT INTO users (email, name, password_hash, picture, id_code)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO users
+       (email, name, password_hash, picture, id_code,
+        title_th, first_name_th, last_name_th,
+        title_en, first_name_en, last_name_en, phone)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      RETURNING id, email, name, password_hash, picture, is_active`,
     [
       normalizeEmail(input.email),
@@ -90,6 +117,13 @@ export async function createUser(db: Queryable, input: NewUser): Promise<UserRec
       input.passwordHash ?? null,
       input.picture ?? null,
       input.idCode ?? null,
+      input.titleTh ?? null,
+      input.firstNameTh ?? null,
+      input.lastNameTh ?? null,
+      input.titleEn ?? null,
+      input.firstNameEn ?? null,
+      input.lastNameEn ?? null,
+      input.phone ?? null,
     ]
   )
   return toRecord(rows[0])
@@ -135,6 +169,70 @@ export async function getUserWithRoles(
     isActive: user.isActive,
     roles: roleRows.map((r) => r.name),
   }
+}
+
+export interface UpdateUser {
+  email: string
+  name: string
+  idCode?: string | null
+  phone?: string | null
+  titleTh?: string | null
+  firstNameTh?: string | null
+  lastNameTh?: string | null
+  titleEn?: string | null
+  firstNameEn?: string | null
+  lastNameEn?: string | null
+}
+
+export async function updateUser(
+  db: Queryable,
+  id: number,
+  input: UpdateUser
+): Promise<UserDetail | null> {
+  const { rows } = await db.query<{ id: number }>(
+    `UPDATE users SET
+       email = $2, name = $3, id_code = $4, phone = $5,
+       title_th = $6, first_name_th = $7, last_name_th = $8,
+       title_en = $9, first_name_en = $10, last_name_en = $11,
+       updated_at = now()
+     WHERE id = $1
+     RETURNING id`,
+    [
+      id,
+      normalizeEmail(input.email),
+      input.name,
+      input.idCode ?? null,
+      input.phone ?? null,
+      input.titleTh ?? null,
+      input.firstNameTh ?? null,
+      input.lastNameTh ?? null,
+      input.titleEn ?? null,
+      input.firstNameEn ?? null,
+      input.lastNameEn ?? null,
+    ]
+  )
+  if (!rows[0]) return null
+  return getUserById(db, id)
+}
+
+export async function deleteUser(db: Queryable, id: number): Promise<boolean> {
+  const { rows } = await db.query<{ id: number }>(
+    `DELETE FROM users WHERE id = $1 RETURNING id`,
+    [id]
+  )
+  return rows.length > 0
+}
+
+export async function setUserActive(
+  db: Queryable,
+  id: number,
+  isActive: boolean
+): Promise<boolean> {
+  const { rows } = await db.query<{ id: number }>(
+    `UPDATE users SET is_active = $2, updated_at = now() WHERE id = $1 RETURNING id`,
+    [id, isActive]
+  )
+  return rows.length > 0
 }
 
 export async function assignRole(
@@ -220,4 +318,49 @@ export async function listUsers(
   }))
 
   return { users, total }
+}
+
+interface UserDetailRow {
+  id: number
+  email: string
+  name: string
+  title_th: string | null
+  first_name_th: string | null
+  last_name_th: string | null
+  title_en: string | null
+  first_name_en: string | null
+  last_name_en: string | null
+  phone: string | null
+  id_code: string | null
+  picture: string | null
+  is_active: boolean
+}
+
+export async function getUserById(db: Queryable, id: number): Promise<UserDetail | null> {
+  const { rows } = await db.query<UserDetailRow>(
+    `SELECT id, email, name, title_th, first_name_th, last_name_th,
+            title_en, first_name_en, last_name_en, phone, id_code, picture, is_active
+     FROM users WHERE id = $1`,
+    [id]
+  )
+  const row = rows[0]
+  if (!row) return null
+
+  const roleMap = await rolesByUserId(db, [row.id])
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    titleTh: row.title_th,
+    firstNameTh: row.first_name_th,
+    lastNameTh: row.last_name_th,
+    titleEn: row.title_en,
+    firstNameEn: row.first_name_en,
+    lastNameEn: row.last_name_en,
+    phone: row.phone,
+    idCode: row.id_code,
+    picture: row.picture,
+    isActive: row.is_active,
+    roles: roleMap.get(row.id) ?? [],
+  }
 }
