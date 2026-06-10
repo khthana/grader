@@ -14,6 +14,7 @@ export interface NewUser {
   name: string
   passwordHash?: string | null
   picture?: string | null
+  idCode?: string | null
 }
 
 export interface UserRecord {
@@ -32,6 +33,26 @@ export interface UserWithRoles {
   picture: string | null
   isActive: boolean
   roles: string[]
+}
+
+export interface UserListItem {
+  id: number
+  name: string
+  email: string
+  idCode: string | null
+  isActive: boolean
+  roles: string[]
+}
+
+export interface ListUsersParams {
+  search: string
+  page: number
+  pageSize: number
+}
+
+export interface UserListPage {
+  users: UserListItem[]
+  total: number
 }
 
 interface UserRow {
@@ -60,10 +81,16 @@ function toRecord(row: UserRow): UserRecord {
 
 export async function createUser(db: Queryable, input: NewUser): Promise<UserRecord> {
   const { rows } = await db.query<UserRow>(
-    `INSERT INTO users (email, name, password_hash, picture)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO users (email, name, password_hash, picture, id_code)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING id, email, name, password_hash, picture, is_active`,
-    [normalizeEmail(input.email), input.name, input.passwordHash ?? null, input.picture ?? null]
+    [
+      normalizeEmail(input.email),
+      input.name,
+      input.passwordHash ?? null,
+      input.picture ?? null,
+      input.idCode ?? null,
+    ]
   )
   return toRecord(rows[0])
 }
@@ -121,4 +148,76 @@ export async function assignRole(
      ON CONFLICT (user_id, role_id) DO NOTHING`,
     [userId, roleName]
   )
+}
+
+interface UserListRow {
+  id: number
+  name: string
+  email: string
+  id_code: string | null
+  is_active: boolean
+}
+
+// Fetch role names for a set of user ids, grouped per user.
+async function rolesByUserId(
+  db: Queryable,
+  ids: number[]
+): Promise<Map<number, string[]>> {
+  const grouped = new Map<number, string[]>()
+  if (ids.length === 0) return grouped
+
+  const placeholders = ids.map((_, i) => `$${i + 1}`).join(",")
+  const { rows } = await db.query<{ user_id: number; name: string }>(
+    `SELECT ur.user_id, r.name
+     FROM user_roles ur
+     JOIN roles r ON r.id = ur.role_id
+     WHERE ur.user_id IN (${placeholders})
+     ORDER BY r.name`,
+    ids
+  )
+  for (const row of rows) {
+    const list = grouped.get(row.user_id) ?? []
+    list.push(row.name)
+    grouped.set(row.user_id, list)
+  }
+  return grouped
+}
+
+export async function listUsers(
+  db: Queryable,
+  { search, page, pageSize }: ListUsersParams
+): Promise<UserListPage> {
+  const hasSearch = search.trim() !== ""
+  const where = hasSearch
+    ? `WHERE u.name ILIKE $1 OR u.email ILIKE $1 OR u.id_code ILIKE $1`
+    : ``
+  const searchParams = hasSearch ? [`%${search.trim()}%`] : []
+
+  const { rows: countRows } = await db.query<{ count: number }>(
+    `SELECT COUNT(*)::int AS count FROM users u ${where}`,
+    searchParams
+  )
+  const total = Number(countRows[0]?.count ?? 0)
+
+  const limitIdx = searchParams.length + 1
+  const offsetIdx = searchParams.length + 2
+  const { rows } = await db.query<UserListRow>(
+    `SELECT u.id, u.name, u.email, u.id_code, u.is_active
+     FROM users u ${where}
+     ORDER BY u.id
+     LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+    [...searchParams, pageSize, (page - 1) * pageSize]
+  )
+
+  const roleMap = await rolesByUserId(db, rows.map((r) => r.id))
+  const users: UserListItem[] = rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    idCode: r.id_code,
+    isActive: r.is_active,
+    roles: roleMap.get(r.id) ?? [],
+  }))
+
+  return { users, total }
 }
