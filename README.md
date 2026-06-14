@@ -62,6 +62,39 @@ Faculty of Engineering, KMITL. Standalone product (the sibling `DEEP-QA-*` repos
 | `npm run test:watch` | Vitest watch mode |
 | `npm run db:setup` | Apply `schema.sql` + seed Admin (needs `DATABASE_URL`) |
 
+## Database backup & restore
+`schema.sql` recreates the **tables** on a fresh machine, but it does **not** carry your data
+(users, roles assignments, logs). Only the four roles and the seeded Admin exist after
+`npm run db:setup`. To move real data between machines, dump and restore Postgres directly.
+
+Throughout, `DB_URL` is your `DATABASE_URL`, e.g. `postgresql://grader:grader@localhost:5433/grader`.
+
+**Back up (on the old machine):**
+```bash
+# plain SQL — portable and human-readable
+pg_dump "$DB_URL" --no-owner --no-privileges -f grader-backup.sql
+
+# or custom format — smaller, restored with pg_restore
+pg_dump "$DB_URL" --no-owner --no-privileges -Fc -f grader-backup.dump
+```
+
+**Restore (on the new machine — create the schema first):**
+```bash
+npm run db:setup                          # creates tables + roles + seed Admin
+psql "$DB_URL" -f grader-backup.sql       # for the .sql dump
+# or, for the .dump file:
+pg_restore --no-owner --no-privileges --data-only -d "$DB_URL" grader-backup.dump
+```
+> The seeded Admin from `db:setup` may collide with a row in the dump. Either skip `db:setup`
+> and restore into an empty database, or restore with `--data-only` after the schema exists and
+> resolve the duplicate `admin@kmitl.ac.th` by hand.
+
+**If Postgres runs in the Docker container above** (`grader-db`), dump/restore through it instead:
+```bash
+docker exec grader-db pg_dump -U grader --no-owner --no-privileges grader > grader-backup.sql
+docker exec -i grader-db psql -U grader grader < grader-backup.sql
+```
+
 ## Testing
 Unit tests cover the pure modules (session, password, roles, breadcrumbs, validation, import, name); repository and API routes are integration-tested against an in-memory Postgres (**pg-mem**) — no Docker needed to run the suite.
 
