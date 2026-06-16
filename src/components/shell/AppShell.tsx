@@ -8,22 +8,45 @@ import { Sidebar } from "./Sidebar"
 import { Breadcrumbs } from "./Breadcrumbs"
 import { ToastProvider } from "./ToastProvider"
 
+interface CourseOption {
+  id: number
+  code: string
+  nameTh: string
+}
+
 interface AppShellProps {
   name: string
   picture: string | null
   roles: Role[]
   activeRole: Role
+  courses: CourseOption[]
+  activeCourseId: number | null
   children: ReactNode
 }
 
-export function AppShell({ name, picture, roles, activeRole, children }: AppShellProps) {
+export function AppShell({
+  name,
+  picture,
+  roles,
+  activeRole,
+  courses,
+  activeCourseId,
+  children,
+}: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
   const menu = getSidebarMenu(activeRole)
 
   return (
     <ToastProvider>
-      <Navbar name={name} picture={picture} roles={roles} activeRole={activeRole} />
+      <Navbar
+        name={name}
+        picture={picture}
+        roles={roles}
+        activeRole={activeRole}
+        courses={courses}
+        activeCourseId={activeCourseId}
+      />
       <div className="flex min-h-screen bg-[#F8FAFC] pt-[64px]">
         <Sidebar menu={menu} collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
         <div className="flex min-w-0 flex-1 flex-col">

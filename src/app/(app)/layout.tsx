@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import type { ReactNode } from "react"
 import { getCurrentUser, getActiveRoleCookie } from "@/lib/session"
 import { resolveActiveRole, type Role } from "@/lib/roles"
+import { getCourseContext } from "@/lib/courses/server"
 import { AppShell } from "@/components/shell/AppShell"
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -21,8 +22,17 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     )
   }
 
+  const { courses, activeCourse } = await getCourseContext()
+
   return (
-    <AppShell name={user.name} picture={user.picture} roles={roles} activeRole={activeRole}>
+    <AppShell
+      name={user.name}
+      picture={user.picture}
+      roles={roles}
+      activeRole={activeRole}
+      courses={courses}
+      activeCourseId={activeCourse?.id ?? null}
+    >
       {children}
     </AppShell>
   )

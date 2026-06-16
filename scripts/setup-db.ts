@@ -5,10 +5,18 @@ import { fileURLToPath } from "node:url"
 import { Pool } from "pg"
 import { hashPassword } from "../src/lib/password"
 import { createUser, findUserByEmail, assignRole } from "../src/lib/users/repository"
+import { createCourse, assignInstructor } from "../src/lib/courses/repository"
 
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "admin@kmitl.ac.th"
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "Password123!"
 const ADMIN_NAME = process.env.SEED_ADMIN_NAME ?? "System Admin"
+
+const SEED_COURSE = {
+  code: "01076021",
+  nameTh: "โครงสร้างข้อมูลและอัลกอริทึม",
+  nameEn: "Data Structures and Algorithms",
+  program: "วิศวกรรมคอมพิวเตอร์",
+}
 
 async function main() {
   const connectionString = process.env.DATABASE_URL
@@ -25,11 +33,11 @@ async function main() {
     await pool.query(schema)
     console.log("✔ schema applied")
 
-    const existing = await findUserByEmail(pool, ADMIN_EMAIL)
-    if (existing) {
+    let admin = await findUserByEmail(pool, ADMIN_EMAIL)
+    if (admin) {
       console.log(`• admin already exists: ${ADMIN_EMAIL}`)
     } else {
-      const admin = await createUser(pool, {
+      admin = await createUser(pool, {
         email: ADMIN_EMAIL,
         name: ADMIN_NAME,
         passwordHash: await hashPassword(ADMIN_PASSWORD),
@@ -40,6 +48,21 @@ async function main() {
       await assignRole(pool, admin.id, "Admin")
       console.log(`✔ seeded admin: ${ADMIN_EMAIL}`)
     }
+
+    // Seed one course and assign the admin to it (idempotent by course code).
+    const { rows } = await pool.query<{ id: number }>(
+      `SELECT id FROM courses WHERE code = $1`,
+      [SEED_COURSE.code]
+    )
+    let courseId = rows[0]?.id
+    if (courseId) {
+      console.log(`• course already exists: ${SEED_COURSE.code}`)
+    } else {
+      const course = await createCourse(pool, SEED_COURSE)
+      courseId = course.id
+      console.log(`✔ seeded course: ${SEED_COURSE.code}`)
+    }
+    await assignInstructor(pool, courseId, admin.id)
   } finally {
     await pool.end()
   }

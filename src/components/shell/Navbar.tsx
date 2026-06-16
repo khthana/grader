@@ -2,15 +2,23 @@
 
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { FaChevronDown, FaSignOutAlt, FaUser } from "react-icons/fa"
+import { FaChevronDown, FaSignOutAlt, FaUser, FaBook } from "react-icons/fa"
 import { HiArrowsRightLeft } from "react-icons/hi2"
 import { getLandingRoute, type Role } from "@/lib/roles"
+
+interface CourseOption {
+  id: number
+  code: string
+  nameTh: string
+}
 
 interface NavbarProps {
   name: string
   picture: string | null
   roles: Role[]
   activeRole: Role
+  courses: CourseOption[]
+  activeCourseId: number | null
 }
 
 function Logo() {
@@ -28,7 +36,71 @@ function setActiveRoleCookie(role: Role) {
   document.cookie = `active_role=${role}; path=/; max-age=${60 * 60 * 8}; samesite=lax`
 }
 
-export function Navbar({ name, picture, roles, activeRole }: NavbarProps) {
+function setActiveCourseCookie(id: number) {
+  document.cookie = `active_course=${id}; path=/; max-age=${60 * 60 * 8}; samesite=lax`
+}
+
+function CourseSwitcher({
+  courses,
+  activeCourseId,
+}: {
+  courses: CourseOption[]
+  activeCourseId: number | null
+}) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  if (courses.length === 0) return null
+
+  const active = courses.find((c) => c.id === activeCourseId) ?? courses[0]
+
+  function select(id: number) {
+    setOpen(false)
+    if (id === active.id) return
+    setActiveCourseCookie(id)
+    router.refresh()
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 font-thai text-sm text-white hover:bg-white/20"
+      >
+        <FaBook className="h-3.5 w-3.5" />
+        <span className="font-medium">{active.code}</span>
+        <span className="hidden max-w-[280px] truncate text-white/70 md:inline">
+          {active.nameTh}
+        </span>
+        <FaChevronDown className="h-3 w-3" />
+      </button>
+      {open && (
+        <div className="content-enter absolute left-1/2 mt-2 w-80 -translate-x-1/2 rounded-xl bg-white py-1 shadow-xl ring-1 ring-black/5">
+          {courses.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => select(c.id)}
+              className={`flex w-full flex-col items-start px-4 py-2 text-left font-thai text-sm hover:bg-slate-50 ${
+                c.id === active.id ? "text-secondary" : "text-slate-600"
+              }`}
+            >
+              <span className="font-medium">{c.code}</span>
+              <span className="truncate text-xs text-slate-400">{c.nameTh}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function Navbar({
+  name,
+  picture,
+  roles,
+  activeRole,
+  courses,
+  activeCourseId,
+}: NavbarProps) {
   const router = useRouter()
   const [roleOpen, setRoleOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -50,34 +122,37 @@ export function Navbar({ name, picture, roles, activeRole }: NavbarProps) {
     <nav className="fixed inset-x-0 top-0 z-[60] flex h-[64px] items-center justify-between bg-primary px-6 shadow-sm">
       <Logo />
 
-      {/* Center: role switcher (only when the user has more than one role) */}
-      {roles.length > 1 && (
-        <div className="relative">
-          <button
-            onClick={() => setRoleOpen((v) => !v)}
-            className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 font-thai text-sm text-white hover:bg-white/20"
-          >
-            <HiArrowsRightLeft className="h-4 w-4" />
-            {activeRole}
-            <FaChevronDown className="h-3 w-3" />
-          </button>
-          {roleOpen && (
-            <div className="content-enter absolute left-1/2 mt-2 w-48 -translate-x-1/2 rounded-xl bg-white py-1 shadow-xl ring-1 ring-black/5">
-              {roles.map((role) => (
-                <button
-                  key={role}
-                  onClick={() => switchRole(role)}
-                  className={`flex w-full items-center px-4 py-2 font-thai text-sm hover:bg-slate-50 ${
-                    role === activeRole ? "font-semibold text-secondary" : "text-slate-600"
-                  }`}
-                >
-                  {role}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Center: course switcher + role switcher (role only when >1 role) */}
+      <div className="flex items-center gap-3">
+        <CourseSwitcher courses={courses} activeCourseId={activeCourseId} />
+        {roles.length > 1 && (
+          <div className="relative">
+            <button
+              onClick={() => setRoleOpen((v) => !v)}
+              className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 font-thai text-sm text-white hover:bg-white/20"
+            >
+              <HiArrowsRightLeft className="h-4 w-4" />
+              {activeRole}
+              <FaChevronDown className="h-3 w-3" />
+            </button>
+            {roleOpen && (
+              <div className="content-enter absolute left-1/2 mt-2 w-48 -translate-x-1/2 rounded-xl bg-white py-1 shadow-xl ring-1 ring-black/5">
+                {roles.map((role) => (
+                  <button
+                    key={role}
+                    onClick={() => switchRole(role)}
+                    className={`flex w-full items-center px-4 py-2 font-thai text-sm hover:bg-slate-50 ${
+                      role === activeRole ? "font-semibold text-secondary" : "text-slate-600"
+                    }`}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Right: profile */}
       <div className="relative">

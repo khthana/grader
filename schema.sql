@@ -47,3 +47,35 @@ CREATE TABLE IF NOT EXISTS user_logs (
 -- The four roles are fixed for this product.
 INSERT INTO roles (name) VALUES ('Admin'), ('Instructor'), ('TA'), ('Student')
 ON CONFLICT (name) DO NOTHING;
+
+-- Course domain (issue #9 / ADR 0001). A Course owns a roster of enrolled
+-- Students; course-local fields (group/program/year) live on the Enrollment.
+CREATE TABLE IF NOT EXISTS courses (
+  id         SERIAL PRIMARY KEY,
+  code       TEXT NOT NULL UNIQUE,
+  name_th    TEXT NOT NULL,
+  name_en    TEXT NOT NULL,
+  program    TEXT,                       -- default program for new enrollments
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Which Users (Instructor/TA, by their global role) may manage a Course.
+CREATE TABLE IF NOT EXISTS course_instructors (
+  course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (course_id, user_id)
+);
+
+-- A Student's membership in a Course's roster. 'group' is a SQL reserved word,
+-- so the column is named study_group (app-level field stays "group").
+CREATE TABLE IF NOT EXISTS enrollments (
+  id          SERIAL PRIMARY KEY,
+  course_id   INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  study_group TEXT,
+  program     TEXT,
+  year        TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (course_id, user_id)
+);
