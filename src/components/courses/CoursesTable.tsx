@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { FaPlus, FaPen, FaTrash } from "react-icons/fa"
+import { FaPlus, FaPen, FaTrash, FaUsers } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
 import { CourseFormDialog, type CourseValue } from "./CourseFormDialog"
+import { CourseStaffDialog } from "./CourseStaffDialog"
 
 type DialogState = { mode: "create" } | { mode: "edit"; course: CourseValue } | null
 
@@ -15,6 +16,7 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
   const [refreshKey, setRefreshKey] = useState(0)
   const [dialog, setDialog] = useState<DialogState>(openCreate ? { mode: "create" } : null)
   const [deleteTarget, setDeleteTarget] = useState<CourseValue | null>(null)
+  const [staffTarget, setStaffTarget] = useState<CourseValue | null>(null)
   const [deleting, setDeleting] = useState(false)
   const reload = () => setRefreshKey((k) => k + 1)
 
@@ -105,6 +107,13 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-2">
                       <button
+                        onClick={() => setStaffTarget(c)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"
+                        aria-label="ผู้สอน"
+                      >
+                        <FaUsers className="h-3.5 w-3.5" />
+                      </button>
+                      <button
                         onClick={() => setDialog({ mode: "edit", course: c })}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-blue-50 hover:text-secondary"
                         aria-label="แก้ไข"
@@ -131,6 +140,15 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
         <CourseFormDialog
           course={dialog.mode === "edit" ? dialog.course : undefined}
           onClose={() => setDialog(null)}
+          onSaved={reload}
+        />
+      )}
+
+      {staffTarget && (
+        <CourseStaffDialog
+          courseId={staffTarget.id}
+          courseLabel={`${staffTarget.code} · ${staffTarget.nameTh}`}
+          onClose={() => setStaffTarget(null)}
           onSaved={reload}
         />
       )}

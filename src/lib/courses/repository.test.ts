@@ -9,6 +9,9 @@ import {
   assignInstructor,
   updateCourse,
   deleteCourse,
+  setCourseInstructors,
+  listCourseInstructors,
+  searchStaffCandidates,
   type Queryable,
 } from "./repository"
 import { createUser, assignRole } from "@/lib/users/repository"
@@ -139,5 +142,78 @@ describe("deleteCourse", () => {
 
   it("returns false for an unknown course", async () => {
     expect(await deleteCourse(db, 9999)).toBe(false)
+  })
+})
+
+describe("setCourseInstructors", () => {
+  let db: Queryable
+  beforeEach(() => {
+    db = freshDb()
+  })
+
+  async function staff(email: string) {
+    const u = await createUser(db, { email, name: email })
+    await assignRole(db, u.id, "Instructor")
+    return u
+  }
+
+  it("replaces the assignment set: adds new, revokes dropped", async () => {
+    const course = await createCourse(db, { code: "C", nameTh: "ก", nameEn: "A" })
+    const a = await staff("a@kmitl.ac.th")
+    const b = await staff("b@kmitl.ac.th")
+    const c = await staff("c@kmitl.ac.th")
+    await assignInstructor(db, course.id, a.id)
+
+    await setCourseInstructors(db, course.id, [b.id, c.id])
+
+    const ids = (await listCourseInstructors(db, course.id)).map((s) => s.id).sort()
+    expect(ids).toEqual([b.id, c.id].sort())
+  })
+
+  it("can clear the staff list entirely", async () => {
+    const course = await createCourse(db, { code: "C", nameTh: "ก", nameEn: "A" })
+    const a = await staff("a@kmitl.ac.th")
+    await assignInstructor(db, course.id, a.id)
+
+    await setCourseInstructors(db, course.id, [])
+    expect(await listCourseInstructors(db, course.id)).toEqual([])
+  })
+
+  it("drives listCoursesForUser entitlement: assigned users see the course, dropped ones don't", async () => {
+    const course = await createCourse(db, { code: "C", nameTh: "ก", nameEn: "A" })
+    const a = await staff("a@kmitl.ac.th")
+    const b = await staff("b@kmitl.ac.th")
+
+    await setCourseInstructors(db, course.id, [a.id])
+    expect((await listCoursesForUser(db, a.id, ["Instructor"])).map((c) => c.code)).toEqual(["C"])
+    expect(await listCoursesForUser(db, b.id, ["Instructor"])).toEqual([])
+
+    // reassign to b only
+    await setCourseInstructors(db, course.id, [b.id])
+    expect(await listCoursesForUser(db, a.id, ["Instructor"])).toEqual([])
+    expect((await listCoursesForUser(db, b.id, ["Instructor"])).map((c) => c.code)).toEqual(["C"])
+  })
+})
+
+describe("searchStaffCandidates", () => {
+  let db: Queryable
+  beforeEach(() => {
+    db = freshDb()
+  })
+
+  it("returns only Instructor/TA users matching the search, with their roles", async () => {
+    const ins = await createUser(db, { email: "alice@kmitl.ac.th", name: "Alice" })
+    await assignRole(db, ins.id, "Instructor")
+    const ta = await createUser(db, { email: "bob@kmitl.ac.th", name: "Bob" })
+    await assignRole(db, ta.id, "TA")
+    const student = await createUser(db, { email: "carol@kmitl.ac.th", name: "Carol" })
+    await assignRole(db, student.id, "Student")
+
+    const all = await searchStaffCandidates(db, "")
+    expect(all.map((u) => u.email).sort()).toEqual(["alice@kmitl.ac.th", "bob@kmitl.ac.th"])
+    expect(all.find((u) => u.email === "alice@kmitl.ac.th")?.roles).toContain("Instructor")
+
+    const byName = await searchStaffCandidates(db, "bob")
+    expect(byName.map((u) => u.email)).toEqual(["bob@kmitl.ac.th"])
   })
 })

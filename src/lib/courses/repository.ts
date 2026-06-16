@@ -107,6 +107,99 @@ export async function assignInstructor(
   )
 }
 
+export interface CourseStaff {
+  id: number
+  name: string
+  email: string
+}
+
+export interface StaffCandidate {
+  id: number
+  name: string
+  email: string
+  roles: string[]
+}
+
+// Users eligible to be course staff: those carrying the Instructor or TA role,
+// optionally filtered by a name/email search. For the assignment picker (which
+// course managers use, so it can't go through the Admin-only user list).
+export async function searchStaffCandidates(
+  db: Queryable,
+  search: string
+): Promise<StaffCandidate[]> {
+  const hasSearch = search.trim() !== ""
+  const params: unknown[] = []
+  let filter = ""
+  if (hasSearch) {
+    params.push(`%${search.trim()}%`)
+    filter = `AND (u.name ILIKE $1 OR u.email ILIKE $1)`
+  }
+
+  const { rows } = await db.query<{ id: number; name: string; email: string }>(
+    `SELECT DISTINCT u.id, u.name, u.email
+     FROM users u
+     JOIN user_roles ur ON ur.user_id = u.id
+     JOIN roles r ON r.id = ur.role_id
+     WHERE r.name IN ('Instructor', 'TA') ${filter}
+     ORDER BY u.name
+     LIMIT 20`,
+    params
+  )
+  if (rows.length === 0) return []
+
+  // Roles in a second pass (pg-mem lacks STRING_AGG), grouped per user.
+  const ids = rows.map((r) => r.id)
+  const placeholders = ids.map((_, i) => `$${i + 1}`).join(",")
+  const { rows: roleRows } = await db.query<{ user_id: number; name: string }>(
+    `SELECT ur.user_id, r.name
+     FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+     WHERE ur.user_id IN (${placeholders})
+     ORDER BY r.name`,
+    ids
+  )
+  const byUser = new Map<number, string[]>()
+  for (const rr of roleRows) {
+    const list = byUser.get(rr.user_id) ?? []
+    list.push(rr.name)
+    byUser.set(rr.user_id, list)
+  }
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    roles: byUser.get(r.id) ?? [],
+  }))
+}
+
+export async function listCourseInstructors(
+  db: Queryable,
+  courseId: number
+): Promise<CourseStaff[]> {
+  const { rows } = await db.query<{ id: number; name: string; email: string }>(
+    `SELECT u.id, u.name, u.email
+     FROM course_instructors ci
+     JOIN users u ON u.id = ci.user_id
+     WHERE ci.course_id = $1::int
+     ORDER BY u.name`,
+    [courseId]
+  )
+  return rows
+}
+
+// Replace a course's entire staff set with `userIds` (assign missing, revoke
+// dropped). Mirrors setUserRoles.
+export async function setCourseInstructors(
+  db: Queryable,
+  courseId: number,
+  userIds: number[]
+): Promise<void> {
+  await db.query(`DELETE FROM course_instructors WHERE course_id = $1::int`, [courseId])
+  for (const userId of userIds) {
+    await assignInstructor(db, courseId, userId)
+  }
+}
+
 // Courses a user may manage: Admin sees all; everyone else sees only the
 // courses they're assigned to via course_instructors.
 export async function listCoursesForUser(

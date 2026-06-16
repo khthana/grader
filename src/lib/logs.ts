@@ -13,6 +13,7 @@ export type LogAction =
   | "course.create"
   | "course.update"
   | "course.delete"
+  | "course.staff"
 
 export interface LogInput {
   actorId?: number | null
