@@ -1,18 +1,13 @@
 import { getCourseContext } from "@/lib/courses/server"
+import { getCurrentUser } from "@/lib/session"
+import { canMutateRoster } from "@/lib/courses/access"
 import { PageTitle } from "@/components/shell/ComingSoon"
-
-const COLUMNS = [
-  "#",
-  "รหัสนักศึกษา",
-  "คำนำหน้า",
-  "ชื่อ - นามสกุล",
-  "หลักสูตร",
-  "กลุ่ม",
-  "ปีการศึกษา",
-]
+import { RosterTable } from "@/components/students/RosterTable"
 
 export default async function StudentsPage() {
   const { activeCourse } = await getCourseContext()
+  const user = await getCurrentUser()
+  const canMutate = canMutateRoster(user?.roles ?? [])
 
   if (!activeCourse) {
     return (
@@ -38,26 +33,7 @@ export default async function StudentsPage() {
         {activeCourse.code} · {activeCourse.nameTh}
       </p>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="border-b border-gray-200 bg-slate-100 text-slate-600">
-            <tr>
-              {COLUMNS.map((col) => (
-                <th key={col} className="px-4 py-3 text-left font-medium">
-                  {col}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td colSpan={COLUMNS.length} className="px-4 py-16 text-center text-slate-400">
-                ยังไม่มีนักศึกษาในรายวิชานี้
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <RosterTable courseId={activeCourse.id} canMutate={canMutate} />
     </div>
   )
 }

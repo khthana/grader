@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { resolveActiveCourse } from "./access"
+import { resolveActiveCourse, canMutateRoster } from "./access"
 
 const courses = [
   { id: 1, code: "C1" },
@@ -22,5 +22,22 @@ describe("resolveActiveCourse", () => {
 
   it("returns null for an empty list", () => {
     expect(resolveActiveCourse([], 1)).toBeNull()
+  })
+})
+
+describe("canMutateRoster", () => {
+  it("lets Admin and Instructor mutate the roster", () => {
+    expect(canMutateRoster(["Admin"])).toBe(true)
+    expect(canMutateRoster(["Instructor"])).toBe(true)
+  })
+
+  it("makes TA and Student read-only", () => {
+    expect(canMutateRoster(["TA"])).toBe(false)
+    expect(canMutateRoster(["Student"])).toBe(false)
+    expect(canMutateRoster([])).toBe(false)
+  })
+
+  it("grants mutation when any role qualifies", () => {
+    expect(canMutateRoster(["TA", "Instructor"])).toBe(true)
   })
 })
