@@ -141,6 +141,21 @@ export async function findUserByEmail(
   return rows[0] ? toRecord(rows[0]) : null
 }
 
+// Find a user by their รหัสนักศึกษา / staff id. Blank ids never match (legacy
+// users with a NULL id_code must not be reused by the enroll find-or-create).
+export async function findUserByIdCode(
+  db: Queryable,
+  idCode: string
+): Promise<UserRecord | null> {
+  if (!idCode || idCode.trim() === "") return null
+  const { rows } = await db.query<UserRow>(
+    `SELECT id, email, name, password_hash, picture, is_active
+     FROM users WHERE id_code = $1`,
+    [idCode.trim()]
+  )
+  return rows[0] ? toRecord(rows[0]) : null
+}
+
 export async function getUserWithRoles(
   db: Queryable,
   id: number

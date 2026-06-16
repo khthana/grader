@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus, FaFileExcel, FaDownload } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
+import { StudentFormDialog } from "./StudentFormDialog"
 
 interface RosterRow {
   id: number
@@ -39,6 +40,9 @@ export function RosterTable({ courseId, canMutate }: { courseId: number; canMuta
     groups: [],
   })
   const [loading, setLoading] = useState(true)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [addOpen, setAddOpen] = useState(false)
+  const reload = () => setRefreshKey((k) => k + 1)
 
   // Debounce search; reset to page 1 whenever the query changes.
   useEffect(() => {
@@ -79,7 +83,7 @@ export function RosterTable({ courseId, canMutate }: { courseId: number; canMuta
     return () => {
       cancelled = true
     }
-  }, [courseId, debounced, group, page, notify])
+  }, [courseId, debounced, group, page, notify, refreshKey])
 
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE))
   const filtering = debounced.trim() !== "" || group !== ""
@@ -127,9 +131,8 @@ export function RosterTable({ courseId, canMutate }: { courseId: number; canMuta
                 <FaFileExcel className="h-3.5 w-3.5" /> นำเข้า Excel
               </button>
               <button
-                disabled
-                title="กำลังพัฒนา"
-                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white opacity-60"
+                onClick={() => setAddOpen(true)}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover"
               >
                 <FaPlus className="h-3 w-3" /> เพิ่มนักศึกษา
               </button>
@@ -210,6 +213,14 @@ export function RosterTable({ courseId, canMutate }: { courseId: number; canMuta
           <FaChevronRight className="h-3 w-3" />
         </button>
       </div>
+
+      {addOpen && (
+        <StudentFormDialog
+          courseId={courseId}
+          onClose={() => setAddOpen(false)}
+          onSaved={reload}
+        />
+      )}
     </div>
   )
 }

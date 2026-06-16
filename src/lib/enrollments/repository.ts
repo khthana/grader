@@ -88,6 +88,19 @@ export async function createEnrollment(
   return toRecord(rows[0])
 }
 
+export async function findEnrollment(
+  db: Queryable,
+  courseId: number,
+  userId: number
+): Promise<EnrollmentRecord | null> {
+  const { rows } = await db.query<EnrollmentRow>(
+    `SELECT id, course_id, user_id, study_group, program, year
+     FROM enrollments WHERE course_id = $1::int AND user_id = $2::int`,
+    [courseId, userId]
+  )
+  return rows[0] ? toRecord(rows[0]) : null
+}
+
 interface EnrollmentListRow {
   id: number
   user_id: number
