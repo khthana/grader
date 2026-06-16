@@ -7,9 +7,12 @@ import {
   getCourseById,
   listCoursesForUser,
   assignInstructor,
+  updateCourse,
+  deleteCourse,
   type Queryable,
 } from "./repository"
 import { createUser, assignRole } from "@/lib/users/repository"
+import { createEnrollment, getEnrollmentById } from "@/lib/enrollments/repository"
 
 const schema = readFileSync(
   fileURLToPath(new URL("../../../schema.sql", import.meta.url)),
@@ -83,5 +86,58 @@ describe("course repository", () => {
     await createCourse(db, { code: "X", nameTh: "เอ็กซ์", nameEn: "X" })
 
     expect(await listCoursesForUser(db, ta.id, ["TA"])).toEqual([])
+  })
+})
+
+describe("updateCourse", () => {
+  let db: Queryable
+  beforeEach(() => {
+    db = freshDb()
+  })
+
+  it("updates a course's fields and reflects them on read", async () => {
+    const c = await createCourse(db, { code: "OLD", nameTh: "เก่า", nameEn: "Old", program: "ก" })
+
+    const updated = await updateCourse(db, c.id, {
+      code: "NEW",
+      nameTh: "ใหม่",
+      nameEn: "New",
+      program: "ข",
+    })
+    expect(updated?.code).toBe("NEW")
+
+    const found = await getCourseById(db, c.id)
+    expect(found?.code).toBe("NEW")
+    expect(found?.nameTh).toBe("ใหม่")
+    expect(found?.program).toBe("ข")
+  })
+
+  it("returns null for an unknown course", async () => {
+    expect(await updateCourse(db, 9999, { code: "X", nameTh: "x", nameEn: "X" })).toBeNull()
+  })
+})
+
+describe("deleteCourse", () => {
+  let db: Queryable
+  beforeEach(() => {
+    db = freshDb()
+  })
+
+  it("removes the course and cascades its enrollments", async () => {
+    const course = await createCourse(db, { code: "C", nameTh: "ก", nameEn: "A" })
+    const stu = await createUser(db, { email: "s@kmitl.ac.th", name: "S", idCode: "1" })
+    const enrollment = await createEnrollment(db, { courseId: course.id, userId: stu.id })
+
+    expect(await deleteCourse(db, course.id)).toBe(true)
+
+    expect(await getCourseById(db, course.id)).toBeNull()
+    expect(await getEnrollmentById(db, enrollment.id)).toBeNull() // cascaded
+    // the user survives the course deletion
+    const { rows } = await db.query<{ id: number }>("SELECT id FROM users WHERE id = $1", [stu.id])
+    expect(rows).toHaveLength(1)
+  })
+
+  it("returns false for an unknown course", async () => {
+    expect(await deleteCourse(db, 9999)).toBe(false)
   })
 })

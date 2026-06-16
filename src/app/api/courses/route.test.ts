@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { newDb } from "pg-mem"
 import { NextRequest } from "next/server"
-import { GET } from "./route"
+import { GET, POST } from "./route"
 import { setTestDb } from "@/lib/db"
 import { createUser, assignRole, type Queryable } from "@/lib/users/repository"
 import { createCourse, assignInstructor } from "@/lib/courses/repository"
@@ -27,7 +27,25 @@ function req(sessionToken?: string): NextRequest {
   return r
 }
 
+function postReq(body: unknown, token?: string): NextRequest {
+  const r = new NextRequest("http://localhost/api/courses", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  if (token) r.cookies.set("session", token)
+  return r
+}
+
 const sessionFor = (email: string) => createSessionToken({ email, name: "x" })
+
+async function seedRole(db: Queryable, email: string, role: string) {
+  const u = await createUser(db, { email, name: role })
+  await assignRole(db, u.id, role)
+  return u
+}
+
+const newCourse = { code: "01076021", nameTh: "โครงสร้างข้อมูล", nameEn: "Data Structures" }
 
 describe("GET /api/courses", () => {
   let db: Queryable
@@ -66,5 +84,57 @@ describe("GET /api/courses", () => {
     const res = await GET(req(sessionFor("ins@kmitl.ac.th")))
     const body = await res.json()
     expect(body.courses.map((c: { code: string }) => c.code)).toEqual(["MINE"])
+  })
+})
+
+describe("POST /api/courses", () => {
+  let db: Queryable
+  beforeEach(() => {
+    db = freshDb()
+    setTestDb(db)
+  })
+  afterEach(() => setTestDb(null))
+
+  it("returns 401 when not signed in", async () => {
+    const res = await POST(postReq(newCourse))
+    expect(res.status).toBe(401)
+  })
+
+  it("returns 403 for a TA (no course management)", async () => {
+    await seedRole(db, "ta@kmitl.ac.th", "TA")
+    const res = await POST(postReq(newCourse, sessionFor("ta@kmitl.ac.th")))
+    expect(res.status).toBe(403)
+  })
+
+  it("returns 400 when required fields are missing", async () => {
+    await seedRole(db, "ins@kmitl.ac.th", "Instructor")
+    const res = await POST(postReq({ code: "", nameTh: "", nameEn: "" }, sessionFor("ins@kmitl.ac.th")))
+    expect(res.status).toBe(400)
+  })
+
+  it("creates the course, assigns the creator, and logs course.create", async () => {
+    const ins = await seedRole(db, "ins@kmitl.ac.th", "Instructor")
+
+    const res = await POST(postReq(newCourse, sessionFor("ins@kmitl.ac.th")))
+    expect(res.status).toBe(201)
+
+    // appears in the creator's entitled courses (switcher)
+    const list = await GET(req(sessionFor("ins@kmitl.ac.th")))
+    const body = await list.json()
+    expect(body.courses.map((c: { code: string }) => c.code)).toEqual(["01076021"])
+
+    const logs = await db.query<{ action: string }>(
+      "SELECT action FROM user_logs WHERE action = 'course.create'"
+    )
+    expect(logs.rows).toHaveLength(1)
+    void ins
+  })
+
+  it("returns 409 for a duplicate course code", async () => {
+    await seedRole(db, "ins@kmitl.ac.th", "Instructor")
+    await POST(postReq(newCourse, sessionFor("ins@kmitl.ac.th")))
+
+    const dup = await POST(postReq(newCourse, sessionFor("ins@kmitl.ac.th")))
+    expect(dup.status).toBe(409)
   })
 })

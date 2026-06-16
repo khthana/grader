@@ -52,12 +52,46 @@ export async function createCourse(db: Queryable, input: NewCourse): Promise<Cou
   return toRecord(rows[0])
 }
 
+export async function findCourseByCode(
+  db: Queryable,
+  code: string
+): Promise<CourseRecord | null> {
+  const { rows } = await db.query<CourseRow>(
+    `SELECT id, code, name_th, name_en, program FROM courses WHERE code = $1`,
+    [code.trim()]
+  )
+  return rows[0] ? toRecord(rows[0]) : null
+}
+
 export async function getCourseById(db: Queryable, id: number): Promise<CourseRecord | null> {
   const { rows } = await db.query<CourseRow>(
     `SELECT id, code, name_th, name_en, program FROM courses WHERE id = $1`,
     [id]
   )
   return rows[0] ? toRecord(rows[0]) : null
+}
+
+export async function updateCourse(
+  db: Queryable,
+  id: number,
+  input: NewCourse
+): Promise<CourseRecord | null> {
+  const { rows } = await db.query<CourseRow>(
+    `UPDATE courses
+     SET code = $2, name_th = $3, name_en = $4, program = $5, updated_at = now()
+     WHERE id = $1::int
+     RETURNING id, code, name_th, name_en, program`,
+    [id, input.code, input.nameTh, input.nameEn, input.program ?? null]
+  )
+  return rows[0] ? toRecord(rows[0]) : null
+}
+
+export async function deleteCourse(db: Queryable, id: number): Promise<boolean> {
+  const { rows } = await db.query<{ id: number }>(
+    `DELETE FROM courses WHERE id = $1::int RETURNING id`,
+    [id]
+  )
+  return rows.length > 0
 }
 
 export async function assignInstructor(

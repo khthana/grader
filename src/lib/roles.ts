@@ -9,6 +9,7 @@ export interface MenuItem {
 const MENU = {
   userManagement: { label: "จัดการผู้ใช้", href: "/users", icon: "users" },
   logs: { label: "บันทึกกิจกรรม", href: "/logs", icon: "logs" },
+  courses: { label: "รายวิชา", href: "/courses", icon: "courses" },
   students: { label: "รายชื่อนักศึกษา", href: "/students", icon: "students" },
   problems: { label: "โจทย์ปัญหา", href: "/problems", icon: "problems" },
   review: { label: "ตรวจงาน", href: "/review", icon: "review" },
@@ -24,9 +25,10 @@ const TEACHING_MENU: MenuItem[] = [
 ]
 
 const SIDEBAR_MENU: Record<Role, MenuItem[]> = {
-  // Admin is the superset: User Management + activity log + the full teaching menu.
-  Admin: [MENU.userManagement, MENU.logs, ...TEACHING_MENU],
-  Instructor: TEACHING_MENU,
+  // Admin is the superset: User Management + activity log + course mgmt + teaching.
+  Admin: [MENU.userManagement, MENU.logs, MENU.courses, ...TEACHING_MENU],
+  // Instructor manages courses; TA gets the teaching menu without course mgmt.
+  Instructor: [MENU.courses, ...TEACHING_MENU],
   TA: TEACHING_MENU,
   Student: [MENU.assignments, MENU.gradebook],
 }

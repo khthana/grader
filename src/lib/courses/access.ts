@@ -8,6 +8,14 @@ export function canMutateRoster(roles: string[]): boolean {
   return roles.some((r) => ROSTER_MUTATORS.includes(r))
 }
 
+// Who may create/edit/delete courses: Admin and Instructor. TA and Student
+// have no course-management access.
+const COURSE_MANAGERS = ["Admin", "Instructor"]
+
+export function canManageCourses(roles: string[]): boolean {
+  return roles.some((r) => COURSE_MANAGERS.includes(r))
+}
+
 // Pick the active course from a user's entitled courses. Prefer the requested
 // id (e.g. from the `active_course` cookie) when it's still in the list;
 // otherwise fall back to the first course. Returns null for an empty list.

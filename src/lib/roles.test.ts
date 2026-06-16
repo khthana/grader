@@ -24,6 +24,7 @@ describe("getSidebarMenu", () => {
     expect(hrefs("Admin")).toEqual([
       "/users",
       "/logs",
+      "/courses",
       "/students",
       "/problems",
       "/review",
@@ -31,10 +32,18 @@ describe("getSidebarMenu", () => {
     ])
   })
 
-  it("gives Instructor and TA the same teaching menu (no User Management)", () => {
-    const teaching = ["/students", "/problems", "/review", "/gradebook"]
-    expect(hrefs("Instructor")).toEqual(teaching)
-    expect(hrefs("TA")).toEqual(teaching)
+  it("gives Instructor course management plus the teaching menu (no User Management)", () => {
+    expect(hrefs("Instructor")).toEqual([
+      "/courses",
+      "/students",
+      "/problems",
+      "/review",
+      "/gradebook",
+    ])
+  })
+
+  it("gives TA the teaching menu without course management", () => {
+    expect(hrefs("TA")).toEqual(["/students", "/problems", "/review", "/gradebook"])
   })
 
   it("gives Student only the student menu", () => {

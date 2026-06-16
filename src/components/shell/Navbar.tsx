@@ -2,9 +2,10 @@
 
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { FaChevronDown, FaSignOutAlt, FaUser, FaBook } from "react-icons/fa"
+import { FaChevronDown, FaSignOutAlt, FaUser, FaBook, FaPlus } from "react-icons/fa"
 import { HiArrowsRightLeft } from "react-icons/hi2"
 import { getLandingRoute, type Role } from "@/lib/roles"
+import { canManageCourses } from "@/lib/courses/access"
 
 interface CourseOption {
   id: number
@@ -43,13 +44,27 @@ function setActiveCourseCookie(id: number) {
 function CourseSwitcher({
   courses,
   activeCourseId,
+  canManage,
 }: {
   courses: CourseOption[]
   activeCourseId: number | null
+  canManage: boolean
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  if (courses.length === 0) return null
+
+  // Fresh course manager with no courses yet: offer a direct add shortcut.
+  if (courses.length === 0) {
+    if (!canManage) return null
+    return (
+      <button
+        onClick={() => router.push("/courses?new=1")}
+        className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 font-thai text-sm text-white hover:bg-white/20"
+      >
+        <FaPlus className="h-3 w-3" /> เพิ่มรายวิชา
+      </button>
+    )
+  }
 
   const active = courses.find((c) => c.id === activeCourseId) ?? courses[0]
 
@@ -87,6 +102,17 @@ function CourseSwitcher({
               <span className="truncate text-xs text-slate-400">{c.nameTh}</span>
             </button>
           ))}
+          {canManage && (
+            <button
+              onClick={() => {
+                setOpen(false)
+                router.push("/courses?new=1")
+              }}
+              className="mt-1 flex w-full items-center gap-2 border-t border-slate-100 px-4 py-2 font-thai text-sm text-secondary hover:bg-slate-50"
+            >
+              <FaPlus className="h-3 w-3" /> เพิ่มรายวิชา
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -124,7 +150,11 @@ export function Navbar({
 
       {/* Center: course switcher + role switcher (role only when >1 role) */}
       <div className="flex items-center gap-3">
-        <CourseSwitcher courses={courses} activeCourseId={activeCourseId} />
+        <CourseSwitcher
+          courses={courses}
+          activeCourseId={activeCourseId}
+          canManage={canManageCourses(roles)}
+        />
         {roles.length > 1 && (
           <div className="relative">
             <button

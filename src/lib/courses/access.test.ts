@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { resolveActiveCourse, canMutateRoster } from "./access"
+import { resolveActiveCourse, canMutateRoster, canManageCourses } from "./access"
 
 const courses = [
   { id: 1, code: "C1" },
@@ -39,5 +39,18 @@ describe("canMutateRoster", () => {
 
   it("grants mutation when any role qualifies", () => {
     expect(canMutateRoster(["TA", "Instructor"])).toBe(true)
+  })
+})
+
+describe("canManageCourses", () => {
+  it("lets Admin and Instructor manage courses", () => {
+    expect(canManageCourses(["Admin"])).toBe(true)
+    expect(canManageCourses(["Instructor"])).toBe(true)
+  })
+
+  it("blocks TA and Student from course management", () => {
+    expect(canManageCourses(["TA"])).toBe(false)
+    expect(canManageCourses(["Student"])).toBe(false)
+    expect(canManageCourses([])).toBe(false)
   })
 })

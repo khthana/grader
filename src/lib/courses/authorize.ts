@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { getUserFromRequest } from "@/lib/auth-guard"
 import { getDb } from "@/lib/db"
 import { listCoursesForUser } from "./repository"
-import { canMutateRoster } from "./access"
+import { canMutateRoster, canManageCourses } from "./access"
 import type { UserWithRoles } from "@/lib/users/repository"
 
 export type CourseAuth =
@@ -11,11 +11,12 @@ export type CourseAuth =
 
 // Resolve + authorize a course-scoped request:
 //   401 unauthenticated · 404 bad course id · 403 when the course isn't in the
-//   caller's entitled set · 403 (when `mutate`) for a read-only role such as TA.
+//   caller's entitled set · 403 (when `mutate`) for a roster read-only role such
+//   as TA · 403 (when `manage`) for a non course-manager (TA/Student).
 export async function authorizeCourse(
   request: NextRequest,
   courseIdParam: string,
-  options: { mutate?: boolean } = {}
+  options: { mutate?: boolean; manage?: boolean } = {}
 ): Promise<CourseAuth> {
   const user = await getUserFromRequest(request)
   if (!user) {
@@ -32,6 +33,9 @@ export async function authorizeCourse(
     return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
   }
   if (options.mutate && !canMutateRoster(user.roles)) {
+    return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
+  }
+  if (options.manage && !canManageCourses(user.roles)) {
     return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
   }
 
