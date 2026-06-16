@@ -6,6 +6,7 @@ import {
   createUser,
   getUserById,
   updateUser,
+  updateUserName,
   deleteUser,
   setUserActive,
   type Queryable,
@@ -99,6 +100,33 @@ describe("updateUser", () => {
       idCode: "1",
     })
     expect(result).toBeNull()
+  })
+
+  it("updateUserName changes prefix/name but leaves email and id_code untouched", async () => {
+    const u = await createUser(db, {
+      email: "keep@kmitl.ac.th",
+      name: "ชื่อเดิม นามเดิม",
+      idCode: "65010100",
+      titleTh: "นาย",
+      firstNameTh: "ชื่อเดิม",
+      lastNameTh: "นามเดิม",
+    })
+
+    const ok = await updateUserName(db, u.id, {
+      name: "ชื่อใหม่ นามใหม่",
+      titleTh: "นางสาว",
+      firstNameTh: "ชื่อใหม่",
+      lastNameTh: "นามใหม่",
+    })
+    expect(ok).toBe(true)
+
+    const detail = await getUserById(db, u.id)
+    expect(detail?.name).toBe("ชื่อใหม่ นามใหม่")
+    expect(detail?.titleTh).toBe("นางสาว")
+    expect(detail?.firstNameTh).toBe("ชื่อใหม่")
+    // identity fields are preserved
+    expect(detail?.email).toBe("keep@kmitl.ac.th")
+    expect(detail?.idCode).toBe("65010100")
   })
 
   it("rejects changing email to one already used by another user", async () => {

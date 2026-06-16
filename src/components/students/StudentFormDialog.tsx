@@ -29,15 +29,47 @@ const EMPTY: FormState = {
   email: "",
 }
 
+export interface RosterRowValue {
+  id: number
+  sid: string | null
+  prefix: string | null
+  name: string
+  program: string | null
+  studyGroup: string | null
+  year: string | null
+}
+
+function splitName(name: string): { firstNameTh: string; lastNameTh: string } {
+  const parts = name.trim().split(/\s+/)
+  return { firstNameTh: parts[0] ?? "", lastNameTh: parts.slice(1).join(" ") }
+}
+
+function initialForm(enrollment?: RosterRowValue): FormState {
+  if (!enrollment) return EMPTY
+  const { firstNameTh, lastNameTh } = splitName(enrollment.name)
+  return {
+    idCode: enrollment.sid ?? "",
+    titleTh: enrollment.prefix || "นาย",
+    firstNameTh,
+    lastNameTh,
+    studyGroup: enrollment.studyGroup ?? "",
+    year: enrollment.year ?? "",
+    program: enrollment.program ?? "",
+    email: "",
+  }
+}
+
 interface Props {
   courseId: number
+  enrollment?: RosterRowValue
   onClose: () => void
   onSaved: () => void
 }
 
-export function StudentFormDialog({ courseId, onClose, onSaved }: Props) {
+export function StudentFormDialog({ courseId, enrollment, onClose, onSaved }: Props) {
   const { notify } = useToast()
-  const [form, setForm] = useState<FormState>(EMPTY)
+  const isEdit = enrollment != null
+  const [form, setForm] = useState<FormState>(() => initialForm(enrollment))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
 
@@ -59,22 +91,27 @@ export function StudentFormDialog({ courseId, onClose, onSaved }: Props) {
 
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/courses/${courseId}/students`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          idCode: form.idCode,
-          titleTh: form.titleTh || undefined,
-          firstNameTh: form.firstNameTh,
-          lastNameTh: form.lastNameTh,
-          studyGroup: form.studyGroup || undefined,
-          year: form.year || undefined,
-          program: form.program || undefined,
-          email: form.email || undefined,
-        }),
-      })
+      const res = await fetch(
+        isEdit
+          ? `/api/courses/${courseId}/students/${enrollment!.id}`
+          : `/api/courses/${courseId}/students`,
+        {
+          method: isEdit ? "PUT" : "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            idCode: form.idCode,
+            titleTh: form.titleTh || undefined,
+            firstNameTh: form.firstNameTh,
+            lastNameTh: form.lastNameTh,
+            studyGroup: form.studyGroup || undefined,
+            year: form.year || undefined,
+            program: form.program || undefined,
+            email: isEdit ? undefined : form.email || undefined,
+          }),
+        }
+      )
       if (res.ok) {
-        notify("success", "เพิ่มนักศึกษาสำเร็จ")
+        notify("success", isEdit ? "บันทึกข้อมูลสำเร็จ" : "เพิ่มนักศึกษาสำเร็จ")
         onSaved()
         onClose()
         return
@@ -98,7 +135,9 @@ export function StudentFormDialog({ courseId, onClose, onSaved }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 font-thai">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-primary">เพิ่มนักศึกษา</h2>
+          <h2 className="text-xl font-semibold text-primary">
+            {isEdit ? "แก้ไขข้อมูลนักศึกษา" : "เพิ่มนักศึกษา"}
+          </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="ปิด">
             <FaTimes />
           </button>
@@ -106,7 +145,12 @@ export function StudentFormDialog({ courseId, onClose, onSaved }: Props) {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="รหัสนักศึกษา *" error={errors.idCode}>
-            <Input value={form.idCode} onChange={(v) => set("idCode", v)} error={!!errors.idCode} />
+            <Input
+              value={form.idCode}
+              onChange={(v) => set("idCode", v)}
+              error={!!errors.idCode}
+              readOnly={isEdit}
+            />
           </Field>
           <Field label="คำนำหน้า">
             <select
@@ -136,9 +180,11 @@ export function StudentFormDialog({ courseId, onClose, onSaved }: Props) {
           <Field label="หลักสูตร (ถ้าเว้นว่างจะใช้ค่าของรายวิชา)">
             <Input value={form.program} onChange={(v) => set("program", v)} />
           </Field>
-          <Field label="อีเมล (ถ้าเว้นว่างจะสร้างจากรหัส)" error={errors.email}>
-            <Input value={form.email} onChange={(v) => set("email", v)} error={!!errors.email} />
-          </Field>
+          {!isEdit && (
+            <Field label="อีเมล (ถ้าเว้นว่างจะสร้างจากรหัส)" error={errors.email}>
+              <Input value={form.email} onChange={(v) => set("email", v)} error={!!errors.email} />
+            </Field>
+          )}
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
@@ -175,19 +221,24 @@ function Input({
   value,
   onChange,
   error,
+  readOnly,
 }: {
   value: string
   onChange: (v: string) => void
   error?: boolean
+  readOnly?: boolean
 }) {
   return (
     <input
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={`mt-1 w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm transition focus:border-transparent focus:outline-none focus:ring-2 ${
-        error ? "border-red-300 focus:ring-red-400" : "border-slate-200 focus:ring-blue-500"
-      }`}
+      readOnly={readOnly}
+      className={`mt-1 w-full rounded-xl border px-4 py-2.5 text-sm transition focus:border-transparent focus:outline-none focus:ring-2 ${
+        readOnly
+          ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500"
+          : "bg-slate-50"
+      } ${error ? "border-red-300 focus:ring-red-400" : "border-slate-200 focus:ring-blue-500"}`}
     />
   )
 }

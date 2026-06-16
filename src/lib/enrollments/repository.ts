@@ -101,6 +101,47 @@ export async function findEnrollment(
   return rows[0] ? toRecord(rows[0]) : null
 }
 
+export async function getEnrollmentById(
+  db: Queryable,
+  id: number
+): Promise<EnrollmentRecord | null> {
+  const { rows } = await db.query<EnrollmentRow>(
+    `SELECT id, course_id, user_id, study_group, program, year
+     FROM enrollments WHERE id = $1::int`,
+    [id]
+  )
+  return rows[0] ? toRecord(rows[0]) : null
+}
+
+export async function deleteEnrollment(db: Queryable, id: number): Promise<boolean> {
+  const { rows } = await db.query<{ id: number }>(
+    `DELETE FROM enrollments WHERE id = $1::int RETURNING id`,
+    [id]
+  )
+  return rows.length > 0
+}
+
+export interface UpdateEnrollment {
+  studyGroup?: string | null
+  program?: string | null
+  year?: string | null
+}
+
+export async function updateEnrollment(
+  db: Queryable,
+  id: number,
+  input: UpdateEnrollment
+): Promise<EnrollmentRecord | null> {
+  const { rows } = await db.query<EnrollmentRow>(
+    `UPDATE enrollments
+     SET study_group = $2, program = $3, year = $4
+     WHERE id = $1::int
+     RETURNING id, course_id, user_id, study_group, program, year`,
+    [id, input.studyGroup ?? null, input.program ?? null, input.year ?? null]
+  )
+  return rows[0] ? toRecord(rows[0]) : null
+}
+
 interface EnrollmentListRow {
   id: number
   user_id: number

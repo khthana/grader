@@ -1,9 +1,19 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus, FaFileExcel, FaDownload } from "react-icons/fa"
+import {
+  FaSearch,
+  FaChevronLeft,
+  FaChevronRight,
+  FaPlus,
+  FaFileExcel,
+  FaDownload,
+  FaPen,
+  FaTrash,
+} from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
 import { StudentFormDialog } from "./StudentFormDialog"
+import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
 
 interface RosterRow {
   id: number
@@ -42,7 +52,28 @@ export function RosterTable({ courseId, canMutate }: { courseId: number; canMuta
   const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
   const [addOpen, setAddOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<RosterRow | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<RosterRow | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const reload = () => setRefreshKey((k) => k + 1)
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/courses/${courseId}/students/${deleteTarget.id}`, {
+        method: "DELETE",
+      })
+      if (!res.ok) throw new Error()
+      notify("success", "นำนักศึกษาออกจากรายวิชาแล้ว")
+      setDeleteTarget(null)
+      reload()
+    } catch {
+      notify("error", "ไม่สามารถนำออกได้")
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   // Debounce search; reset to page 1 whenever the query changes.
   useEffect(() => {
@@ -87,6 +118,7 @@ export function RosterTable({ courseId, canMutate }: { courseId: number; canMuta
 
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE))
   const filtering = debounced.trim() !== "" || group !== ""
+  const colCount = canMutate ? 8 : 7
 
   return (
     <div className="font-thai">
@@ -152,18 +184,19 @@ export function RosterTable({ courseId, canMutate }: { courseId: number; canMuta
               <th className="px-4 py-3 text-left font-medium">หลักสูตร</th>
               <th className="px-4 py-3 text-left font-medium">กลุ่ม</th>
               <th className="px-4 py-3 text-left font-medium">ปีการศึกษา</th>
+              {canMutate && <th className="px-4 py-3 text-center font-medium">จัดการ</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
+                <td colSpan={colCount} className="px-4 py-12 text-center text-slate-400">
                   กำลังโหลด...
                 </td>
               </tr>
             ) : data.enrollments.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
+                <td colSpan={colCount} className="px-4 py-12 text-center text-slate-400">
                   {filtering ? "ไม่พบนักศึกษาที่ค้นหา" : "ยังไม่มีนักศึกษาในรายวิชานี้"}
                 </td>
               </tr>
@@ -185,6 +218,26 @@ export function RosterTable({ courseId, canMutate }: { courseId: number; canMuta
                     )}
                   </td>
                   <td className="px-4 py-3 text-slate-400">{e.year ?? "—"}</td>
+                  {canMutate && (
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => setEditTarget(e)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-blue-50 hover:text-secondary"
+                          aria-label="แก้ไข"
+                        >
+                          <FaPen className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(e)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600"
+                          aria-label="นำออกจากรายวิชา"
+                        >
+                          <FaTrash className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))
             )}
@@ -219,6 +272,25 @@ export function RosterTable({ courseId, canMutate }: { courseId: number; canMuta
           courseId={courseId}
           onClose={() => setAddOpen(false)}
           onSaved={reload}
+        />
+      )}
+
+      {editTarget && (
+        <StudentFormDialog
+          courseId={courseId}
+          enrollment={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={reload}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="นำออกจากรายวิชา"
+          message={`ต้องการลบ ${deleteTarget.name} (${deleteTarget.sid ?? "—"}) ออกจากรายวิชาใช่หรือไม่?`}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+          busy={deleting}
         />
       )}
     </div>

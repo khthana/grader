@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getUserFromRequest } from "@/lib/auth-guard"
 import { getDb } from "@/lib/db"
-import { listCoursesForUser } from "@/lib/courses/repository"
-import { canMutateRoster } from "@/lib/courses/access"
+import { authorizeCourse } from "@/lib/courses/authorize"
 import { listEnrollments, listGroups } from "@/lib/enrollments/repository"
 import { enrollStudent } from "@/lib/enrollments/enroll"
 import { validateEnrollInput } from "@/lib/enrollments/validation"
 import { safeLog } from "@/lib/logs"
-import type { UserWithRoles } from "@/lib/users/repository"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -20,44 +17,11 @@ function parsePositiveInt(value: string | null, fallback: number, max?: number):
   return max ? Math.min(n, max) : n
 }
 
-type Authorized =
-  | { ok: true; user: UserWithRoles; courseId: number }
-  | { ok: false; response: NextResponse }
-
-// Resolve + authorize a course request: 401 unauthenticated, 404 bad id,
-// 403 when the course isn't in the caller's entitled set (or, when `mutate`,
-// when the caller is read-only on rosters, e.g. a TA).
-async function authorizeCourse(
-  request: NextRequest,
-  context: RouteContext,
-  options: { mutate?: boolean } = {}
-): Promise<Authorized> {
-  const user = await getUserFromRequest(request)
-  if (!user) {
-    return { ok: false, response: NextResponse.json({ error: "Not authenticated" }, { status: 401 }) }
-  }
-
-  const { id } = await context.params
-  const courseId = Number.parseInt(id, 10)
-  if (!Number.isFinite(courseId)) {
-    return { ok: false, response: NextResponse.json({ error: "Not found" }, { status: 404 }) }
-  }
-
-  const entitled = await listCoursesForUser(getDb(), user.id, user.roles)
-  if (!entitled.some((c) => c.id === courseId)) {
-    return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
-  }
-  if (options.mutate && !canMutateRoster(user.roles)) {
-    return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
-  }
-
-  return { ok: true, user, courseId }
-}
-
 // The roster of a course the caller is entitled to (Admin all; Instructor/TA
 // on assigned courses).
 export async function GET(request: NextRequest, context: RouteContext) {
-  const auth = await authorizeCourse(request, context)
+  const { id } = await context.params
+  const auth = await authorizeCourse(request, id)
   if (!auth.ok) return auth.response
   const { courseId } = auth
 
@@ -81,7 +45,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
 // Add (enroll) one student into the course. Instructor/Admin only.
 export async function POST(request: NextRequest, context: RouteContext) {
-  const auth = await authorizeCourse(request, context, { mutate: true })
+  const { id } = await context.params
+  const auth = await authorizeCourse(request, id, { mutate: true })
   if (!auth.ok) return auth.response
   const { user, courseId } = auth
 

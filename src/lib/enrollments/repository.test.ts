@@ -2,7 +2,15 @@ import { describe, it, expect, beforeEach } from "vitest"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { newDb } from "pg-mem"
-import { createEnrollment, listEnrollments, listGroups, type Queryable } from "./repository"
+import {
+  createEnrollment,
+  listEnrollments,
+  listGroups,
+  updateEnrollment,
+  deleteEnrollment,
+  getEnrollmentById,
+  type Queryable,
+} from "./repository"
 import { createCourse } from "@/lib/courses/repository"
 import { createUser } from "@/lib/users/repository"
 
@@ -188,5 +196,85 @@ describe("listGroups", () => {
     await mk(other.id, "9") // different course — excluded
 
     expect(await listGroups(db, course.id)).toEqual(["1", "2"])
+  })
+})
+
+describe("updateEnrollment", () => {
+  let db: Queryable
+
+  beforeEach(() => {
+    db = freshDb()
+  })
+
+  it("updates group, program, and year", async () => {
+    const course = await seedCourse(db)
+    const s = await seedStudent(db)
+    const e = await enroll(db, course.id, s.id, { studyGroup: "1", program: "เดิม", year: "2565" })
+
+    const updated = await updateEnrollment(db, e.id, {
+      studyGroup: "2",
+      program: "ใหม่",
+      year: "2566",
+    })
+
+    expect(updated).not.toBeNull()
+    expect(updated?.studyGroup).toBe("2")
+    expect(updated?.program).toBe("ใหม่")
+    expect(updated?.year).toBe("2566")
+  })
+
+  it("returns null for an unknown enrollment", async () => {
+    expect(await updateEnrollment(db, 9999, { studyGroup: "1" })).toBeNull()
+  })
+})
+
+describe("deleteEnrollment", () => {
+  let db: Queryable
+
+  beforeEach(() => {
+    db = freshDb()
+  })
+
+  it("removes only the targeted enrollment", async () => {
+    const course = await seedCourse(db)
+    const s1 = await seedStudent(db)
+    const s2 = await seedStudent(db)
+    const e1 = await enroll(db, course.id, s1.id)
+    await enroll(db, course.id, s2.id)
+
+    expect(await deleteEnrollment(db, e1.id)).toBe(true)
+
+    const { enrollments, total } = await listEnrollments(db, {
+      courseId: course.id,
+      search: "",
+      group: "",
+      page: 1,
+      pageSize: 10,
+    })
+    expect(total).toBe(1)
+    expect(enrollments.map((e) => e.userId)).toEqual([s2.id])
+  })
+
+  it("returns false for an unknown enrollment", async () => {
+    expect(await deleteEnrollment(db, 9999)).toBe(false)
+  })
+})
+
+describe("getEnrollmentById", () => {
+  let db: Queryable
+
+  beforeEach(() => {
+    db = freshDb()
+  })
+
+  it("reads an enrollment back with its course and user", async () => {
+    const course = await seedCourse(db)
+    const s = await seedStudent(db)
+    const e = await enroll(db, course.id, s.id, { studyGroup: "1" })
+
+    const found = await getEnrollmentById(db, e.id)
+    expect(found?.courseId).toBe(course.id)
+    expect(found?.userId).toBe(s.id)
+    expect(await getEnrollmentById(db, 9999)).toBeNull()
   })
 })

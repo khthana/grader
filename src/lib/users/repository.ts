@@ -230,6 +230,38 @@ export async function updateUser(
   return getUserById(db, id)
 }
 
+export interface UpdateUserName {
+  name: string
+  titleTh?: string | null
+  firstNameTh?: string | null
+  lastNameTh?: string | null
+}
+
+// Focused update of a user's display name + Thai prefix/first/last only.
+// Leaves email and id_code (identity) untouched — used by roster editing where
+// รหัสนักศึกษา is read-only.
+export async function updateUserName(
+  db: Queryable,
+  id: number,
+  input: UpdateUserName
+): Promise<boolean> {
+  const { rows } = await db.query<{ id: number }>(
+    `UPDATE users SET
+       name = $2, title_th = $3, first_name_th = $4, last_name_th = $5,
+       updated_at = now()
+     WHERE id = $1
+     RETURNING id`,
+    [
+      id,
+      input.name,
+      input.titleTh ?? null,
+      input.firstNameTh ?? null,
+      input.lastNameTh ?? null,
+    ]
+  )
+  return rows.length > 0
+}
+
 export async function deleteUser(db: Queryable, id: number): Promise<boolean> {
   const { rows } = await db.query<{ id: number }>(
     `DELETE FROM users WHERE id = $1 RETURNING id`,
