@@ -1,6 +1,6 @@
 # CE-Grader
 
-ระบบตรวจและให้คะแนน Python code ของนักศึกษาอัตโนมัติ (Computer Engineering Python Grader) — นักศึกษาส่ง Python code เข้ามา ระบบรันกับ test cases ผ่าน Piston แล้วให้คะแนนพร้อม feedback. มาพร้อมระบบ login, role-based shell และหน้า **จัดการผู้ใช้ (User Management)** สำหรับผู้ดูแลระบบ.
+ระบบตรวจและให้คะแนน Python code ของนักศึกษาอัตโนมัติ (Computer Engineering Python Grader) — นักศึกษาส่ง Python code เข้ามา ระบบรันกับ test cases ผ่าน Piston แล้วให้คะแนนพร้อม feedback. มาพร้อมระบบ login, role-based shell, หน้า **จัดการผู้ใช้ (User Management)** สำหรับผู้ดูแลระบบ, และหน้า **จัดการรายวิชา + รายชื่อนักศึกษา** (course management & student roster — CRUD, นำเข้า/ส่งออก Excel, มอบหมายผู้สอน) สำหรับ Admin/Instructor/TA.
 
 Faculty of Engineering, KMITL. Standalone product (the sibling `DEEP-QA-*` repos are read-only design references only).
 
@@ -103,11 +103,15 @@ npm test
 ```
 
 ## Project layout
-- `src/app/(app)/` — authenticated pages wrapped by the role-based shell
-- `src/app/api/` — route handlers (auth, users, logs, grade)
-- `src/lib/` — domain logic (auth, db, repository, roles, validation, import, logs)
-- `src/components/` — shell + User Management + editor UI
+- `src/app/(app)/` — authenticated pages wrapped by the role-based shell (`/users`, `/logs`, `/courses`, `/students`, `/problems`, …)
+- `src/app/api/` — route handlers (auth, users, logs, grade, `courses`, `courses/[id]/students`)
+- `src/lib/` — domain logic (auth, db, roles, logs) + `users/`, `courses/`, `enrollments/` (repository · validation · access · enroll/import/export)
+- `src/components/` — shell + `users/` + `courses/` + `students/` + editor UI
 - `src/proxy.ts` — route protection (Next 16 proxy, Node runtime)
-- `schema.sql` — database schema
+- `schema.sql` — database schema · `CONTEXT.md` — domain glossary · `docs/adr/` — architecture decisions
 
-For architecture details and conventions, see [CLAUDE.md](CLAUDE.md).
+For architecture details and conventions, see [CLAUDE.md](CLAUDE.md). The course-roster feature spec is `requirement/prd_teacher_students_roster.md`.
+
+> **Schema changes are manual:** after editing `schema.sql`, re-apply it to your dev DB with
+> `set -a; . ./.env.local; set +a; npm run db:setup` (idempotent). The test suite uses a fresh
+> in-memory schema, so it won't warn you about an un-migrated dev DB.

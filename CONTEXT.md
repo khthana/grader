@@ -31,6 +31,14 @@ Adding a student to a course's รายชื่อนักศึกษา cre
 creating the User first). A User's identity (sid/`id_code`, prefix, first/last name)
 stays on the User; everything shown in the roster *besides* the name lives here.
 
+### Course staff (ผู้สอน / ผู้ช่วยสอน)
+The Users assigned to manage a Course — stored in `course_instructors`. Whether an
+assigned staff member acts as an **Instructor** (full roster CRUD + course
+management) or a **TA** (read-only roster) is read from their global **Role**; there
+is no per-course capacity column (v1). Being assigned is what grants entitlement to a
+Course (drives the switcher and every roster/course route). Admin is entitled to all
+Courses without assignment.
+
 ### Roster (รายชื่อนักศึกษา)
 The set of Students enrolled in a given Course — i.e. that Course's Enrollments. The
 `/students` page shows the roster of the currently-selected Course.

@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CE-Grader is a **standalone product**. The `DEEP-QA-FRONTEND/` and `DEEP-QA-BACKEND/` repos (siblings of this folder) are **read-only references only** — used for design-system look/feel and UX patterns, never extended or imported at runtime.
 
-The app now has a working authenticated experience: Postgres-backed login (email/password + Google OAuth), a role-based shell, and a functional Admin **User Management** module. Teaching/student feature pages (รายชื่อนักศึกษา · ตรวจงาน · สมุดคะแนน · งานที่ได้มอบหมาย) are styled **"coming soon" stubs**; โจทย์ปัญหา links to the existing Python editor. The original spec for this work is `requirement/prd_auth_shell_user_management.md` (delivered).
+The app now has a working authenticated experience: Postgres-backed login (email/password + Google OAuth), a role-based shell, a functional Admin **User Management** module, and a **course-scoped student roster + course management** feature. Delivered teaching pages: **รายวิชา** (`/courses` — course CRUD + staff assignment, Admin/Instructor) and **รายชื่อนักศึกษา** (`/students` — the roster of the selected course: view/add/edit/un-enroll + Excel import/export). Still **"coming soon" stubs**: ตรวจงาน · สมุดคะแนน · งานที่ได้มอบหมาย; โจทย์ปัญหา links to the existing Python editor. Specs (both delivered): `requirement/prd_auth_shell_user_management.md`, `requirement/prd_teacher_students_roster.md`. The course-roster design rationale lives in `CONTEXT.md` (glossary) and `docs/adr/0001-course-scoped-roster.md`.
 
 ## Commands
 - `npm run dev` — start dev server (Turbopack)
@@ -21,7 +21,8 @@ The app now has a working authenticated experience: Postgres-backed login (email
 
 ### Routing & the authed shell
 - **Next.js 16 (App Router) · TypeScript · Tailwind v4.** All routes live under `src/app/`.
-- Authenticated pages live in the **`src/app/(app)/` route group**, whose `layout.tsx` renders the shell (navbar + collapsible sidebar + breadcrumb + toast host) around every page. Routes: `/dashboard` (role landing resolver), `/users`, `/logs`, `/students`, `/problems` (+ `/problems/[id]`), `/review`, `/gradebook`, `/assignments`.
+- Authenticated pages live in the **`src/app/(app)/` route group**, whose `layout.tsx` renders the shell (navbar + collapsible sidebar + breadcrumb + toast host) around every page. Routes: `/dashboard` (role landing resolver), `/users`, `/logs`, `/courses`, `/students`, `/problems` (+ `/problems/[id]`), `/review`, `/gradebook`, `/assignments`.
+- The navbar also hosts a **course switcher** (the active course persists in an `active_course` cookie, mirroring `active_role`). `src/lib/courses/server.ts#getCourseContext()` resolves `{ courses, activeCourse }` for the shell + course-scoped pages.
 - **Route protection is `src/proxy.ts`** — Next 16 renamed `middleware` to **`proxy`**, which runs on the **Node.js runtime** (so `node:crypto` session verification works). It redirects unauthenticated users to `/login` and authenticated users away from `/login`. The `config.matcher` lists every protected path; add new authed routes there.
 - `/login` and the auth API routes are outside the `(app)` group.
 
@@ -37,10 +38,20 @@ The app now has a working authenticated experience: Postgres-backed login (email
 - `src/lib/breadcrumbs.ts` (pure, unit-tested) derives Thai-labelled crumbs from the pathname.
 
 ### Data layer (Postgres, raw `pg` + SQL)
-- `schema.sql` defines `users`, `roles`, `user_roles`, `user_logs`. `npm run db:setup` (`scripts/setup-db.ts`) applies it and seeds an Admin.
+- `schema.sql` defines `users`, `roles`, `user_roles`, `user_logs`, plus the course domain: `courses` (`code` unique, `name_th`, `name_en`, default `program`), `course_instructors` (course↔user staff link), `enrollments` (`course_id`, `user_id`, **`study_group`** — `group` is a SQL reserved word, `program`, `year`, unique `(course_id, user_id)`). FK `ON DELETE CASCADE` means deleting a course drops its enrollments + staff links. `npm run db:setup` applies the schema **and** seeds an Admin + one course assigned to that Admin. **After any `schema.sql` change, re-run `db:setup` against the dev DB** — pg-mem rebuilds schema per test so tests won't catch a missing migration (see Conventions).
 - `src/lib/db.ts` — lazy singleton `pg` Pool from `DATABASE_URL` via `getDb()`. **Test seam:** `setTestDb(pool)` injects a pg-mem pool in tests; `setTestDb(null)` resets.
 - `src/lib/users/repository.ts` — all user SQL, taking an injectable `Queryable`: `createUser`, `findUserByEmail`, `getUserById`, `getUserWithRoles`, `listUsers` (search + pagination), `updateUser`, `deleteUser`, `setUserActive`, `assignRole`, `setUserRoles`, `countUsersWithRole`.
 - The single `users` table stores a display `name` plus structured Thai/English title/first/last, phone, nullable `id_code`, bcrypt hash, `is_active`. A student is a user with the Student role.
+- `src/lib/courses/repository.ts` — course/staff SQL: `createCourse`, `getCourseById`, `findCourseByCode`, `listCourses`, `updateCourse`, `deleteCourse`, `listCoursesForUser(userId, roles)` (entitlement — Admin all, else assigned), `assignInstructor`, `setCourseInstructors` (replace-set), `listCourseInstructors`, `searchStaffCandidates` (Instructor/TA users for the picker).
+- `src/lib/enrollments/repository.ts` — roster SQL: `createEnrollment`, `findEnrollment`/`getEnrollmentById`, `listEnrollments` (course-scoped search + group filter + pagination), `listAllEnrollments` (export, unpaginated), `listGroups`, `updateEnrollment`, `deleteEnrollment`. Shared `buildRosterFilter` + `toListItem` back the list/export queries.
+
+### Course roster & management (ADR 0001)
+- **Domain (see `CONTEXT.md`):** a **roster student is a User** with the Student role linked to a **Course** via an **Enrollment**; course-local fields (group/program/year) live on the enrollment, identity (sid/`id_code`, prefix, name) on the user.
+- **Access helpers** (`src/lib/courses/access.ts`, pure): `resolveActiveCourse`, `canMutateRoster(roles)` (Admin/Instructor mutate; TA view-only), `canManageCourses(roles)` (Admin/Instructor). **Route gating: `authorizeCourse(req, courseIdParam, { mutate?, manage? })`** (`src/lib/courses/authorize.ts`) — 401 / 404 / 403-not-entitled / 403-read-only(mutate) / 403-non-manager(manage). Every `/api/courses*` route uses it.
+- **Courses** (`/courses`, page server-guarded by `canManageCourses`): `GET/POST /api/courses`; `GET/PUT/DELETE /api/courses/[id]`; `GET/PUT /api/courses/[id]/instructors` (+ `/candidates`). Create auto-assigns the creator. Logs `course.create|update|delete|staff`.
+- **Roster** (`/students`): `GET/POST /api/courses/[id]/students`; `PUT/DELETE …/[enrollmentId]`; `POST …/import`; `GET …/export`. **Enroll service** `src/lib/enrollments/enroll.ts#enrollStudent` (shared by single-add + import): find-or-create user by `id_code`, ensure Student role (never overwrites name), derive `{sid}@kmitl.ac.th` when email blank, inherit course default program; returns a discriminated `{ ok, created } | { ok:false, reason:"duplicate" }`. Delete = **un-enroll** (enrollment only). Logs `enrollment.add|update|remove|import`.
+- **Pure modules:** `enrollments/validation.ts` (`validateEnrollInput`), `enrollments/import.ts` (`validateRosterRows` — within-sheet dup `id_code`), `enrollments/export.ts` (`rosterToSheet` AoA for xlsx), `courses/validation.ts` (`validateCourseInput`).
+- **UI:** `src/components/courses/` (`CoursesTable`, `CourseFormDialog`, `CourseStaffDialog`) and `src/components/students/` (`RosterTable`, `StudentFormDialog`, `RosterImportDialog`) — styled like `UsersTable`, mutate controls gated by a `canMutate` prop so TA sees a read-only roster.
 
 ### User Management (Admin only — every `/api/users*` route is Admin-gated via `requireAdmin`)
 - `GET /api/users` — search + pagination → `{ users, total, page, pageSize }`.
@@ -53,7 +64,7 @@ The app now has a working authenticated experience: Postgres-backed login (email
 - UI: `src/components/users/` — `UsersTable` (search/pagination/row actions), `UserFormDialog` (create/edit), `RolesDialog`, `ImportDialog` (client-side **xlsx** parse + template download). Shell + shared UI in `src/components/shell/`.
 
 ### Activity logging
-- `src/lib/logs.ts` — `writeLog` / `safeLog` (best-effort, never breaks the operation) / `listLogs` (action filter, newest-first, pagination). Actions: `user.create | user.update | user.delete | user.roles | login`, with actor/target id + **email snapshots** (survive deletion).
+- `src/lib/logs.ts` — `writeLog` / `safeLog` (best-effort, never breaks the operation) / `listLogs` (action filter, newest-first, pagination). The `LogAction` union: `user.create | user.update | user.delete | user.roles | login | enrollment.add | enrollment.update | enrollment.remove | enrollment.import | course.create | course.update | course.delete | course.staff`, with actor/target id + **email snapshots** (survive deletion).
 - Wired into the create/update/delete/role-change endpoints and the login route. Admin views them at `/logs` via `GET /api/logs`.
 
 ### Data Flow (Grading)
@@ -70,7 +81,9 @@ Problem data is still duplicated — add to **both**:
 ## Testing
 - **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`.
 - Pure modules are unit-tested directly (session, password, roles, breadcrumbs, validation, import, name).
-- Repository + route handlers are integration-tested against **pg-mem** (in-memory Postgres, no Docker): build a pool with `newDb()` + `mem.public.none(schema.sql)` + `mem.adapters.createPg()`, inject via `setTestDb`, seed through the repository. Route handlers are imported and called with a `NextRequest`; auth is exercised with real `createSessionToken` cookies. pg-mem is stricter than Postgres (needs explicit casts, e.g. `$1::int`).
+- Repository + route handlers are integration-tested against **pg-mem** (in-memory Postgres, no Docker): build a pool with `newDb()` + `mem.public.none(schema.sql)` + `mem.adapters.createPg()`, inject via `setTestDb`, seed through the repository. Route handlers are imported and called with a `NextRequest`; auth is exercised with real `createSessionToken` cookies.
+- **pg-mem gotchas** (it's stricter / less complete than Postgres): needs explicit casts (e.g. `$1::int`); **`STRING_AGG` is unsupported** — group roles/joins in a second query + JS (see `searchStaffCandidates`, `rolesByUserId`). The schema-file `readFileSync(new URL("…/schema.sql", import.meta.url))` path must climb the right number of `../` for the test's directory depth — a wrong count throws `ENOENT … src/schema.sql` and reports "no tests".
+- Because pg-mem applies a fresh `schema.sql` per run, tests pass even when the **dev DB is missing a migration** — after editing `schema.sql`, run `db:setup` against the dev DB (see Conventions) or you'll hit `relation "…" does not exist` only at runtime.
 
 ## Environment Variables
 Required in `.env.local`:
@@ -97,4 +110,5 @@ docker run -d --name grader-db --restart unless-stopped \
 - `@/*` resolves to `src/*` (tsconfig). All routes under `src/app/`.
 - Tailwind CSS v4 with `@import "tailwindcss"` in `globals.css`; brand tokens (`primary` `#0F2A60`, `primary-hover`, `secondary` `#003296`, `secondary-hover`, `font-thai`) via `@theme` there.
 - **Icons: `react-icons` (installed).** `framer-motion` and MUI are intentionally **not** used (per PRD) — animations are CSS (`.content-enter` keyframe in `globals.css`); dialogs/toasts are small custom components.
-- Route protection lives in `src/proxy.ts` (Next 16 proxy, Node runtime) — **not** `middleware.ts`.
+- Route protection lives in `src/proxy.ts` (Next 16 proxy, Node runtime) — **not** `middleware.ts`. Add new authed **page** routes to `config.matcher`; API routes self-guard and aren't matched.
+- **Schema migrations are manual:** `schema.sql` uses `CREATE TABLE IF NOT EXISTS`, and `db:setup` is idempotent — but it doesn't auto-load `.env.local`. On Windows/Git-Bash run it as: `set -a; . ./.env.local; set +a; npm run db:setup`.
