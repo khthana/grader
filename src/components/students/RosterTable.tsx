@@ -11,10 +11,12 @@ import {
   FaPen,
   FaTrash,
 } from "react-icons/fa"
+import * as XLSX from "xlsx"
 import { useToast } from "@/components/shell/ToastProvider"
 import { StudentFormDialog } from "./StudentFormDialog"
 import { RosterImportDialog } from "./RosterImportDialog"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
+import { rosterToSheet } from "@/lib/enrollments/export"
 
 interface RosterRow {
   id: number
@@ -37,7 +39,15 @@ interface ListResponse {
 
 const PAGE_SIZE = 10
 
-export function RosterTable({ courseId, canMutate }: { courseId: number; canMutate: boolean }) {
+export function RosterTable({
+  courseId,
+  courseCode,
+  canMutate,
+}: {
+  courseId: number
+  courseCode: string
+  canMutate: boolean
+}) {
   const { notify } = useToast()
   const [search, setSearch] = useState("")
   const [debounced, setDebounced] = useState("")
@@ -57,7 +67,26 @@ export function RosterTable({ courseId, canMutate }: { courseId: number; canMuta
   const [editTarget, setEditTarget] = useState<RosterRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<RosterRow | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const reload = () => setRefreshKey((k) => k + 1)
+
+  async function exportRoster() {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams({ search: debounced, group })
+      const res = await fetch(`/api/courses/${courseId}/students/export?${params}`)
+      if (!res.ok) throw new Error()
+      const body = await res.json()
+      const ws = XLSX.utils.aoa_to_sheet(rosterToSheet(body.enrollments))
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "roster")
+      XLSX.writeFile(wb, `roster-${courseCode}.xlsx`)
+    } catch {
+      notify("error", "ส่งออกไม่สำเร็จ")
+    } finally {
+      setExporting(false)
+    }
+  }
 
   async function confirmDelete() {
     if (!deleteTarget) return
@@ -151,11 +180,11 @@ export function RosterTable({ courseId, canMutate }: { courseId: number; canMuta
           {canMutate && (
             <>
               <button
-                disabled
-                title="กำลังพัฒนา"
-                className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-400 opacity-60"
+                onClick={exportRoster}
+                disabled={exporting || data.total === 0}
+                className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
               >
-                <FaDownload className="h-3 w-3" /> ส่งออก
+                <FaDownload className="h-3 w-3" /> {exporting ? "กำลังส่งออก..." : "ส่งออก"}
               </button>
               <button
                 onClick={() => setImportOpen(true)}

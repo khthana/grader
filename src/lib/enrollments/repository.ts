@@ -153,12 +153,21 @@ interface EnrollmentListRow {
   year: string | null
 }
 
-export async function listEnrollments(
-  db: Queryable,
-  { courseId, search, group, page, pageSize }: ListEnrollmentsParams
-): Promise<EnrollmentListPage> {
-  // Build the dynamic predicate: course scope is always present; search and
-  // group are optional. Params are positional so the JOIN/count stay in sync.
+const LIST_COLUMNS = `e.id, e.user_id, u.id_code AS sid, u.title_th AS prefix, u.name,
+            e.program, e.study_group, e.year`
+
+export interface RosterFilter {
+  courseId: number
+  search: string
+  group: string
+}
+
+// Dynamic roster predicate: course scope is always present; search and group
+// are optional. Returns positional params so the count/select stay in sync.
+function buildRosterFilter({ courseId, search, group }: RosterFilter): {
+  where: string
+  params: unknown[]
+} {
   const conditions = ["e.course_id = $1::int"]
   const params: unknown[] = [courseId]
 
@@ -170,7 +179,27 @@ export async function listEnrollments(
     params.push(group.trim())
     conditions.push(`e.study_group = $${params.length}`)
   }
-  const where = `WHERE ${conditions.join(" AND ")}`
+  return { where: `WHERE ${conditions.join(" AND ")}`, params }
+}
+
+function toListItem(r: EnrollmentListRow): EnrollmentListItem {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    sid: r.sid,
+    prefix: r.prefix,
+    name: r.name,
+    program: r.program,
+    studyGroup: r.study_group,
+    year: r.year,
+  }
+}
+
+export async function listEnrollments(
+  db: Queryable,
+  { courseId, search, group, page, pageSize }: ListEnrollmentsParams
+): Promise<EnrollmentListPage> {
+  const { where, params } = buildRosterFilter({ courseId, search, group })
 
   const { rows: countRows } = await db.query<{ count: number }>(
     `SELECT COUNT(*)::int AS count
@@ -182,8 +211,7 @@ export async function listEnrollments(
   const limitIdx = params.length + 1
   const offsetIdx = params.length + 2
   const { rows } = await db.query<EnrollmentListRow>(
-    `SELECT e.id, e.user_id, u.id_code AS sid, u.title_th AS prefix, u.name,
-            e.program, e.study_group, e.year
+    `SELECT ${LIST_COLUMNS}
      FROM enrollments e
      JOIN users u ON u.id = e.user_id
      ${where}
@@ -192,18 +220,24 @@ export async function listEnrollments(
     [...params, pageSize, (page - 1) * pageSize]
   )
 
-  const enrollments: EnrollmentListItem[] = rows.map((r) => ({
-    id: r.id,
-    userId: r.user_id,
-    sid: r.sid,
-    prefix: r.prefix,
-    name: r.name,
-    program: r.program,
-    studyGroup: r.study_group,
-    year: r.year,
-  }))
+  return { enrollments: rows.map(toListItem), total }
+}
 
-  return { enrollments, total }
+// All matching rows, no pagination — for roster export.
+export async function listAllEnrollments(
+  db: Queryable,
+  filter: RosterFilter
+): Promise<EnrollmentListItem[]> {
+  const { where, params } = buildRosterFilter(filter)
+  const { rows } = await db.query<EnrollmentListRow>(
+    `SELECT ${LIST_COLUMNS}
+     FROM enrollments e
+     JOIN users u ON u.id = e.user_id
+     ${where}
+     ORDER BY e.id`,
+    params
+  )
+  return rows.map(toListItem)
 }
 
 // Distinct, sorted group values present in a course (nulls excluded) — drives

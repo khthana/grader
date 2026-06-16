@@ -33,7 +33,7 @@ export default async function StudentsPage() {
         {activeCourse.code} · {activeCourse.nameTh}
       </p>
 
-      <RosterTable courseId={activeCourse.id} canMutate={canMutate} />
+      <RosterTable courseId={activeCourse.id} courseCode={activeCourse.code} canMutate={canMutate} />
     </div>
   )
 }

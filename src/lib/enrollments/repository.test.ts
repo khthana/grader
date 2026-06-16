@@ -6,6 +6,7 @@ import {
   createEnrollment,
   listEnrollments,
   listGroups,
+  listAllEnrollments,
   updateEnrollment,
   deleteEnrollment,
   getEnrollmentById,
@@ -196,6 +197,41 @@ describe("listGroups", () => {
     await mk(other.id, "9") // different course — excluded
 
     expect(await listGroups(db, course.id)).toEqual(["1", "2"])
+  })
+})
+
+describe("listAllEnrollments", () => {
+  let db: Queryable
+
+  beforeEach(() => {
+    db = freshDb()
+  })
+
+  it("returns every matching row with no pagination, respecting search and group", async () => {
+    const course = await seedCourse(db)
+    for (let i = 0; i < 15; i++) {
+      const s = await seedStudent(db)
+      await enroll(db, course.id, s.id, { studyGroup: i % 2 === 0 ? "1" : "2" })
+    }
+
+    const all = await listAllEnrollments(db, { courseId: course.id, search: "", group: "" })
+    expect(all).toHaveLength(15)
+
+    const g1 = await listAllEnrollments(db, { courseId: course.id, search: "", group: "1" })
+    expect(g1).toHaveLength(8)
+    expect(g1.every((e) => e.studyGroup === "1")).toBe(true)
+  })
+
+  it("only returns the requested course's rows", async () => {
+    const a = await seedCourse(db, "AAA")
+    const b = await seedCourse(db, "BBB")
+    const sa = await seedStudent(db)
+    const sb = await seedStudent(db)
+    await enroll(db, a.id, sa.id)
+    await enroll(db, b.id, sb.id)
+
+    const all = await listAllEnrollments(db, { courseId: a.id, search: "", group: "" })
+    expect(all.map((e) => e.userId)).toEqual([sa.id])
   })
 })
 
