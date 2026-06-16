@@ -13,6 +13,7 @@ import {
 } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
 import { StudentFormDialog } from "./StudentFormDialog"
+import { RosterImportDialog } from "./RosterImportDialog"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
 
 interface RosterRow {
@@ -52,6 +53,7 @@ export function RosterTable({ courseId, canMutate }: { courseId: number; canMuta
   const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
   const [addOpen, setAddOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<RosterRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<RosterRow | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -156,11 +158,10 @@ export function RosterTable({ courseId, canMutate }: { courseId: number; canMuta
                 <FaDownload className="h-3 w-3" /> ส่งออก
               </button>
               <button
-                disabled
-                title="กำลังพัฒนา"
-                className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-400 opacity-60"
+                onClick={() => setImportOpen(true)}
+                className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
               >
-                <FaFileExcel className="h-3.5 w-3.5" /> นำเข้า Excel
+                <FaFileExcel className="h-3.5 w-3.5 text-green-600" /> นำเข้า Excel
               </button>
               <button
                 onClick={() => setAddOpen(true)}
@@ -272,6 +273,14 @@ export function RosterTable({ courseId, canMutate }: { courseId: number; canMuta
           courseId={courseId}
           onClose={() => setAddOpen(false)}
           onSaved={reload}
+        />
+      )}
+
+      {importOpen && (
+        <RosterImportDialog
+          courseId={courseId}
+          onClose={() => setImportOpen(false)}
+          onImported={reload}
         />
       )}
 

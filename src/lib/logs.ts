@@ -9,6 +9,7 @@ export type LogAction =
   | "enrollment.add"
   | "enrollment.update"
   | "enrollment.remove"
+  | "enrollment.import"
 
 export interface LogInput {
   actorId?: number | null
