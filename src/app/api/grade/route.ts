@@ -1,21 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { runTestCases } from "@/lib/piston"
-import { SubmissionRequest, GradeResult } from "@/types"
+import type { SubmissionRequest, GradeResult, TestCase } from "@/types"
 import { getUserFromRequest } from "@/lib/auth-guard"
-
-// ข้อมูลโจทย์ตัวอย่าง — ย้ายไป database ทีหลังได้
-const problems = {
-  "hello-world": {
-    testCases: [
-      {
-        id: "1",
-        input: "",
-        expectedOutput: "Hello, World!",
-        isHidden: false,
-      },
-    ],
-  },
-}
+import { getDb } from "@/lib/db"
+import { getProblemById } from "@/lib/problems/repository"
 
 export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request)
@@ -23,52 +11,53 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
   }
 
-  try {
-    const body: SubmissionRequest = await request.json()
-    const { problemId, code } = body
+  const body = (await request.json().catch(() => ({}))) as Partial<SubmissionRequest>
+  const { problemId, code, mode } = body
 
-    // ตรวจสอบ input
-    if (!problemId || !code) {
-      return NextResponse.json(
-        { error: "problemId and code are required" },
-        { status: 400 }
-      )
-    }
-
-    // หา problem
-    const problem = problems[problemId as keyof typeof problems]
-    if (!problem) {
-      return NextResponse.json(
-        { error: "Problem not found" },
-        { status: 404 }
-      )
-    }
-
-    // ส่งไป Piston แล้วรับผล
-    const results = await runTestCases(code, problem.testCases)
-
-    // คำนวณคะแนน
-    const passedTests = results.filter((r) => r.passed).length
-    const totalTests = results.length
-    const score = Math.round((passedTests / totalTests) * 100)
-
-    const gradeResult: GradeResult = {
-      score,
-      totalTests,
-      passedTests,
-      results,
-      feedback:
-        score === 100
-          ? "ผ่านทุก test case!"
-          : `ผ่าน ${passedTests}/${totalTests} test cases`,
-    }
-
-    return NextResponse.json(gradeResult)
-
-  } catch {
+  if (!problemId || !code) {
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: "problemId and code are required" },
+      { status: 400 }
     )
   }
+
+  const problem = await getProblemById(getDb(), Number(problemId))
+  if (!problem) {
+    return NextResponse.json({ error: "Problem not found" }, { status: 404 })
+  }
+
+  // "run" = visible test cases only; "submit" = all (default to submit if not specified)
+  const runMode = mode === "run" ? "run" : "submit"
+  const testCases: TestCase[] = (
+    runMode === "run"
+      ? problem.testCases.filter((tc) => !tc.isHidden)
+      : problem.testCases
+  ).map((tc) => ({
+    id: tc.id,
+    input: tc.input,
+    expectedOutput: tc.expectedOutput,
+    isHidden: tc.isHidden,
+    score: tc.score,
+  }))
+
+  const results = await runTestCases(code, testCases)
+
+  const pointsEarned = results.reduce((sum, r) => sum + (r.passed ? r.score : 0), 0)
+  const pointsMax = testCases.reduce((sum, tc) => sum + tc.score, 0)
+  const passedTests = results.filter((r) => r.passed).length
+  const totalTests = results.length
+
+  const gradeResult: GradeResult = {
+    pointsEarned,
+    pointsMax,
+    totalTests,
+    passedTests,
+    results,
+    feedback:
+      pointsEarned === pointsMax
+        ? "ผ่านทุก test case!"
+        : `ได้ ${pointsEarned}/${pointsMax} คะแนน`,
+  }
+
+  return NextResponse.json(gradeResult)
 }

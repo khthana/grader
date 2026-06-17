@@ -1,41 +1,46 @@
+import { notFound } from "next/navigation"
 import Link from "next/link"
-import { FaArrowLeft } from "react-icons/fa"
+import { FaArrowLeft, FaClock } from "react-icons/fa"
 import { CodeEditor } from "@/components/editor/CodeEditor"
-import { PageTitle } from "@/components/shell/ComingSoon"
-
-// ข้อมูลโจทย์ตัวอย่าง — ย้ายไป database ทีหลังได้
-const problems = {
-  "hello-world": {
-    id: "hello-world",
-    title: "Hello, World!",
-    description: `จงเขียนโปรแกรม Python ที่แสดงผลข้อความ Hello, World! ออกทางหน้าจอ`,
-    examples: [{ input: "ไม่มี input", output: "Hello, World!" }],
-  },
-}
+import { getDb } from "@/lib/db"
+import { getProblemById } from "@/lib/problems/repository"
+import { getCourseContext } from "@/lib/courses/server"
 
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
+function formatDate(iso: string | null) {
+  if (!iso) return null
+  return new Date(iso).toLocaleString("th-TH", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 export default async function ProblemPage({ params }: PageProps) {
   const { id } = await params
-  const problem = problems[id as keyof typeof problems]
+  const problemId = Number.parseInt(id, 10)
+  if (!Number.isFinite(problemId)) notFound()
 
-  if (!problem) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-20 font-thai">
-        <p className="text-slate-400">ไม่พบโจทย์นี้</p>
-        <Link href="/problems" className="text-sm text-secondary hover:underline">
-          กลับไปหน้าโจทย์ปัญหา
-        </Link>
-      </div>
-    )
+  const { activeCourse } = await getCourseContext()
+  const problem = await getProblemById(getDb(), problemId)
+
+  if (!problem || (activeCourse && problem.courseId !== activeCourse.id)) {
+    notFound()
   }
+
+  const visibleCases = problem.testCases.filter((tc) => !tc.isHidden)
+  const dueDate = formatDate(problem.dueAt)
 
   return (
     <div className="flex flex-col gap-6 font-thai">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <PageTitle icon="problems">{problem.title}</PageTitle>
+        <h1 className="text-2xl font-semibold text-primary">{problem.title}</h1>
         <Link
           href="/problems"
           className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-secondary"
@@ -44,18 +49,57 @@ export default async function ProblemPage({ params }: PageProps) {
         </Link>
       </div>
 
+      {/* Due date */}
+      {dueDate && (
+        <div className="flex items-center gap-2 text-sm text-slate-500">
+          <FaClock className="h-3.5 w-3.5" />
+          กำหนดส่ง: {dueDate}
+        </div>
+      )}
+
       {/* Problem description */}
       <div className="rounded-xl border border-gray-200 bg-white p-6">
-        <p className="leading-relaxed text-slate-700">{problem.description}</p>
-        <div className="mt-4 flex flex-col gap-2">
-          <h2 className="text-sm font-semibold text-slate-500">ตัวอย่าง</h2>
-          {problem.examples.map((ex, i) => (
-            <div key={i} className="rounded-lg bg-slate-50 p-4 font-mono text-sm text-slate-600">
-              <p>Input: {ex.input}</p>
-              <p>Output: {ex.output}</p>
+        {problem.description && (
+          <p className="leading-relaxed text-slate-700 whitespace-pre-wrap">
+            {problem.description}
+          </p>
+        )}
+
+        {(problem.inputSpec || problem.outputSpec) && (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {problem.inputSpec && (
+              <div>
+                <h2 className="mb-1 text-sm font-semibold text-slate-500">รูปแบบ Input</h2>
+                <pre className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 whitespace-pre-wrap">
+                  {problem.inputSpec}
+                </pre>
+              </div>
+            )}
+            {problem.outputSpec && (
+              <div>
+                <h2 className="mb-1 text-sm font-semibold text-slate-500">รูปแบบ Output</h2>
+                <pre className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 whitespace-pre-wrap">
+                  {problem.outputSpec}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
+
+        {visibleCases.length > 0 && (
+          <div className="mt-4">
+            <h2 className="mb-2 text-sm font-semibold text-slate-500">ตัวอย่าง</h2>
+            <div className="flex flex-col gap-2">
+              {visibleCases.map((tc, i) => (
+                <div key={tc.id} className="rounded-lg bg-slate-50 p-4 font-mono text-sm text-slate-600">
+                  <p className="mb-1 text-xs font-semibold text-slate-400">ตัวอย่าง {i + 1}</p>
+                  <p>Input: {tc.input || "(ไม่มี)"}</p>
+                  <p>Output: {tc.expectedOutput}</p>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Code editor */}

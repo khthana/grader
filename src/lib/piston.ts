@@ -11,7 +11,6 @@ interface PistonResponse {
   }
 }
 
-// รัน Python code 1 ครั้งกับ input หนึ่งชุด
 async function runCode(code: string, input: string): Promise<PistonResponse> {
   const res = await fetch(`${PISTON_API}/execute`, {
     method: "POST",
@@ -31,7 +30,6 @@ async function runCode(code: string, input: string): Promise<PistonResponse> {
   return res.json()
 }
 
-// ตรวจ code กับทุก test case แล้วคืน TestResult[]
 export async function runTestCases(
   code: string,
   testCases: TestCase[]
@@ -46,16 +44,17 @@ export async function runTestCases(
 
         return {
           testCaseId: tc.id,
+          score: tc.score,
           passed,
           actualOutput,
           expectedOutput,
           executionTime: 0,
           error: response.run.stderr || undefined,
         } satisfies TestResult
-
       } catch (error) {
         return {
           testCaseId: tc.id,
+          score: tc.score,
           passed: false,
           actualOutput: "",
           expectedOutput: tc.expectedOutput,

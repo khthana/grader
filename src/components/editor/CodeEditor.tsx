@@ -4,19 +4,20 @@ import { useState } from "react"
 import { GradeResult } from "@/types"
 
 interface CodeEditorProps {
-  problemId: string
+  problemId: number
 }
 
 export function CodeEditor({ problemId }: CodeEditorProps) {
   const [code, setCode] = useState("")
   const [result, setResult] = useState<GradeResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [activeMode, setActiveMode] = useState<"run" | "submit" | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  async function handleSubmit() {
+  async function handleGrade(mode: "run" | "submit") {
     if (!code.trim()) return
-
     setIsLoading(true)
+    setActiveMode(mode)
     setError(null)
     setResult(null)
 
@@ -24,16 +25,14 @@ export function CodeEditor({ problemId }: CodeEditorProps) {
       const res = await fetch("/api/grade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ problemId, code, language: "python" }),
+        body: JSON.stringify({ problemId, code, language: "python", mode }),
       })
 
       const data = await res.json()
-
       if (!res.ok) {
         setError(data.error || "เกิดข้อผิดพลาด")
         return
       }
-
       setResult(data)
     } catch {
       setError("ไม่สามารถเชื่อมต่อ server ได้")
@@ -42,33 +41,43 @@ export function CodeEditor({ problemId }: CodeEditorProps) {
     }
   }
 
+  const perfect = result && result.pointsEarned === result.pointsMax
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 font-thai">
       {/* Code Input */}
       <textarea
         value={code}
         onChange={(e) => setCode(e.target.value)}
         placeholder="พิมพ์ Python code ของคุณที่นี่..."
-        className="w-full h-64 p-4 font-mono text-sm bg-gray-900 text-green-400 
-                   rounded-lg border border-gray-700 resize-none focus:outline-none 
-                   focus:border-blue-500"
+        className="h-64 w-full resize-none rounded-lg border border-gray-700 bg-gray-900
+                   p-4 font-mono text-sm text-green-400 focus:border-blue-500 focus:outline-none"
         spellCheck={false}
       />
 
-      {/* Submit Button */}
-      <button
-        onClick={handleSubmit}
-        disabled={isLoading || !code.trim()}
-        className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium
-                   hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed
-                   transition-colors"
-      >
-        {isLoading ? "กำลังตรวจ..." : "ส่งคำตอบ"}
-      </button>
+      {/* Buttons */}
+      <div className="flex gap-3">
+        <button
+          onClick={() => handleGrade("run")}
+          disabled={isLoading || !code.trim()}
+          className="rounded-lg border border-secondary px-5 py-2 text-sm font-medium text-secondary
+                     transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isLoading && activeMode === "run" ? "กำลังรัน..." : "รันทดสอบ"}
+        </button>
+        <button
+          onClick={() => handleGrade("submit")}
+          disabled={isLoading || !code.trim()}
+          className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white
+                     transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isLoading && activeMode === "submit" ? "กำลังส่ง..." : "ส่งคำตอบ"}
+        </button>
+      </div>
 
       {/* Error */}
       {error && (
-        <div className="p-4 bg-red-900/50 border border-red-700 rounded-lg text-red-300">
+        <div className="rounded-lg border border-red-700 bg-red-900/50 p-4 text-red-300">
           {error}
         </div>
       )}
@@ -76,29 +85,36 @@ export function CodeEditor({ problemId }: CodeEditorProps) {
       {/* Result */}
       {result && (
         <div className="flex flex-col gap-3">
-          {/* Score */}
-          <div className={`p-4 rounded-lg border ${
-            result.score === 100
-              ? "bg-green-900/50 border-green-700 text-green-300"
-              : "bg-yellow-900/50 border-yellow-700 text-yellow-300"
-          }`}>
-            <p className="text-2xl font-bold">{result.score}/100</p>
-            <p className="text-sm mt-1">{result.feedback}</p>
+          {/* Score banner */}
+          <div
+            className={`rounded-lg border p-4 ${
+              perfect
+                ? "border-green-700 bg-green-900/50 text-green-300"
+                : "border-yellow-700 bg-yellow-900/50 text-yellow-300"
+            }`}
+          >
+            <p className="text-2xl font-bold">
+              ได้ {result.pointsEarned}/{result.pointsMax} คะแนน
+            </p>
+            <p className="mt-1 text-sm">{result.feedback}</p>
+            {activeMode === "run" && (
+              <p className="mt-1 text-xs opacity-75">* รันเฉพาะ test cases ที่แสดงได้</p>
+            )}
           </div>
 
-          {/* Test Cases */}
+          {/* Test case results */}
           <div className="flex flex-col gap-2">
             {result.results.map((r, i) => (
               <div
                 key={r.testCaseId}
-                className={`p-3 rounded-lg border text-sm font-mono ${
+                className={`rounded-lg border p-3 font-mono text-sm ${
                   r.passed
-                    ? "bg-green-900/30 border-green-700 text-green-300"
-                    : "bg-red-900/30 border-red-700 text-red-300"
+                    ? "border-green-700 bg-green-900/30 text-green-300"
+                    : "border-red-700 bg-red-900/30 text-red-300"
                 }`}
               >
                 <p className="font-semibold">
-                  Test {i + 1}: {r.passed ? "ผ่าน" : "ไม่ผ่าน"}
+                  Test {i + 1}: {r.passed ? "ผ่าน" : "ไม่ผ่าน"} ({r.score} คะแนน)
                 </p>
                 {!r.passed && (
                   <>

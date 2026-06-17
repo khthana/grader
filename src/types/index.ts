@@ -1,24 +1,16 @@
-// โจทย์ที่นักศึกษาต้องทำ
-export interface Problem {
-  id: string
-  title: string
-  description: string
-  testCases: TestCase[]
-  timeLimit: number    // milliseconds
-  memoryLimit: number  // MB
-}
-
 // test case สำหรับตรวจโค้ด
 export interface TestCase {
-  id: string
+  id: number
   input: string
   expectedOutput: string
-  isHidden: boolean    // hidden = นักศึกษาไม่เห็น แต่ใช้ตรวจจริง
+  isHidden: boolean
+  score: number
 }
 
 // ผลการรัน code แต่ละ test case
 export interface TestResult {
-  testCaseId: string
+  testCaseId: number
+  score: number
   passed: boolean
   actualOutput: string
   expectedOutput: string
@@ -28,7 +20,8 @@ export interface TestResult {
 
 // ผลการตรวจทั้งหมด
 export interface GradeResult {
-  score: number          // 0-100
+  pointsEarned: number
+  pointsMax: number
   totalTests: number
   passedTests: number
   results: TestResult[]
@@ -37,7 +30,8 @@ export interface GradeResult {
 
 // ข้อมูลที่ส่งมาจาก client
 export interface SubmissionRequest {
-  problemId: string
+  problemId: number
   code: string
-  language: string     // "python" เป็นหลัก
+  language: string
+  mode: "run" | "submit"
 }
