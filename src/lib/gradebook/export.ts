@@ -17,7 +17,17 @@ const STATUS_LABEL: Record<ScorebookStatus, string> = {
 export function gradebookToSheet(gradebook: Gradebook): string[][] {
   const { problems, students } = gradebook
 
-  const header = [...IDENTITY_HEADERS, ...problems.map((p) => p.title), "รวม"]
+  // Per-week problem number (resets each week), matching the on-screen header
+  // and the /problems "ลำดับ". The week is kept in the label because the sheet's
+  // header is a single flat row — without it every week would repeat "ข้อ 1…".
+  const perWeekCount = new Map<number, number>()
+  const problemLabels = problems.map((p) => {
+    const n = (perWeekCount.get(p.weekNo) ?? 0) + 1
+    perWeekCount.set(p.weekNo, n)
+    return `สัปดาห์ ${p.weekNo} ข้อ ${n}`
+  })
+
+  const header = [...IDENTITY_HEADERS, ...problemLabels, "รวม"]
 
   const rows = students.map((s, idx) => {
     let total = 0

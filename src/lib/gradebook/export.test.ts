@@ -22,17 +22,30 @@ function gb(overrides: Partial<Gradebook> = {}): Gradebook {
 }
 
 describe("gradebookToSheet", () => {
-  it("starts with a header row of identity columns, each problem title, then รวม", () => {
+  it("starts with identity columns, a per-week problem label, then รวม", () => {
     const sheet = gradebookToSheet(gb())
     expect(sheet[0]).toEqual([
       "#",
       "รหัสนักศึกษา",
       "ชื่อ - นามสกุล",
       "สถานะ",
-      "Q1",
-      "Q2",
+      "สัปดาห์ 1 ข้อ 1",
+      "สัปดาห์ 2 ข้อ 1",
       "รวม",
     ])
+  })
+
+  it("resets the problem number within each week", () => {
+    const sheet = gradebookToSheet(
+      gb({
+        problems: [
+          { id: 1, title: "A", weekNo: 1, pointsMax: 10, dueAt: null },
+          { id: 2, title: "B", weekNo: 1, pointsMax: 10, dueAt: null },
+          { id: 3, title: "C", weekNo: 2, pointsMax: 10, dueAt: null },
+        ],
+      })
+    )
+    expect(sheet[0].slice(4, 7)).toEqual(["สัปดาห์ 1 ข้อ 1", "สัปดาห์ 1 ข้อ 2", "สัปดาห์ 2 ข้อ 1"])
   })
 
   it("renders a row per student with rank, identity, status label, scores, and total", () => {

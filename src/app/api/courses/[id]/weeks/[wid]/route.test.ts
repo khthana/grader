@@ -3,11 +3,12 @@ import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { newDb } from "pg-mem"
 import { NextRequest } from "next/server"
-import { PUT } from "./route"
+import { PUT, DELETE } from "./route"
 import { setTestDb } from "@/lib/db"
 import { createUser, assignRole, type Queryable } from "@/lib/users/repository"
 import { createCourse, assignInstructor } from "@/lib/courses/repository"
 import { seedWeeks, listWeeks } from "@/lib/weeks/repository"
+import { createProblem } from "@/lib/problems/repository"
 import { createSessionToken } from "@/lib/auth"
 
 const schema = readFileSync(
@@ -70,5 +71,62 @@ describe("PUT /api/courses/[id]/weeks/[wid]", () => {
     const body = await res.json()
     expect(body.week.topic).toBe("พื้นฐาน Python")
     expect(body.week.weekNo).toBe(1)
+  })
+})
+
+describe("DELETE /api/courses/[id]/weeks/[wid]", () => {
+  let db: Queryable
+  beforeEach(() => { db = freshDb(); setTestDb(db) })
+  afterEach(() => setTestDb(null))
+
+  it("returns 403 for a TA (read-only)", async () => {
+    const { ta, course, weeks } = await seedAll(db)
+    const last = weeks[weeks.length - 1]
+    const req = new NextRequest(
+      `http://localhost/api/courses/${course.id}/weeks/${last.id}`,
+      { method: "DELETE" }
+    )
+    req.cookies.set("session", sessionFor(ta.email))
+    const res = await DELETE(req, ctx(course.id, last.id))
+    expect(res.status).toBe(403)
+  })
+
+  it("removes the last empty week for an Instructor", async () => {
+    const { ins, course, weeks } = await seedAll(db)
+    const last = weeks[weeks.length - 1]
+    const req = new NextRequest(
+      `http://localhost/api/courses/${course.id}/weeks/${last.id}`,
+      { method: "DELETE" }
+    )
+    req.cookies.set("session", sessionFor(ins.email))
+    const res = await DELETE(req, ctx(course.id, last.id))
+    expect(res.status).toBe(200)
+    expect(await listWeeks(db, course.id)).toHaveLength(weeks.length - 1)
+  })
+
+  it("returns 409 when removing a non-last week", async () => {
+    const { ins, course, weeks } = await seedAll(db)
+    const req = new NextRequest(
+      `http://localhost/api/courses/${course.id}/weeks/${weeks[0].id}`,
+      { method: "DELETE" }
+    )
+    req.cookies.set("session", sessionFor(ins.email))
+    const res = await DELETE(req, ctx(course.id, weeks[0].id))
+    expect(res.status).toBe(409)
+    expect(await listWeeks(db, course.id)).toHaveLength(weeks.length)
+  })
+
+  it("returns 409 when the last week still holds a problem", async () => {
+    const { ins, course, weeks } = await seedAll(db)
+    const last = weeks[weeks.length - 1]
+    await createProblem(db, { courseId: course.id, weekId: last.id, title: "โจทย์" })
+    const req = new NextRequest(
+      `http://localhost/api/courses/${course.id}/weeks/${last.id}`,
+      { method: "DELETE" }
+    )
+    req.cookies.set("session", sessionFor(ins.email))
+    const res = await DELETE(req, ctx(course.id, last.id))
+    expect(res.status).toBe(409)
+    expect(await listWeeks(db, course.id)).toHaveLength(weeks.length)
   })
 })

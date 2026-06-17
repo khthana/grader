@@ -10,16 +10,23 @@ import {
 import { seedWeeks } from "@/lib/weeks/repository"
 import { canManageCourses } from "@/lib/courses/access"
 import { validateCourseInput } from "@/lib/courses/validation"
+import { resolveActiveRole, type Role } from "@/lib/roles"
 import { safeLog } from "@/lib/logs"
 
-// The signed-in user's entitled courses (Admin → all; Instructor/TA → assigned).
+// The signed-in user's entitled courses. Entitlement follows the *active* role
+// (navbar switcher), so an Admin acting as Instructor sees only the courses
+// they teach; Admin → all, Instructor/TA/Student → assigned/enrolled.
 export async function GET(request: NextRequest) {
   const user = await getUserFromRequest(request)
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
   }
 
-  const courses = await listCoursesForUser(getDb(), user.id, user.roles)
+  const requestedRole = request.cookies.get("active_role")?.value as Role | undefined
+  const activeRole = resolveActiveRole(user.roles as Role[], requestedRole)
+  const entitlementRoles = activeRole ? [activeRole] : user.roles
+
+  const courses = await listCoursesForUser(getDb(), user.id, entitlementRoles)
   return NextResponse.json({ courses })
 }
 

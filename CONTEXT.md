@@ -57,9 +57,10 @@ for a course. An attribute of the **Enrollment**.
 
 ### Week (สัปดาห์)
 A numbered weekly unit within a **Course** (e.g. Week 1 · "พื้นฐาน Python และ I/O").
-Has a `week_no` (integer) and a `topic` (editable by Instructor). Eight weeks are
-auto-seeded when a Course is created; the Instructor manages topics separately.
-Week is course-scoped — `weeks` table carries `(course_id, week_no, topic)`.
+Has a `week_no` (integer) and a `topic` (editable by Instructor). Six weeks are
+auto-seeded with empty topics when a Course is created; the Instructor appends or
+removes weeks (the last empty one) and manages topics separately. Week is
+course-scoped — `weeks` table carries `(course_id, week_no, topic)`.
 
 ### Problem (โจทย์ปัญหา)
 A programming challenge belonging to one **Course** and one **Week**. Carries a title,

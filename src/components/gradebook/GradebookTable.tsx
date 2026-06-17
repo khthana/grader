@@ -96,6 +96,17 @@ export function GradebookTable({ courseId, courseCode = "" }: { courseId: number
   const weekNos = [...new Set(problems.map((p) => p.weekNo))].sort((a, b) => a - b)
   const totalMax = problems.reduce((s, p) => s + p.pointsMax, 0)
 
+  // Per-week problem number (resets each week), matching the "ลำดับ" shown on
+  // /problems — both order by week_no then p.id. Keeps headers compact; the full
+  // title stays reachable via the column's hover tooltip.
+  const problemNo = new Map<number, number>()
+  const perWeekCount = new Map<number, number>()
+  for (const p of problems) {
+    const n = (perWeekCount.get(p.weekNo) ?? 0) + 1
+    perWeekCount.set(p.weekNo, n)
+    problemNo.set(p.id, n)
+  }
+
   const { pageItems, pageCount, page: current } = paginate(students, page, PER_PAGE)
   const offset = (current - 1) * PER_PAGE
 
@@ -164,10 +175,10 @@ export function GradebookTable({ courseId, courseCode = "" }: { courseId: number
               {problems.map((p) => (
                 <th
                   key={p.id}
-                  className="border-l border-slate-200 px-3 py-1.5 text-center font-medium max-w-[80px] truncate"
+                  className="border-l border-slate-200 px-3 py-1.5 text-center font-medium whitespace-nowrap"
                   title={p.title}
                 >
-                  {p.title}
+                  ข้อ {problemNo.get(p.id)}
                   <br />
                   <span className="font-normal text-slate-300">/{p.pointsMax}</span>
                 </th>

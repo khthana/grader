@@ -81,7 +81,9 @@ CREATE TABLE IF NOT EXISTS enrollments (
 );
 
 -- Problem domain (issue #17). Problems are course-scoped, organised by Week.
--- Eight weeks are seeded per course; topics are editable by Instructor.
+-- New courses seed DEFAULT_WEEKS (6) weeks with empty topics; Instructors can
+-- append weeks up to MAX_WEEKS (16) or remove the last empty one, and edit
+-- topics. Week count is app-enforced (see src/lib/weeks/repository.ts).
 CREATE TABLE IF NOT EXISTS weeks (
   id         SERIAL PRIMARY KEY,
   course_id  INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,

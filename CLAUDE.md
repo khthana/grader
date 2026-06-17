@@ -33,7 +33,7 @@ Specs: `requirement/prd_auth_shell_user_management.md`, `requirement/prd_teacher
 ### Routing & the authed shell
 - **Next.js 16 (App Router) · TypeScript · Tailwind v4.** All routes live under `src/app/`.
 - Authenticated pages live in the **`src/app/(app)/` route group**, whose `layout.tsx` renders the shell (navbar + collapsible sidebar + breadcrumb + toast host) around every page. Routes: `/dashboard` (role landing resolver), `/users`, `/logs`, `/courses`, `/students`, `/problems` (+ `/problems/[id]`, `/problems/new`, `/problems/[id]/edit`, `/problems/[id]/submissions`), `/review`, `/gradebook`, `/assignments`.
-- The navbar also hosts a **course switcher** (the active course persists in an `active_course` cookie, mirroring `active_role`). `src/lib/courses/server.ts#getCourseContext()` resolves `{ courses, activeCourse }` for the shell + course-scoped pages.
+- The navbar also hosts a **course switcher** (the active course persists in an `active_course` cookie, mirroring `active_role`). `src/lib/courses/server.ts#getCourseContext()` resolves `{ courses, activeCourse }` for the shell + course-scoped pages. **Course entitlement follows the active role, not the full role set:** an Admin who switches the navbar to Instructor sees only the courses they teach (both `getCourseContext` and `GET /api/courses` narrow to `[activeRole]` via `resolveActiveRole`; falls back to full roles when no `active_role` cookie is set).
 - **Route protection is `src/proxy.ts`** — Next 16 renamed `middleware` to **`proxy`**, which runs on the **Node.js runtime** (so `node:crypto` session verification works). It redirects unauthenticated users to `/login` and authenticated users away from `/login`. The `config.matcher` lists every protected path; add new authed routes there.
 - `/login` and the auth API routes are outside the `(app)` group.
 
@@ -49,12 +49,12 @@ Specs: `requirement/prd_auth_shell_user_management.md`, `requirement/prd_teacher
 - `src/lib/breadcrumbs.ts` (pure, unit-tested) derives Thai-labelled crumbs from the pathname.
 
 ### Data layer (Postgres, raw `pg` + SQL)
-- `schema.sql` defines all tables. Core: `users`, `roles`, `user_roles`, `user_logs`. Course domain: `courses`, `course_instructors`, `enrollments` (`study_group` — `group` is a SQL reserved word). Problems domain: `weeks` (`course_id`, `week_no` 1–18, `topic`), `problems` (`course_id`, `week_id`, `title`, `description`, `input_spec`, `output_spec`, `due_at`, `close_at`, `language`), `test_cases` (`problem_id`, `input`, `expected_output`, `is_hidden`, `score`, `sort_order`), `submissions` (`problem_id`, `user_id`, `course_id`, `code`, `language`, `points_earned`, `points_max`, `is_late`, `results` jsonb, `reviewed_at`, `reviewed_by`, `manual_score`). FK `ON DELETE CASCADE` everywhere. `npm run db:setup` applies schema + seeds Admin + one course. **After any `schema.sql` change, re-run `db:setup` against dev DB.**
+- `schema.sql` defines all tables. Core: `users`, `roles`, `user_roles`, `user_logs`. Course domain: `courses`, `course_instructors`, `enrollments` (`study_group` — `group` is a SQL reserved word). Problems domain: `weeks` (`course_id`, `week_no`, `topic` — new courses seed `DEFAULT_WEEKS`=6, growable to `MAX_WEEKS`=16), `problems` (`course_id`, `week_id`, `title`, `description`, `input_spec`, `output_spec`, `due_at`, `close_at`, `language`), `test_cases` (`problem_id`, `input`, `expected_output`, `is_hidden`, `score`, `sort_order`), `submissions` (`problem_id`, `user_id`, `course_id`, `code`, `language`, `points_earned`, `points_max`, `is_late`, `results` jsonb, `reviewed_at`, `reviewed_by`, `manual_score`). FK `ON DELETE CASCADE` everywhere. `npm run db:setup` applies schema + seeds Admin + one course. **After any `schema.sql` change, re-run `db:setup` against dev DB.**
 - `src/lib/db.ts` — lazy singleton `pg` Pool from `DATABASE_URL` via `getDb()`. **Test seam:** `setTestDb(pool)` injects a pg-mem pool in tests; `setTestDb(null)` resets.
 - `src/lib/users/repository.ts` — `createUser`, `findUserByEmail`, `getUserById`, `getUserWithRoles`, `listUsers`, `updateUser`, `deleteUser`, `setUserActive`, `assignRole`, `setUserRoles`, `countUsersWithRole`.
 - `src/lib/courses/repository.ts` — `createCourse`, `getCourseById`, `findCourseByCode`, `listCourses`, `updateCourse`, `deleteCourse`, `listCoursesForUser(userId, roles)` (**entitlement: Admin all; others: `course_instructors` UNION `enrollments`**), `assignInstructor`, `setCourseInstructors`, `listCourseInstructors`, `searchStaffCandidates`.
 - `src/lib/enrollments/repository.ts` — `createEnrollment`, `findEnrollment`, `getEnrollmentById`, `listEnrollments`, `listAllEnrollments`, `listGroups`, `updateEnrollment`, `deleteEnrollment`.
-- `src/lib/weeks/repository.ts` — `seedWeeks(db, courseId)` (inserts weeks 1–18 if absent), `listWeeks`, `updateWeek`.
+- `src/lib/weeks/repository.ts` — `seedWeeks(db, courseId)` (inserts `DEFAULT_WEEKS` weeks with empty topics if absent), `listWeeks`, `updateWeekTopic`, `addWeek` (append next `week_no`, null at `MAX_WEEKS`), `weekHasProblems`, `deleteWeek`.
 - `src/lib/problems/repository.ts` — `createProblem`, `getProblemById` (includes `testCases[]`), `listProblems` (includes `pointsMax` via SUM), `updateProblem`, `deleteProblem`, `setTestCases` (DELETE+INSERT atomically).
 - `src/lib/submissions/repository.ts` — `createSubmission`, `listSubmissions`, `countSubmitted`, `countPending`, `getSubmission`, `reviewSubmission` (sets `manual_score`/`reviewed_by`/`reviewed_at`), `listSubmissionsForProblem` (with `effectiveScore`), `getLastSubmission`, `listPendingSubmissions` (cross-problem pending queue for `/review`).
 - `src/lib/gradebook/repository.ts` — `getGradebook(db, courseId)` → `{ problems: GradebookProblem[], students: GradebookStudent[] }` where `student.scores[problemId]` = `COALESCE(manual_score, points_earned)` from latest submission.
@@ -69,7 +69,7 @@ Specs: `requirement/prd_auth_shell_user_management.md`, `requirement/prd_teacher
 - **UI:** `src/components/courses/` and `src/components/students/`.
 
 ### Problems & grading
-- **Weeks:** `GET/PUT /api/courses/[id]/weeks` (seed on first visit; Instructor edits topic). `src/components/problems/WeekBar.tsx` renders week tabs.
+- **Weeks:** `GET /api/courses/[id]/weeks` (list); `POST` (Instructor appends a week, 409 at `MAX_WEEKS`); `PUT /api/courses/[id]/weeks/[wid]` (Instructor edits topic); `DELETE …/[wid]` (Instructor removes the **last** week only — must be empty of problems and keep ≥1 week). `src/components/problems/WeekBar.tsx` renders a wrapping `grid-cols-6` of week cards with inline topic edit + add/remove controls.
 - **Problems (Instructor):** `GET/POST /api/courses/[id]/problems`; `GET/PUT/DELETE /api/courses/[id]/problems/[pid]`. `ProblemEditor` component handles create/edit with live test-case management. `validateProblemInput` (pure): title required, weekId required, ≥1 test case, score ≥ 0, `close_at` ≥ `due_at`.
 - **Student view** (`/problems/[id]`): loads problem from DB, shows visible test cases + deadline banners, shows student's last effective score, passes `isClosed` to `CodeEditor`.
 - **Grading** (`POST /api/grade`): `mode:run` = visible tests only, no Submission stored; `mode:submit` = all tests, stores Submission, enforces `close_at` (403 if past), checks enrollment for non-privileged users, sets `is_late` if past `due_at`. Calls Piston (`src/lib/piston.ts`, Python 3.10.0). `GradeResult` returns `{ pointsEarned, pointsMax, totalTests, passedTests, results, feedback }`.
@@ -82,7 +82,7 @@ Specs: `requirement/prd_auth_shell_user_management.md`, `requirement/prd_teacher
 - **UI:** `SubmissionsTable` (per-problem, `/problems/[id]/submissions`), `PendingQueue` (`/review`).
 
 ### Gradebook & assignments
-- **Gradebook** (`/gradebook`, Instructor/Admin): `GET /api/courses/[id]/gradebook` → matrix; `GradebookTable` component with week-grouped columns, color-coded cells, per-student totals.
+- **Gradebook** (`/gradebook`, Instructor/Admin): `GET /api/courses/[id]/gradebook` → matrix; `GradebookTable` component with week-grouped columns, color-coded cells, per-student totals. Problem columns are headed **"ข้อ N"** (per-week index that resets each week, matching `/problems`' "ลำดับ"); the full title shows on hover (`title` attr). The xlsx export labels columns `สัปดาห์ {w} ข้อ {n}` (week kept inline since the sheet header is one flat row).
 - **Assignments** (`/assignments`, Student): `GET /api/courses/[id]/assignments` → calling user's problem list with last submission data; `AssignmentsList` grouped by week with status badges.
 
 ### User Management (Admin only — every `/api/users*` route is Admin-gated via `requireAdmin`)
@@ -108,7 +108,7 @@ Specs: `requirement/prd_auth_shell_user_management.md`, `requirement/prd_teacher
 5. `GradeResult = { pointsEarned, pointsMax, totalTests, passedTests, results[], feedback }` returned to client.
 
 ## Testing
-- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **362 tests / 62 files** as of 2026-06-17.
+- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **375 tests / 62 files** as of 2026-06-17.
 - Pure modules are unit-tested directly (session, password, roles, breadcrumbs, validation, import, name).
 - Repository + route handlers are integration-tested against **pg-mem** (in-memory Postgres, no Docker): build a pool with `newDb()` + `mem.public.none(schema.sql)` + `mem.adapters.createPg()`, inject via `setTestDb`, seed through the repository. Route handlers are imported and called with a `NextRequest`; auth is exercised with real `createSessionToken` cookies.
 - **pg-mem gotchas:** explicit casts (`$1::int`); no `STRING_AGG` (use second query + JS); no `DISTINCT ON` (use subquery with `MAX(submitted_at)` + inner join); schema path `../` count must match test file depth exactly.

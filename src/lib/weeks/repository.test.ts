@@ -6,9 +6,15 @@ import {
   seedWeeks,
   listWeeks,
   updateWeekTopic,
+  addWeek,
+  weekHasProblems,
+  deleteWeek,
+  DEFAULT_WEEKS,
+  MAX_WEEKS,
   type Queryable,
 } from "./repository"
 import { createCourse } from "@/lib/courses/repository"
+import { createProblem } from "@/lib/problems/repository"
 
 const schema = readFileSync(
   fileURLToPath(new URL("../../../schema.sql", import.meta.url)),
@@ -32,21 +38,21 @@ describe("week repository", () => {
     courseId = course.id
   })
 
-  it("seedWeeks creates 8 rows with default topics", async () => {
+  it("seedWeeks creates DEFAULT_WEEKS rows with empty topics", async () => {
     await seedWeeks(db, courseId)
     const weeks = await listWeeks(db, courseId)
-    expect(weeks).toHaveLength(8)
+    expect(weeks).toHaveLength(DEFAULT_WEEKS)
     expect(weeks[0].weekNo).toBe(1)
-    expect(weeks[0].topic).toBe("สัปดาห์ที่ 1")
-    expect(weeks[7].weekNo).toBe(8)
-    expect(weeks[7].topic).toBe("สัปดาห์ที่ 8")
+    expect(weeks[0].topic).toBe("")
+    expect(weeks[DEFAULT_WEEKS - 1].weekNo).toBe(DEFAULT_WEEKS)
+    expect(weeks[DEFAULT_WEEKS - 1].topic).toBe("")
   })
 
   it("listWeeks returns rows ordered by week_no", async () => {
     await seedWeeks(db, courseId)
     const weeks = await listWeeks(db, courseId)
     const nos = weeks.map((w) => w.weekNo)
-    expect(nos).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+    expect(nos).toEqual([1, 2, 3, 4, 5, 6])
   })
 
   it("updateWeekTopic persists the new topic", async () => {
@@ -69,6 +75,48 @@ describe("week repository", () => {
     await seedWeeks(db, courseId)
     await seedWeeks(db, courseId)
     const weeks = await listWeeks(db, courseId)
-    expect(weeks).toHaveLength(8)
+    expect(weeks).toHaveLength(DEFAULT_WEEKS)
+  })
+
+  it("addWeek appends the next week number with an empty topic", async () => {
+    await seedWeeks(db, courseId)
+    const added = await addWeek(db, courseId)
+    expect(added?.weekNo).toBe(DEFAULT_WEEKS + 1)
+    expect(added?.topic).toBe("")
+    const weeks = await listWeeks(db, courseId)
+    expect(weeks).toHaveLength(DEFAULT_WEEKS + 1)
+  })
+
+  it("addWeek starts at week 1 for a course with no weeks", async () => {
+    const added = await addWeek(db, courseId)
+    expect(added?.weekNo).toBe(1)
+  })
+
+  it("addWeek returns null once MAX_WEEKS is reached", async () => {
+    for (let i = 0; i < MAX_WEEKS; i++) await addWeek(db, courseId)
+    const weeks = await listWeeks(db, courseId)
+    expect(weeks).toHaveLength(MAX_WEEKS)
+    expect(await addWeek(db, courseId)).toBeNull()
+  })
+
+  it("weekHasProblems reflects whether a problem references the week", async () => {
+    await seedWeeks(db, courseId)
+    const weeks = await listWeeks(db, courseId)
+    expect(await weekHasProblems(db, weeks[0].id)).toBe(false)
+    await createProblem(db, {
+      courseId,
+      weekId: weeks[0].id,
+      title: "โจทย์",
+    })
+    expect(await weekHasProblems(db, weeks[0].id)).toBe(true)
+  })
+
+  it("deleteWeek removes the row and returns true", async () => {
+    await seedWeeks(db, courseId)
+    const weeks = await listWeeks(db, courseId)
+    const last = weeks[weeks.length - 1]
+    expect(await deleteWeek(db, last.id)).toBe(true)
+    const after = await listWeeks(db, courseId)
+    expect(after).toHaveLength(DEFAULT_WEEKS - 1)
   })
 })

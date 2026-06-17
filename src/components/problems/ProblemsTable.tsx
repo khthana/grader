@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { FaPlus, FaPen, FaTrash, FaEye } from "react-icons/fa"
@@ -48,16 +48,23 @@ export function ProblemsTable({
   const [deleteTarget, setDeleteTarget] = useState<ProblemItem | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  // Load weeks once
-  useEffect(() => {
-    fetch(`/api/courses/${courseId}/weeks`)
+  // Load (or reload) weeks. Keeps the current selection if it still exists,
+  // otherwise clamps to the last week (e.g. after removing the active one).
+  const loadWeeks = useCallback(() => {
+    return fetch(`/api/courses/${courseId}/weeks`)
       .then((r) => r.json())
       .then(({ weeks: w }: { weeks: Week[] }) => {
         setWeeks(w)
-        if (w.length > 0) setActiveWeekNo(w[0].weekNo)
+        setActiveWeekNo((prev) =>
+          w.some((x) => x.weekNo === prev) ? prev : (w[w.length - 1]?.weekNo ?? 1)
+        )
       })
       .catch(() => {})
   }, [courseId])
+
+  useEffect(() => {
+    loadWeeks()
+  }, [loadWeeks])
 
   // Load problems when active week changes
   useEffect(() => {
@@ -105,6 +112,7 @@ export function ProblemsTable({
           courseId={courseId}
           canManage={canManage}
           onWeekChange={setActiveWeekNo}
+          onWeeksChanged={loadWeeks}
         />
       )}
 

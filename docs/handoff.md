@@ -25,6 +25,16 @@ ccb58e5 docs: add Teacher Scorebook spec + mockup (#22)
 ```
 > Note: `2641fb5`'s subject on the remote carries a stray leading `@ ` (a here-string quoting slip); the body and code are correct. Cosmetic only — fixing it needs a force-push.
 
+## Latest changes (2026-06-17, later session — not yet committed)
+
+Three UX fixes, **375 tests passing**, typecheck + lint clean:
+
+1. **Course switcher follows the active role.** `getCourseContext()` and `GET /api/courses` now narrow entitlement to `[resolveActiveRole(roles, cookie)]` instead of the full role set — an Admin who switches the navbar to Instructor sees only the courses they teach. Backwards-compatible: no `active_role` cookie → falls back to full roles (so existing tests/Admins are unaffected).
+2. **Week selector reworked** (`/problems`). `WeekBar` is now a wrapping `grid-cols-6` of equal-width cards (was a horizontally-scrolling row of `min-w` cards that grew unevenly with long topics). Weeks are now **dynamic**: `seedWeeks` seeds `DEFAULT_WEEKS`=6 with **empty** topics (was 8 with default `"สัปดาห์ที่ N"` topics that duplicated the week label); Instructors can append (`POST /api/courses/[id]/weeks`, cap `MAX_WEEKS`=16) and remove the last empty week (`DELETE …/weeks/[wid]` — guarded: last only, no problems, keep ≥1). Fixed the inline topic-edit "Enter doesn't save" bug — root cause was `router.refresh()` not reloading the client-fetched weeks; now uses an `onWeeksChanged` refetch callback + a `committedRef` to stop Enter/blur double-firing.
+3. **Gradebook columns show "ข้อ N"** (`GradebookTable`) instead of full titles — per-week index resetting each week (matches `/problems`' "ลำดับ"; same `week_no, p.id` ordering). Full title on hover via `title`. The old `max-w-[80px] truncate` never worked (`table-layout: auto`); replaced with `whitespace-nowrap`. Excel export labels columns `สัปดาห์ {w} ข้อ {n}` (week inline because the sheet header is one flat row).
+
+> Note: existing courses already in the DB keep their old week count (8) and old default topics — the seed change only affects newly created courses. Instructors adjust existing courses via the new add/remove buttons. No migration written.
+
 ## What was built this session
 
 ### Teacher Scorebook (#22–#26)
