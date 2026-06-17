@@ -91,4 +91,18 @@ describe("gradebook repository", () => {
     const gb = await getGradebook(db, courseId)
     expect(gb.students[0].scores[problemId]).toBe(9)
   })
+
+  it("exposes each problem's dueAt and rolls a past-due unsubmitted problem up to a missing status", async () => {
+    const weeks = await listWeeks(db, courseId)
+    const past = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    await createProblem(db, {
+      courseId, weekId: weeks[0].id, title: "Q2 (overdue)", dueAt: past,
+    })
+
+    const gb = await getGradebook(db, courseId)
+
+    const overdue = gb.problems.find((p) => p.title === "Q2 (overdue)")
+    expect(overdue?.dueAt).toBe(past)
+    expect(gb.students[0].status).toBe("missing")
+  })
 })

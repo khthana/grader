@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react"
 
+type ScorebookStatus = "complete" | "late" | "missing" | "none-due"
+
 interface GradebookProblem {
   id: number
   title: string
   weekNo: number
   pointsMax: number
+  dueAt: string | null
 }
 
 interface GradebookStudent {
@@ -14,6 +17,25 @@ interface GradebookStudent {
   name: string
   idCode: string | null
   scores: Record<number, number | null>
+  status: ScorebookStatus
+}
+
+const STATUS_META: Record<ScorebookStatus, { dot: string; label: string }> = {
+  complete: { dot: "bg-green-500", label: "ส่งครบ" },
+  late: { dot: "bg-yellow-400", label: "ส่งช้า" },
+  missing: { dot: "bg-red-500", label: "ค้างส่ง" },
+  "none-due": { dot: "bg-slate-300", label: "ยังไม่ถึงกำหนด" },
+}
+
+function StatusDot({ status }: { status: ScorebookStatus }) {
+  const meta = STATUS_META[status]
+  return (
+    <span
+      className={`inline-block h-2.5 w-2.5 rounded-full ${meta.dot}`}
+      title={meta.label}
+      aria-label={meta.label}
+    />
+  )
 }
 
 interface Gradebook {
@@ -61,13 +83,27 @@ export function GradebookTable({ courseId }: { courseId: number }) {
   const weekNos = [...new Set(problems.map((p) => p.weekNo))].sort((a, b) => a - b)
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white font-thai">
+    <div className="flex flex-col gap-3 font-thai">
+      {/* Status legend */}
+      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+        {(Object.keys(STATUS_META) as ScorebookStatus[]).map((s) => (
+          <span key={s} className="flex items-center gap-1.5">
+            <StatusDot status={s} />
+            {STATUS_META[s].label}
+          </span>
+        ))}
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
       <table className="min-w-full text-sm">
         <thead>
           {/* Week header row */}
           <tr className="bg-slate-100 text-xs font-semibold text-slate-500">
             <th className="sticky left-0 z-10 bg-slate-100 px-5 py-2 text-left" rowSpan={2}>
               รหัส / ชื่อ
+            </th>
+            <th className="px-3 py-2 text-center" rowSpan={2}>
+              สถานะ
             </th>
             {weekNos.map((wn) => {
               const weekProblems = problems.filter((p) => p.weekNo === wn)
@@ -116,6 +152,9 @@ export function GradebookTable({ courseId }: { courseId: number }) {
                   <p className="font-medium text-slate-700">{student.name}</p>
                   <p className="text-xs text-slate-400 font-mono">{student.idCode ?? "–"}</p>
                 </td>
+                <td className="px-3 py-3 text-center">
+                  <StatusDot status={student.status} />
+                </td>
                 {problems.map((p) => (
                   <td key={p.id} className="border-l border-slate-100 px-3 py-3 text-center">
                     {scoreCell(student.scores[p.id], p.pointsMax)}
@@ -131,6 +170,7 @@ export function GradebookTable({ courseId }: { courseId: number }) {
           })}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
