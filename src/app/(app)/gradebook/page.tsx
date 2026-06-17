@@ -27,7 +27,7 @@ export default async function GradebookPage() {
           {activeCourse.nameTh} ({activeCourse.code})
         </p>
       </div>
-      <GradebookTable courseId={activeCourse.id} />
+      <GradebookTable courseId={activeCourse.id} courseCode={activeCourse.code} />
     </div>
   )
 }

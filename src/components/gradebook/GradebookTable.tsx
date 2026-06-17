@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import * as XLSX from "xlsx"
 import { scoreTier, paginate, type ScoreTier } from "@/lib/gradebook/display"
+import { gradebookToSheet } from "@/lib/gradebook/export"
 
 type ScorebookStatus = "complete" | "late" | "missing" | "none-due"
 
@@ -62,7 +64,7 @@ function ScorePill({ score, pointsMax }: { score: number | null; pointsMax: numb
   )
 }
 
-export function GradebookTable({ courseId }: { courseId: number }) {
+export function GradebookTable({ courseId, courseCode = "" }: { courseId: number; courseCode?: string }) {
   const [gradebook, setGradebook] = useState<Gradebook | null>(null)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -97,16 +99,32 @@ export function GradebookTable({ courseId }: { courseId: number }) {
   const { pageItems, pageCount, page: current } = paginate(students, page, PER_PAGE)
   const offset = (current - 1) * PER_PAGE
 
+  function exportXlsx() {
+    const ws = XLSX.utils.aoa_to_sheet(gradebookToSheet(gradebook!))
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "scorebook")
+    XLSX.writeFile(wb, `scorebook-${courseCode || courseId}.xlsx`)
+  }
+
   return (
     <div className="flex flex-col gap-3 font-thai">
-      {/* Status legend */}
-      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-        {(Object.keys(STATUS_META) as ScorebookStatus[]).map((s) => (
-          <span key={s} className="flex items-center gap-1.5">
-            <StatusDot status={s} />
-            {STATUS_META[s].label}
-          </span>
-        ))}
+      {/* Legend + export */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+          {(Object.keys(STATUS_META) as ScorebookStatus[]).map((s) => (
+            <span key={s} className="flex items-center gap-1.5">
+              <StatusDot status={s} />
+              {STATUS_META[s].label}
+            </span>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={exportXlsx}
+          className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+        >
+          ส่งออก Excel
+        </button>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
