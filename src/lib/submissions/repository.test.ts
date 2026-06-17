@@ -11,6 +11,7 @@ import {
   reviewSubmission,
   listSubmissionsForProblem,
   getLastSubmission,
+  listPendingSubmissions,
   type Queryable,
 } from "./repository"
 import { createUser, assignRole } from "@/lib/users/repository"
@@ -181,5 +182,42 @@ describe("submission repository", () => {
     expect(last).not.toBeNull()
     expect(last!.id).toBe(second.id)
     expect(last!.code).toBe("second")
+  })
+
+  // Phase 1 — #24 behaviors
+
+  it("listPendingSubmissions returns empty when no submissions", async () => {
+    const list = await listPendingSubmissions(db, courseId)
+    expect(list).toHaveLength(0)
+  })
+
+  it("listPendingSubmissions returns pending items with problem and student info", async () => {
+    await createSubmission(db, {
+      problemId, userId, courseId,
+      code: "x", language: "python",
+      pointsEarned: 5, pointsMax: 10, isLate: false, results: [],
+    })
+
+    const list = await listPendingSubmissions(db, courseId)
+    expect(list).toHaveLength(1)
+    expect(list[0].problemId).toBe(problemId)
+    expect(list[0].problemTitle).toBe("Q1")
+    expect(list[0].weekNo).toBe(1)
+    expect(list[0].userId).toBe(userId)
+    expect(list[0].studentIdCode).toBe("64010001")
+    expect(list[0].pointsEarned).toBe(5)
+    expect(list[0].pointsMax).toBe(10)
+  })
+
+  it("after reviewSubmission, item no longer appears in pending list", async () => {
+    const sub = await createSubmission(db, {
+      problemId, userId, courseId,
+      code: "x", language: "python",
+      pointsEarned: 5, pointsMax: 10, isLate: false, results: [],
+    })
+    expect(await listPendingSubmissions(db, courseId)).toHaveLength(1)
+
+    await reviewSubmission(db, sub.id, { manualScore: null, reviewedBy: instructorId })
+    expect(await listPendingSubmissions(db, courseId)).toHaveLength(0)
   })
 })

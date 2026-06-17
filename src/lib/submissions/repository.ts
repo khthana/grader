@@ -252,3 +252,62 @@ export async function getLastSubmission(
   )
   return rows[0] ? toRecord(rows[0]) : null
 }
+
+export interface PendingSubmissionItem {
+  id: number
+  problemId: number
+  problemTitle: string
+  weekNo: number
+  userId: number
+  studentName: string
+  studentIdCode: string | null
+  submittedAt: string
+  isLate: boolean
+  pointsEarned: number | null
+  pointsMax: number | null
+}
+
+interface PendingRow {
+  id: number
+  problem_id: number
+  problem_title: string
+  week_no: number
+  user_id: number
+  student_name: string
+  student_id_code: string | null
+  submitted_at: string
+  is_late: boolean
+  points_earned: string | null
+  points_max: string | null
+}
+
+export async function listPendingSubmissions(
+  db: Queryable,
+  courseId: number
+): Promise<PendingSubmissionItem[]> {
+  const { rows } = await db.query<PendingRow>(
+    `SELECT s.id, s.problem_id, p.title AS problem_title, w.week_no,
+            s.user_id, u.name AS student_name, u.id_code AS student_id_code,
+            s.submitted_at, s.is_late, s.points_earned, s.points_max
+     FROM submissions s
+     JOIN problems p ON p.id = s.problem_id
+     JOIN weeks w ON w.id = p.week_id
+     JOIN users u ON u.id = s.user_id
+     WHERE s.course_id = $1::int AND s.reviewed_at IS NULL
+     ORDER BY s.submitted_at ASC`,
+    [courseId]
+  )
+  return rows.map((r) => ({
+    id: r.id,
+    problemId: r.problem_id,
+    problemTitle: r.problem_title,
+    weekNo: r.week_no,
+    userId: r.user_id,
+    studentName: r.student_name,
+    studentIdCode: r.student_id_code,
+    submittedAt: r.submitted_at,
+    isLate: r.is_late,
+    pointsEarned: r.points_earned != null ? Number(r.points_earned) : null,
+    pointsMax: r.points_max != null ? Number(r.points_max) : null,
+  }))
+}
