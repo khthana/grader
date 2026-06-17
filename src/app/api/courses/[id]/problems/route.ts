@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db"
 import { authorizeCourse } from "@/lib/courses/authorize"
 import { createProblem, listProblems, setTestCases } from "@/lib/problems/repository"
 import { validateProblemInput } from "@/lib/problems/validation"
+import { countSubmitted, countPending } from "@/lib/submissions/repository"
 import { safeLog } from "@/lib/logs"
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -16,8 +17,26 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const weekParam = url.searchParams.get("week")
   const weekId = weekParam ? Number.parseInt(weekParam, 10) : undefined
 
-  const problems = await listProblems(getDb(), auth.courseId, weekId)
-  return NextResponse.json({ problems })
+  const db = getDb()
+  const problems = await listProblems(db, auth.courseId, weekId)
+
+  // Attach submission counts for the instructor table
+  const { rows: enrollRows } = await db.query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM enrollments WHERE course_id = $1::int`,
+    [auth.courseId]
+  )
+  const enrolledCount = Number(enrollRows[0]?.count ?? 0)
+
+  const enriched = await Promise.all(
+    problems.map(async (p) => ({
+      ...p,
+      submittedCount: await countSubmitted(db, p.id, auth.courseId),
+      pendingCount: await countPending(db, p.id),
+      enrolledCount,
+    }))
+  )
+
+  return NextResponse.json({ problems: enriched })
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {

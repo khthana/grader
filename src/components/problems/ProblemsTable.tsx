@@ -17,6 +17,9 @@ interface ProblemItem {
   pointsMax: number
   dueAt: string | null
   closeAt: string | null
+  submittedCount: number
+  pendingCount: number
+  enrolledCount: number
 }
 
 function formatDate(iso: string | null) {
@@ -165,8 +168,18 @@ export function ProblemsTable({
                     {p.pointsMax}
                   </td>
                   <td className="px-5 py-4 text-slate-500">{formatDate(p.dueAt)}</td>
-                  <td className="px-5 py-4 text-center text-slate-300">–</td>
-                  <td className="px-5 py-4 text-center text-slate-300">–</td>
+                  <td className="px-5 py-4 text-center text-slate-600">
+                    {p.submittedCount}/{p.enrolledCount}
+                  </td>
+                  <td className="px-5 py-4 text-center text-slate-600">
+                    {p.pendingCount > 0 ? (
+                      <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">
+                        {p.pendingCount}
+                      </span>
+                    ) : (
+                      <span className="text-slate-300">–</span>
+                    )}
+                  </td>
                   {canManage && (
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-2">

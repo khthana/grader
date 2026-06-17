@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { FaArrowLeft, FaClock } from "react-icons/fa"
+import { FaArrowLeft, FaClock, FaExclamationTriangle } from "react-icons/fa"
 import { CodeEditor } from "@/components/editor/CodeEditor"
 import { getDb } from "@/lib/db"
 import { getProblemById } from "@/lib/problems/repository"
@@ -35,6 +35,10 @@ export default async function ProblemPage({ params }: PageProps) {
 
   const visibleCases = problem.testCases.filter((tc) => !tc.isHidden)
   const dueDate = formatDate(problem.dueAt)
+  const now = new Date()
+  const isClosed = problem.closeAt ? new Date(problem.closeAt) < now : false
+  const isLateWindow =
+    !isClosed && problem.dueAt ? new Date(problem.dueAt) < now : false
 
   return (
     <div className="flex flex-col gap-6 font-thai">
@@ -49,11 +53,23 @@ export default async function ProblemPage({ params }: PageProps) {
         </Link>
       </div>
 
-      {/* Due date */}
+      {/* Deadline info + warning banners */}
       {dueDate && (
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <FaClock className="h-3.5 w-3.5" />
           กำหนดส่ง: {dueDate}
+        </div>
+      )}
+      {isClosed && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          <FaExclamationTriangle className="h-4 w-4 shrink-0" />
+          หมดเวลาส่งงานแล้ว — ไม่สามารถส่งคำตอบได้อีก
+        </div>
+      )}
+      {isLateWindow && (
+        <div className="flex items-center gap-2 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm font-medium text-yellow-700">
+          <FaExclamationTriangle className="h-4 w-4 shrink-0" />
+          ⚠ ส่งช้า — เลยกำหนดส่งแล้ว แต่ยังส่งได้อยู่ งานจะถูกบันทึกว่าส่งช้า
         </div>
       )}
 
@@ -105,7 +121,7 @@ export default async function ProblemPage({ params }: PageProps) {
       {/* Code editor */}
       <div className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold text-slate-500">เขียน Code ของคุณ</h2>
-        <CodeEditor problemId={problem.id} />
+        <CodeEditor problemId={problem.id} isClosed={isClosed} />
       </div>
     </div>
   )

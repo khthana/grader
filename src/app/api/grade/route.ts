@@ -4,6 +4,8 @@ import type { SubmissionRequest, GradeResult, TestCase } from "@/types"
 import { getUserFromRequest } from "@/lib/auth-guard"
 import { getDb } from "@/lib/db"
 import { getProblemById } from "@/lib/problems/repository"
+import { findEnrollment } from "@/lib/enrollments/repository"
+import { createSubmission } from "@/lib/submissions/repository"
 
 export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request)
@@ -21,13 +23,33 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const problem = await getProblemById(getDb(), Number(problemId))
+  const db = getDb()
+  const problem = await getProblemById(db, Number(problemId))
   if (!problem) {
     return NextResponse.json({ error: "Problem not found" }, { status: 404 })
   }
 
-  // "run" = visible test cases only; "submit" = all (default to submit if not specified)
   const runMode = mode === "run" ? "run" : "submit"
+
+  if (runMode === "submit") {
+    // Deadline enforcement (ADR 0002): close_at checked first
+    const now = new Date()
+    if (problem.closeAt && new Date(problem.closeAt) < now) {
+      return NextResponse.json({ error: "หมดเวลาส่งงานแล้ว" }, { status: 403 })
+    }
+
+    // Enrollment check: student must be enrolled in this course
+    const isPrivileged = user.roles.some((r) =>
+      ["Admin", "Instructor", "TA"].includes(r)
+    )
+    if (!isPrivileged) {
+      const enrollment = await findEnrollment(db, problem.courseId, user.id)
+      if (!enrollment) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+    }
+  }
+
   const testCases: TestCase[] = (
     runMode === "run"
       ? problem.testCases.filter((tc) => !tc.isHidden)
@@ -46,6 +68,23 @@ export async function POST(request: NextRequest) {
   const pointsMax = testCases.reduce((sum, tc) => sum + tc.score, 0)
   const passedTests = results.filter((r) => r.passed).length
   const totalTests = results.length
+
+  // Store submission only on mode:submit
+  if (runMode === "submit") {
+    const now = new Date()
+    const isLate = problem.dueAt ? new Date(problem.dueAt) < now : false
+    await createSubmission(db, {
+      problemId: problem.id,
+      userId: user.id,
+      courseId: problem.courseId,
+      code,
+      language: body.language ?? "python",
+      pointsEarned,
+      pointsMax,
+      isLate,
+      results,
+    })
+  }
 
   const gradeResult: GradeResult = {
     pointsEarned,

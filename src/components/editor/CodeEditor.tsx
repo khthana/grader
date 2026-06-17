@@ -5,9 +5,10 @@ import { GradeResult } from "@/types"
 
 interface CodeEditorProps {
   problemId: number
+  isClosed?: boolean
 }
 
-export function CodeEditor({ problemId }: CodeEditorProps) {
+export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
   const [code, setCode] = useState("")
   const [result, setResult] = useState<GradeResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -56,24 +57,30 @@ export function CodeEditor({ problemId }: CodeEditorProps) {
       />
 
       {/* Buttons */}
-      <div className="flex gap-3">
-        <button
-          onClick={() => handleGrade("run")}
-          disabled={isLoading || !code.trim()}
-          className="rounded-lg border border-secondary px-5 py-2 text-sm font-medium text-secondary
-                     transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isLoading && activeMode === "run" ? "กำลังรัน..." : "รันทดสอบ"}
-        </button>
-        <button
-          onClick={() => handleGrade("submit")}
-          disabled={isLoading || !code.trim()}
-          className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white
-                     transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isLoading && activeMode === "submit" ? "กำลังส่ง..." : "ส่งคำตอบ"}
-        </button>
-      </div>
+      {isClosed ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+          หมดเวลาส่งงานแล้ว — ไม่สามารถส่งคำตอบได้อีก
+        </div>
+      ) : (
+        <div className="flex gap-3">
+          <button
+            onClick={() => handleGrade("run")}
+            disabled={isLoading || !code.trim()}
+            className="rounded-lg border border-secondary px-5 py-2 text-sm font-medium text-secondary
+                       transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isLoading && activeMode === "run" ? "กำลังรัน..." : "รันทดสอบ"}
+          </button>
+          <button
+            onClick={() => handleGrade("submit")}
+            disabled={isLoading || !code.trim()}
+            className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white
+                       transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isLoading && activeMode === "submit" ? "กำลังส่ง..." : "ส่งคำตอบ"}
+          </button>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
