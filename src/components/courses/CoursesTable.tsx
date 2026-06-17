@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { FaPlus, FaPen, FaTrash, FaUsers } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
@@ -11,6 +12,7 @@ type DialogState = { mode: "create" } | { mode: "edit"; course: CourseValue } | 
 
 export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
   const { notify } = useToast()
+  const router = useRouter()
   const [courses, setCourses] = useState<CourseValue[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -18,7 +20,13 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
   const [deleteTarget, setDeleteTarget] = useState<CourseValue | null>(null)
   const [staffTarget, setStaffTarget] = useState<CourseValue | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const reload = () => setRefreshKey((k) => k + 1)
+  // Refresh this client table AND the server-rendered shell, so the navbar
+  // course switcher (fed by the layout's getCourseContext) updates immediately
+  // rather than only on the next full page load.
+  const reload = () => {
+    setRefreshKey((k) => k + 1)
+    router.refresh()
+  }
 
   useEffect(() => {
     let cancelled = false
