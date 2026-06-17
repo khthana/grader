@@ -139,3 +139,116 @@ export async function countPending(
   )
   return Number(rows[0]?.count ?? 0)
 }
+
+export async function getSubmission(
+  db: Queryable,
+  id: number
+): Promise<SubmissionRecord | null> {
+  const { rows } = await db.query<SubmissionRow>(
+    `SELECT id, problem_id, user_id, course_id, code, language,
+            points_earned, points_max, is_late, results,
+            submitted_at, reviewed_at, reviewed_by, manual_score
+     FROM submissions
+     WHERE id = $1::int`,
+    [id]
+  )
+  return rows[0] ? toRecord(rows[0]) : null
+}
+
+export async function reviewSubmission(
+  db: Queryable,
+  id: number,
+  { manualScore, reviewedBy }: { manualScore: number | null; reviewedBy: number }
+): Promise<SubmissionRecord | null> {
+  const { rows } = await db.query<SubmissionRow>(
+    `UPDATE submissions
+     SET manual_score = $2, reviewed_by = $3::int, reviewed_at = NOW()
+     WHERE id = $1::int
+     RETURNING id, problem_id, user_id, course_id, code, language,
+               points_earned, points_max, is_late, results,
+               submitted_at, reviewed_at, reviewed_by, manual_score`,
+    [id, manualScore, reviewedBy]
+  )
+  return rows[0] ? toRecord(rows[0]) : null
+}
+
+export interface SubmissionListItem {
+  id: number
+  userId: number
+  studentName: string
+  studentIdCode: string | null
+  submittedAt: string
+  isLate: boolean
+  pointsEarned: number | null
+  pointsMax: number | null
+  manualScore: number | null
+  effectiveScore: number | null
+  reviewedAt: string | null
+}
+
+interface SubmissionListRow {
+  id: number
+  user_id: number
+  student_name: string
+  student_id_code: string | null
+  submitted_at: string
+  is_late: boolean
+  points_earned: string | null
+  points_max: string | null
+  manual_score: string | null
+  reviewed_at: string | null
+}
+
+export async function listSubmissionsForProblem(
+  db: Queryable,
+  problemId: number
+): Promise<SubmissionListItem[]> {
+  const { rows } = await db.query<SubmissionListRow>(
+    `SELECT s.id, s.user_id,
+            u.name AS student_name,
+            u.id_code AS student_id_code,
+            s.submitted_at, s.is_late,
+            s.points_earned, s.points_max, s.manual_score, s.reviewed_at
+     FROM submissions s
+     JOIN users u ON u.id = s.user_id
+     WHERE s.problem_id = $1::int
+     ORDER BY s.submitted_at DESC`,
+    [problemId]
+  )
+  return rows.map((row) => {
+    const pointsEarned = row.points_earned != null ? Number(row.points_earned) : null
+    const manualScore = row.manual_score != null ? Number(row.manual_score) : null
+    const effectiveScore = manualScore ?? pointsEarned
+    return {
+      id: row.id,
+      userId: row.user_id,
+      studentName: row.student_name,
+      studentIdCode: row.student_id_code,
+      submittedAt: row.submitted_at,
+      isLate: row.is_late,
+      pointsEarned,
+      pointsMax: row.points_max != null ? Number(row.points_max) : null,
+      manualScore,
+      effectiveScore,
+      reviewedAt: row.reviewed_at,
+    }
+  })
+}
+
+export async function getLastSubmission(
+  db: Queryable,
+  problemId: number,
+  userId: number
+): Promise<SubmissionRecord | null> {
+  const { rows } = await db.query<SubmissionRow>(
+    `SELECT id, problem_id, user_id, course_id, code, language,
+            points_earned, points_max, is_late, results,
+            submitted_at, reviewed_at, reviewed_by, manual_score
+     FROM submissions
+     WHERE problem_id = $1::int AND user_id = $2::int
+     ORDER BY submitted_at DESC
+     LIMIT 1`,
+    [problemId, userId]
+  )
+  return rows[0] ? toRecord(rows[0]) : null
+}

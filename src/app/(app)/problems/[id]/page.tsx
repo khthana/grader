@@ -5,6 +5,8 @@ import { CodeEditor } from "@/components/editor/CodeEditor"
 import { getDb } from "@/lib/db"
 import { getProblemById } from "@/lib/problems/repository"
 import { getCourseContext } from "@/lib/courses/server"
+import { getCurrentUser } from "@/lib/session"
+import { getLastSubmission } from "@/lib/submissions/repository"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -26,12 +28,19 @@ export default async function ProblemPage({ params }: PageProps) {
   const problemId = Number.parseInt(id, 10)
   if (!Number.isFinite(problemId)) notFound()
 
-  const { activeCourse } = await getCourseContext()
-  const problem = await getProblemById(getDb(), problemId)
+  const [{ activeCourse }, user] = await Promise.all([getCourseContext(), getCurrentUser()])
+  const db = getDb()
+  const problem = await getProblemById(db, problemId)
 
   if (!problem || (activeCourse && problem.courseId !== activeCourse.id)) {
     notFound()
   }
+
+  const isPrivileged = user?.roles.some((r) => ["Admin", "Instructor", "TA"].includes(r))
+  const lastSubmission =
+    user && !isPrivileged
+      ? await getLastSubmission(db, problemId, user.id)
+      : null
 
   const visibleCases = problem.testCases.filter((tc) => !tc.isHidden)
   const dueDate = formatDate(problem.dueAt)
@@ -39,6 +48,9 @@ export default async function ProblemPage({ params }: PageProps) {
   const isClosed = problem.closeAt ? new Date(problem.closeAt) < now : false
   const isLateWindow =
     !isClosed && problem.dueAt ? new Date(problem.dueAt) < now : false
+  const pointsMax = problem.testCases.reduce((s, tc) => s + (tc.score ?? 0), 0)
+  const effectiveScore =
+    lastSubmission?.manualScore ?? lastSubmission?.pointsEarned ?? null
 
   return (
     <div className="flex flex-col gap-6 font-thai">
@@ -52,6 +64,22 @@ export default async function ProblemPage({ params }: PageProps) {
           <FaArrowLeft className="h-3 w-3" /> โจทย์ทั้งหมด
         </Link>
       </div>
+
+      {/* Last submission score */}
+      {effectiveScore != null && (
+        <div className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium ${
+          effectiveScore === pointsMax
+            ? "border-green-200 bg-green-50 text-green-700"
+            : "border-blue-200 bg-blue-50 text-blue-700"
+        }`}>
+          คะแนนล่าสุดของคุณ: {effectiveScore}/{pointsMax} คะแนน
+          {lastSubmission?.isLate && (
+            <span className="ml-2 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">
+              ส่งช้า
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Deadline info + warning banners */}
       {dueDate && (

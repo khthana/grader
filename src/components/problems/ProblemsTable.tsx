@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { FaPlus, FaPen, FaTrash } from "react-icons/fa"
+import { FaPlus, FaPen, FaTrash, FaEye } from "react-icons/fa"
 import { WeekBar, type Week } from "./WeekBar"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
 import { useToast } from "@/components/shell/ToastProvider"
@@ -183,6 +183,13 @@ export function ProblemsTable({
                   {canManage && (
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-2">
+                        <Link
+                          href={`/problems/${p.id}/submissions?courseId=${courseId}`}
+                          className="rounded p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                          title="ดูการส่งงาน"
+                        >
+                          <FaEye className="h-3.5 w-3.5" />
+                        </Link>
                         <Link
                           href={`/problems/${p.id}/edit?courseId=${courseId}`}
                           className="rounded p-1.5 text-slate-400 transition hover:bg-blue-50 hover:text-secondary"

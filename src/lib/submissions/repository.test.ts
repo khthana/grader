@@ -7,6 +7,10 @@ import {
   listSubmissions,
   countSubmitted,
   countPending,
+  getSubmission,
+  reviewSubmission,
+  listSubmissionsForProblem,
+  getLastSubmission,
   type Queryable,
 } from "./repository"
 import { createUser, assignRole } from "@/lib/users/repository"
@@ -32,12 +36,14 @@ describe("submission repository", () => {
   let courseId: number
   let problemId: number
   let userId: number
+  let instructorId: number
 
   beforeEach(async () => {
     db = freshDb()
-    const ins = await createUser(db, { email: "ins@kmitl.ac.th", name: "Ins" })
+    const ins = await createUser(db, { email: "ins@kmitl.ac.th", name: "Instructor One", firstNameTh: "หนึ่ง", lastNameTh: "ผู้สอน" })
     await assignRole(db, ins.id, "Instructor")
-    const student = await createUser(db, { email: "stu@kmitl.ac.th", name: "Stu", idCode: "64010001" })
+    instructorId = ins.id
+    const student = await createUser(db, { email: "stu@kmitl.ac.th", name: "Stu", idCode: "64010001", firstNameTh: "นักศึกษา", lastNameTh: "ทดสอบ" })
     await assignRole(db, student.id, "Student")
     userId = student.id
     const course = await createCourse(db, { code: "C01", nameTh: "ก", nameEn: "A" })
@@ -85,5 +91,95 @@ describe("submission repository", () => {
     expect(await countPending(db, problemId)).toBe(0)
     await createSubmission(db, { problemId, userId, courseId, code: "x", language: "python", pointsEarned: 5, pointsMax: 10, isLate: false, results: [] })
     expect(await countPending(db, problemId)).toBe(1)
+  })
+
+  // Phase 1 — #21 behaviors
+
+  it("getSubmission returns full record including code and results", async () => {
+    const created = await createSubmission(db, {
+      problemId, userId, courseId,
+      code: "print('hi')", language: "python",
+      pointsEarned: 5, pointsMax: 10, isLate: false,
+      results: [{ passed: false, testCaseId: 1 }],
+    })
+    const found = await getSubmission(db, created.id)
+    expect(found).not.toBeNull()
+    expect(found!.id).toBe(created.id)
+    expect(found!.code).toBe("print('hi')")
+    expect(found!.pointsEarned).toBe(5)
+    expect(found!.results).toMatchObject([{ passed: false, testCaseId: 1 }])
+  })
+
+  it("getSubmission returns null for unknown id", async () => {
+    const found = await getSubmission(db, 99999)
+    expect(found).toBeNull()
+  })
+
+  it("reviewSubmission sets manual_score, reviewed_by, reviewed_at", async () => {
+    const sub = await createSubmission(db, {
+      problemId, userId, courseId,
+      code: "x", language: "python",
+      pointsEarned: 3, pointsMax: 10, isLate: false, results: [],
+    })
+    const reviewed = await reviewSubmission(db, sub.id, { manualScore: 8, reviewedBy: instructorId })
+    expect(reviewed).not.toBeNull()
+    expect(reviewed!.manualScore).toBe(8)
+    expect(reviewed!.reviewedBy).toBe(instructorId)
+    expect(reviewed!.reviewedAt).not.toBeNull()
+  })
+
+  it("reviewSubmission with manualScore null still sets reviewed_at", async () => {
+    const sub = await createSubmission(db, {
+      problemId, userId, courseId,
+      code: "x", language: "python",
+      pointsEarned: 10, pointsMax: 10, isLate: false, results: [],
+    })
+    const reviewed = await reviewSubmission(db, sub.id, { manualScore: null, reviewedBy: instructorId })
+    expect(reviewed!.manualScore).toBeNull()
+    expect(reviewed!.reviewedAt).not.toBeNull()
+  })
+
+  it("after reviewSubmission, countPending decreases", async () => {
+    const sub = await createSubmission(db, {
+      problemId, userId, courseId,
+      code: "x", language: "python",
+      pointsEarned: 5, pointsMax: 10, isLate: false, results: [],
+    })
+    expect(await countPending(db, problemId)).toBe(1)
+    await reviewSubmission(db, sub.id, { manualScore: 5, reviewedBy: instructorId })
+    expect(await countPending(db, problemId)).toBe(0)
+  })
+
+  it("listSubmissionsForProblem includes student name and id_code", async () => {
+    await createSubmission(db, {
+      problemId, userId, courseId,
+      code: "x", language: "python",
+      pointsEarned: 7, pointsMax: 10, isLate: true, results: [],
+    })
+    const list = await listSubmissionsForProblem(db, problemId)
+    expect(list).toHaveLength(1)
+    expect(list[0].userId).toBe(userId)
+    expect(list[0].studentIdCode).toBe("64010001")
+    expect(typeof list[0].studentName).toBe("string")
+    expect(list[0].isLate).toBe(true)
+    expect(list[0].pointsEarned).toBe(7)
+    expect(list[0].effectiveScore).toBe(7)
+  })
+
+  it("getLastSubmission returns the most recent submission for a user+problem", async () => {
+    await createSubmission(db, {
+      problemId, userId, courseId,
+      code: "first", language: "python",
+      pointsEarned: 3, pointsMax: 10, isLate: false, results: [],
+    })
+    const second = await createSubmission(db, {
+      problemId, userId, courseId,
+      code: "second", language: "python",
+      pointsEarned: 7, pointsMax: 10, isLate: false, results: [],
+    })
+    const last = await getLastSubmission(db, problemId, userId)
+    expect(last).not.toBeNull()
+    expect(last!.id).toBe(second.id)
+    expect(last!.code).toBe("second")
   })
 })
