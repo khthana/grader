@@ -200,8 +200,8 @@ export async function setCourseInstructors(
   }
 }
 
-// Courses a user may manage: Admin sees all; everyone else sees only the
-// courses they're assigned to via course_instructors.
+// Courses a user is entitled to: Admin sees all; otherwise any course where
+// the user appears as staff (course_instructors) OR as an enrolled student.
 export async function listCoursesForUser(
   db: Queryable,
   userId: number,
@@ -217,8 +217,11 @@ export async function listCoursesForUser(
   const { rows } = await db.query<CourseRow>(
     `SELECT c.id, c.code, c.name_th, c.name_en, c.program
      FROM courses c
-     JOIN course_instructors ci ON ci.course_id = c.id
-     WHERE ci.user_id = $1::int
+     WHERE c.id IN (
+       SELECT course_id FROM course_instructors WHERE user_id = $1::int
+       UNION
+       SELECT course_id FROM enrollments WHERE user_id = $1::int
+     )
      ORDER BY c.code`,
     [userId]
   )
