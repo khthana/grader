@@ -2,19 +2,9 @@
 
 import { useState } from "react"
 import * as XLSX from "xlsx"
-import { FaTimes, FaDownload, FaFileExcel } from "react-icons/fa"
+import { FaTimes, FaFileExcel } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
-
-const COLUMNS = [
-  "idCode",
-  "titleTh",
-  "firstNameTh",
-  "lastNameTh",
-  "studyGroup",
-  "year",
-  "program",
-  "email",
-]
+import { parseKmitlSheet } from "@/lib/import/kmitl"
 
 interface RowResult {
   row: number
@@ -45,14 +35,6 @@ export function RosterImportDialog({ courseId, onClose, onImported }: Props) {
   const [results, setResults] = useState<ImportResponse | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  function downloadTemplate() {
-    const example = ["65010100", "นาย", "ประพาฬพงษ์", "ธรรมาวาดานันท์", "1", "2565", "วิศวกรรมคอมพิวเตอร์", ""]
-    const ws = XLSX.utils.aoa_to_sheet([COLUMNS, example])
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "students")
-    XLSX.writeFile(wb, "roster-import-template.xlsx")
-  }
-
   async function readFile(file: File) {
     setFileName(file.name)
     setResults(null)
@@ -60,8 +42,26 @@ export function RosterImportDialog({ courseId, onClose, onImported }: Props) {
       const buf = await file.arrayBuffer()
       const wb = XLSX.read(buf)
       const sheet = wb.Sheets[wb.SheetNames[0]]
-      const json = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "", raw: false })
-      setRows(json)
+      const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+        header: 1,
+        blankrows: false,
+        defval: "",
+      })
+      // Each student is enrolled into this course; ตอน becomes the study group,
+      // and the login email is derived ({รหัส}@kmitl.ac.th) server-side.
+      const mapped = parseKmitlSheet(aoa).map((s) => ({
+        idCode: s.idCode,
+        titleTh: s.titleTh,
+        firstNameTh: s.firstNameTh,
+        lastNameTh: s.lastNameTh,
+        studyGroup: s.studyGroup,
+      }))
+      if (mapped.length === 0) {
+        notify("error", "ไม่พบรายชื่อนักศึกษาในไฟล์ (รองรับไฟล์ใบคะแนนสอบ สจล.)")
+        setRows(null)
+        return
+      }
+      setRows(mapped)
     } catch {
       notify("error", "อ่านไฟล์ Excel ไม่สำเร็จ")
       setRows(null)
@@ -114,12 +114,10 @@ export function RosterImportDialog({ courseId, onClose, onImported }: Props) {
           </button>
         </div>
 
-        <button
-          onClick={downloadTemplate}
-          className="mb-4 inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-        >
-          <FaDownload className="h-3.5 w-3.5" /> ดาวน์โหลดเทมเพลตไฟล์ตัวอย่าง
-        </button>
+        <p className="mb-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-500">
+          รองรับไฟล์ <span className="font-medium text-slate-600">ใบคะแนนสอบ (.xls)</span> จากสำนักทะเบียน สจล.
+          นักศึกษาทุกคนในไฟล์จะถูกเพิ่มเข้าวิชานี้ โดยใช้ <span className="font-medium text-slate-600">ตอน</span> เป็นกลุ่มเรียน
+        </p>
 
         <label
           onDragOver={(e) => {
@@ -140,9 +138,9 @@ export function RosterImportDialog({ courseId, onClose, onImported }: Props) {
           <span className="text-sm text-slate-600">
             {fileName
               ? `${fileName}${rows ? ` · พบ ${rows.length} รายชื่อ พร้อมนำเข้า` : ""}`
-              : "ลากไฟล์ .xlsx มาวาง หรือคลิกเพื่อเลือก"}
+              : "ลากไฟล์ใบคะแนนสอบมาวาง หรือคลิกเพื่อเลือก"}
           </span>
-          <span className="text-xs text-slate-400">รองรับคอลัมน์: รหัส, คำนำหน้า, ชื่อ, นามสกุล, กลุ่ม, ปีการศึกษา, หลักสูตร, email</span>
+          <span className="text-xs text-slate-400">ไฟล์ใบคะแนนสอบ (.xls / .xlsx) จากสำนักทะเบียน สจล.</span>
           <input type="file" accept=".xlsx,.xls" onChange={onFile} className="hidden" />
         </label>
 

@@ -2,22 +2,9 @@
 
 import { useState } from "react"
 import * as XLSX from "xlsx"
-import { FaTimes, FaDownload, FaFileExcel } from "react-icons/fa"
+import { FaTimes, FaFileExcel } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
-
-const COLUMNS = [
-  "titleTh",
-  "firstNameTh",
-  "lastNameTh",
-  "titleEn",
-  "firstNameEn",
-  "lastNameEn",
-  "email",
-  "phone",
-  "idCode",
-  "password",
-  "roles",
-]
+import { parseKmitlSheet } from "@/lib/import/kmitl"
 
 interface RowResult {
   row: number
@@ -44,14 +31,6 @@ export function ImportDialog({ onClose, onImported }: Props) {
   const [results, setResults] = useState<ImportResponse | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  function downloadTemplate() {
-    const example = ["นาย", "สมชาย", "ใจดี", "Mr.", "Somchai", "Jaidee", "somchai@kmitl.ac.th", "0812345678", "64010001", "", "Student"]
-    const ws = XLSX.utils.aoa_to_sheet([COLUMNS, example])
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "users")
-    XLSX.writeFile(wb, "user-import-template.xlsx")
-  }
-
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -61,8 +40,26 @@ export function ImportDialog({ onClose, onImported }: Props) {
       const buf = await file.arrayBuffer()
       const wb = XLSX.read(buf)
       const sheet = wb.Sheets[wb.SheetNames[0]]
-      const json = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "", raw: false })
-      setRows(json)
+      const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+        header: 1,
+        blankrows: false,
+        defval: "",
+      })
+      // Each student becomes a Student user whose login email is {รหัส}@kmitl.ac.th.
+      const mapped = parseKmitlSheet(aoa).map((s) => ({
+        idCode: s.idCode,
+        titleTh: s.titleTh,
+        firstNameTh: s.firstNameTh,
+        lastNameTh: s.lastNameTh,
+        email: `${s.idCode}@kmitl.ac.th`,
+        roles: "Student",
+      }))
+      if (mapped.length === 0) {
+        notify("error", "ไม่พบรายชื่อนักศึกษาในไฟล์ (รองรับไฟล์ใบคะแนนสอบ สจล.)")
+        setRows(null)
+        return
+      }
+      setRows(mapped)
     } catch {
       notify("error", "อ่านไฟล์ Excel ไม่สำเร็จ")
       setRows(null)
@@ -102,17 +99,15 @@ export function ImportDialog({ onClose, onImported }: Props) {
           </button>
         </div>
 
-        <button
-          onClick={downloadTemplate}
-          className="mb-4 inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-        >
-          <FaDownload className="h-3.5 w-3.5" /> ดาวน์โหลดเทมเพลต
-        </button>
+        <p className="mb-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-500">
+          รองรับไฟล์ <span className="font-medium text-slate-600">ใบคะแนนสอบ (.xls)</span> จากสำนักทะเบียน สจล.
+          ระบบจะสร้างผู้ใช้บทบาทนักศึกษา โดยใช้อีเมล <span className="font-mono">{"{รหัสนักศึกษา}"}@kmitl.ac.th</span>
+        </p>
 
         <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 py-10 text-center hover:border-blue-300">
           <FaFileExcel className="h-8 w-8 text-green-600" />
           <span className="text-sm text-slate-600">
-            {fileName || "เลือกไฟล์ .xlsx ตามเทมเพลต"}
+            {fileName || "เลือกไฟล์ใบคะแนนสอบ (.xls / .xlsx)"}
           </span>
           <input type="file" accept=".xlsx,.xls" onChange={onFile} className="hidden" />
         </label>
