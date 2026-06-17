@@ -16,6 +16,15 @@ export function canManageCourses(roles: string[]): boolean {
   return roles.some((r) => COURSE_MANAGERS.includes(r))
 }
 
+// Who counts as teaching staff for a course: Admin, Instructor, or TA. Used to
+// gate read access to staff-only views such as the Scorebook — an enrolled
+// Student is entitled to the course but is not teaching staff.
+const TEACHING_STAFF = ["Admin", "Instructor", "TA"]
+
+export function isTeachingStaff(roles: string[]): boolean {
+  return roles.some((r) => TEACHING_STAFF.includes(r))
+}
+
 // Pick the active course from a user's entitled courses. Prefer the requested
 // id (e.g. from the `active_course` cookie) when it's still in the list;
 // otherwise fall back to the first course. Returns null for an empty list.

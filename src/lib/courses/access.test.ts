@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { resolveActiveCourse, canMutateRoster, canManageCourses } from "./access"
+import { resolveActiveCourse, canMutateRoster, canManageCourses, isTeachingStaff } from "./access"
 
 const courses = [
   { id: 1, code: "C1" },
@@ -52,5 +52,22 @@ describe("canManageCourses", () => {
     expect(canManageCourses(["TA"])).toBe(false)
     expect(canManageCourses(["Student"])).toBe(false)
     expect(canManageCourses([])).toBe(false)
+  })
+})
+
+describe("isTeachingStaff", () => {
+  it("treats Admin, Instructor, and TA as teaching staff", () => {
+    expect(isTeachingStaff(["Admin"])).toBe(true)
+    expect(isTeachingStaff(["Instructor"])).toBe(true)
+    expect(isTeachingStaff(["TA"])).toBe(true)
+  })
+
+  it("does not treat a Student-only user as teaching staff", () => {
+    expect(isTeachingStaff(["Student"])).toBe(false)
+    expect(isTeachingStaff([])).toBe(false)
+  })
+
+  it("counts a user as staff when any role qualifies", () => {
+    expect(isTeachingStaff(["Student", "TA"])).toBe(true)
   })
 })

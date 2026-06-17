@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { getUserFromRequest } from "@/lib/auth-guard"
 import { getDb } from "@/lib/db"
 import { listCoursesForUser } from "./repository"
-import { canMutateRoster, canManageCourses } from "./access"
+import { canMutateRoster, canManageCourses, isTeachingStaff } from "./access"
 import type { UserWithRoles } from "@/lib/users/repository"
 
 export type CourseAuth =
@@ -11,12 +11,13 @@ export type CourseAuth =
 
 // Resolve + authorize a course-scoped request:
 //   401 unauthenticated · 404 bad course id · 403 when the course isn't in the
-//   caller's entitled set · 403 (when `mutate`) for a roster read-only role such
-//   as TA · 403 (when `manage`) for a non course-manager (TA/Student).
+//   caller's entitled set · 403 (when `staff`) for an entitled non-staff role
+//   such as an enrolled Student · 403 (when `mutate`) for a roster read-only role
+//   such as TA · 403 (when `manage`) for a non course-manager (TA/Student).
 export async function authorizeCourse(
   request: NextRequest,
   courseIdParam: string,
-  options: { mutate?: boolean; manage?: boolean } = {}
+  options: { staff?: boolean; mutate?: boolean; manage?: boolean } = {}
 ): Promise<CourseAuth> {
   const user = await getUserFromRequest(request)
   if (!user) {
@@ -30,6 +31,9 @@ export async function authorizeCourse(
 
   const entitled = await listCoursesForUser(getDb(), user.id, user.roles)
   if (!entitled.some((c) => c.id === courseId)) {
+    return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
+  }
+  if (options.staff && !isTeachingStaff(user.roles)) {
     return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
   }
   if (options.mutate && !canMutateRoster(user.roles)) {

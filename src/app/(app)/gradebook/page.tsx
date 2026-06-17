@@ -1,13 +1,13 @@
 import { notFound } from "next/navigation"
 import { getCurrentUser } from "@/lib/session"
 import { getCourseContext } from "@/lib/courses/server"
-import { canManageCourses } from "@/lib/courses/access"
+import { isTeachingStaff } from "@/lib/courses/access"
 import { GradebookTable } from "@/components/gradebook/GradebookTable"
 
 export default async function GradebookPage() {
   const [user, { activeCourse }] = await Promise.all([getCurrentUser(), getCourseContext()])
 
-  if (!user || !canManageCourses(user.roles)) notFound()
+  if (!user || !isTeachingStaff(user.roles)) notFound()
   if (!activeCourse) {
     return (
       <div className="flex flex-col gap-6 font-thai">

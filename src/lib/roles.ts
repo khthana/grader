@@ -30,7 +30,8 @@ const SIDEBAR_MENU: Record<Role, MenuItem[]> = {
   // Instructor manages courses; TA gets the teaching menu without course mgmt.
   Instructor: [MENU.courses, ...TEACHING_MENU],
   TA: TEACHING_MENU,
-  Student: [MENU.assignments, MENU.gradebook],
+  // The Scorebook is staff-only; a Student sees only their own assignments.
+  Student: [MENU.assignments],
 }
 
 export function getSidebarMenu(role: Role): MenuItem[] {

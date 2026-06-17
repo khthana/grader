@@ -84,6 +84,16 @@ describe("GET /api/courses/[id]/gradebook", () => {
     expect(res.status).toBe(403)
   })
 
+  it("returns 403 for an enrolled Student (Scorebook is staff-only)", async () => {
+    const res = await GET(req(courseId, sessionFor("stu@kmitl.ac.th")), makeCtx(courseId))
+    expect(res.status).toBe(403)
+  })
+
+  it("returns 200 for a TA assigned to the course", async () => {
+    const res = await GET(req(courseId, sessionFor("ta@kmitl.ac.th")), makeCtx(courseId))
+    expect(res.status).toBe(200)
+  })
+
   it("returns 200 with correct gradebook matrix", async () => {
     await createSubmission(db, {
       problemId, userId: studentId, courseId,
