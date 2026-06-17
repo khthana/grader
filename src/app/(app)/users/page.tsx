@@ -1,12 +1,16 @@
 import { PageTitle } from "@/components/shell/ComingSoon"
 import { UsersTable } from "@/components/users/UsersTable"
+import { getCurrentUser } from "@/lib/session"
 
-// User Management (read). Create/edit/delete + roles + import arrive in #4-#7.
-export default function UsersPage() {
+export default async function UsersPage() {
+  const user = await getCurrentUser()
+  // Impersonation is a dev-only testing aid; never offered in production.
+  const allowImpersonation = process.env.NODE_ENV !== "production"
+
   return (
     <div className="flex flex-col gap-6">
       <PageTitle icon="users">จัดการผู้ใช้</PageTitle>
-      <UsersTable />
+      <UsersTable currentUserId={user?.id} allowImpersonation={allowImpersonation} />
     </div>
   )
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus, FaPen, FaTrash, FaUserShield, FaFileExcel } from "react-icons/fa"
+import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus, FaPen, FaTrash, FaUserShield, FaFileExcel, FaUserSecret } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
 import { UserFormDialog } from "./UserFormDialog"
 import { RolesDialog } from "./RolesDialog"
@@ -35,7 +35,13 @@ const ROLE_BADGE: Record<string, string> = {
   Student: "bg-pink-100 text-pink-800",
 }
 
-export function UsersTable() {
+export function UsersTable({
+  currentUserId,
+  allowImpersonation = false,
+}: {
+  currentUserId?: number
+  allowImpersonation?: boolean
+}) {
   const { notify } = useToast()
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
@@ -100,6 +106,17 @@ export function UsersTable() {
       reload()
     } catch {
       notify("error", "ไม่สามารถเปลี่ยนสถานะได้")
+    }
+  }
+
+  async function impersonate(user: UserRow) {
+    try {
+      const res = await fetch(`/api/users/${user.id}/impersonate`, { method: "POST" })
+      if (!res.ok) throw new Error()
+      // Hard navigation so the swapped session cookie re-renders the whole shell.
+      window.location.href = "/"
+    } catch {
+      notify("error", "ไม่สามารถเข้าใช้เป็นผู้ใช้นี้ได้")
     }
   }
 
@@ -212,6 +229,16 @@ export function UsersTable() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-2">
+                      {allowImpersonation && u.id !== currentUserId && (
+                        <button
+                          onClick={() => impersonate(u)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-amber-50 hover:text-amber-600"
+                          aria-label="เข้าใช้เป็น"
+                          title="เข้าใช้เป็น (ทดสอบมุมมอง)"
+                        >
+                          <FaUserSecret className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       <button
                         onClick={() => setDialog({ mode: "edit", id: u.id })}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-blue-50 hover:text-secondary"

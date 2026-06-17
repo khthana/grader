@@ -5,6 +5,7 @@ export type LogAction =
   | "user.update"
   | "user.delete"
   | "user.roles"
+  | "user.impersonate"
   | "login"
   | "enrollment.add"
   | "enrollment.update"
