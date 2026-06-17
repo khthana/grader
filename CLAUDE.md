@@ -9,7 +9,7 @@ CE-Grader is a **standalone product**. The `DEEP-QA-FRONTEND/` and `DEEP-QA-BACK
 
 The app is **feature-complete** as of 2026-06-17. All pages are live — no ComingSoon stubs remain. Delivered features:
 - **Auth + shell:** Postgres-backed login (email/password + Google OAuth), role-based shell, navbar course switcher.
-- **Admin:** User Management (`/users` — CRUD + bulk xlsx import + role assignment), Activity Logs (`/logs`).
+- **Admin:** User Management (`/users` — CRUD + bulk xlsx import + role assignment), Activity Logs (`/logs`), **dev-only impersonation** (enter another user's session to test their view; persistent banner + one-click exit).
 - **Course management:** รายวิชา (`/courses` — CRUD + staff assignment, Admin/Instructor).
 - **Roster:** รายชื่อนักศึกษา (`/students` — view/add/edit/un-enroll + Excel import/export).
 - **Problems:** `/problems` — Instructor CRUD (title, description, test cases, deadlines); `/problems/[id]` — student view with `mode:run` (visible tests only) / `mode:submit` (all tests, stores Submission); `/problems/[id]/edit` — ProblemEditor; `/problems/new`; `/problems/[id]/submissions` — per-problem submission list with score override.
@@ -90,8 +90,15 @@ Specs: `requirement/prd_auth_shell_user_management.md`, `requirement/prd_teacher
 - `src/lib/users/validation.ts`, `src/lib/users/import.ts`, `src/lib/users/name.ts` — pure helpers.
 - UI: `src/components/users/`.
 
+### Admin impersonation (dev-only — never offered in production)
+- A gated testing aid: an Admin enters another user's session to verify that user's view, then returns to their own account. The whole shell reflects the impersonated user "for free" because roles resolve per-request from the session email.
+- **Pure gate** `src/lib/users/impersonation.ts#canImpersonate({ actorRoles, actorId, targetId, isProduction })` → refuses `production` / `not-admin` / `self`.
+- **Enter:** `POST /api/users/[id]/impersonate` (`requireAdmin`) — saves the Admin's current token in an `impersonator` cookie, swaps `session` to a fresh token for the target, clears `active_role`/`active_course`; logs `user.impersonate`. Production → 404, self → 400.
+- **Exit:** `POST /api/users/impersonate/exit` — **cookie-driven, no `requireAdmin`** (the impersonated session may be a non-Admin): moves the `impersonator` token back into `session`, deletes `impersonator`, clears `active_*`; a safe no-op when no valid `impersonator` token is present.
+- **Shell wiring:** `isImpersonating()` (`src/lib/session.ts`) detects a valid `impersonator` cookie; the `(app)` layout passes `impersonatedName` to `AppShell`, which renders `ImpersonationBanner` ("ออกจากโหมด" → exit route → hard-nav to `/users`). Dev-only is enforced both server-side (route 404 in prod) and in the UI (`/users` page passes `allowImpersonation = NODE_ENV !== 'production'` to `UsersTable`).
+
 ### Activity logging
-- `src/lib/logs.ts` — `writeLog` / `safeLog` / `listLogs`. `LogAction` union: `user.create|update|delete|roles | login | enrollment.add|update|remove|import | course.create|update|delete|staff | problem.create|update|delete`.
+- `src/lib/logs.ts` — `writeLog` / `safeLog` / `listLogs`. `LogAction` union: `user.create|update|delete|roles|impersonate | login | enrollment.add|update|remove|import | course.create|update|delete|staff | problem.create|update|delete`.
 
 ### Data Flow (Grading)
 1. Student opens `/problems/[id]` — problem + test cases loaded from DB; last submission score shown.
@@ -101,7 +108,7 @@ Specs: `requirement/prd_auth_shell_user_management.md`, `requirement/prd_teacher
 5. `GradeResult = { pointsEarned, pointsMax, totalTests, passedTests, results[], feedback }` returned to client.
 
 ## Testing
-- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **314 tests / 54 files** as of 2026-06-17.
+- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **362 tests / 62 files** as of 2026-06-17.
 - Pure modules are unit-tested directly (session, password, roles, breadcrumbs, validation, import, name).
 - Repository + route handlers are integration-tested against **pg-mem** (in-memory Postgres, no Docker): build a pool with `newDb()` + `mem.public.none(schema.sql)` + `mem.adapters.createPg()`, inject via `setTestDb`, seed through the repository. Route handlers are imported and called with a `NextRequest`; auth is exercised with real `createSessionToken` cookies.
 - **pg-mem gotchas:** explicit casts (`$1::int`); no `STRING_AGG` (use second query + JS); no `DISTINCT ON` (use subquery with `MAX(submitted_at)` + inner join); schema path `../` count must match test file depth exactly.
