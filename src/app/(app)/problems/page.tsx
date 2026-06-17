@@ -1,27 +1,38 @@
-import Link from "next/link"
-import { FaChevronRight } from "react-icons/fa"
+import { getCourseContext } from "@/lib/courses/server"
+import { getCurrentUser } from "@/lib/session"
+import { canManageCourses } from "@/lib/courses/access"
 import { PageTitle } from "@/components/shell/ComingSoon"
+import { ProblemsTable } from "@/components/problems/ProblemsTable"
 
-// Minimal problem list. Backed by hardcoded problems for now (see the editor
-// page + /api/grade); a real problem store arrives in a later iteration.
-const PROBLEMS = [{ id: "hello-world", title: "Hello, World!" }]
+export default async function ProblemsPage() {
+  const { activeCourse } = await getCourseContext()
+  const user = await getCurrentUser()
+  const canManage = canManageCourses(user?.roles ?? [])
 
-export default function ProblemsPage() {
-  return (
-    <div className="flex flex-col gap-6 font-thai">
-      <PageTitle icon="problems">โจทย์ปัญหา</PageTitle>
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-        {PROBLEMS.map((p) => (
-          <Link
-            key={p.id}
-            href={`/problems/${p.id}`}
-            className="flex items-center justify-between border-b border-gray-100 px-5 py-4 last:border-b-0 hover:bg-slate-50"
-          >
-            <span className="text-slate-700">{p.title}</span>
-            <FaChevronRight className="h-3 w-3 text-slate-300" />
-          </Link>
-        ))}
+  if (!activeCourse) {
+    return (
+      <div className="font-thai">
+        <PageTitle icon="problems">โจทย์ปัญหา</PageTitle>
+        <div className="mt-6 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white py-20 text-center">
+          <p className="text-lg font-medium text-slate-500">ยังไม่มีรายวิชา</p>
+          <p className="text-sm text-slate-400">
+            เลือกรายวิชาจาก switcher ด้านบน หรือสร้างรายวิชาใหม่ที่หน้า "รายวิชา"
+          </p>
+        </div>
       </div>
+    )
+  }
+
+  return (
+    <div className="font-thai">
+      <div className="mb-1 flex items-center gap-3">
+        <h1 className="text-2xl font-semibold text-primary">โจทย์ปัญหา</h1>
+      </div>
+      <p className="mb-6 text-sm text-slate-500">
+        {activeCourse.code} · {activeCourse.nameTh}
+      </p>
+
+      <ProblemsTable courseId={activeCourse.id} canManage={canManage} />
     </div>
   )
 }
