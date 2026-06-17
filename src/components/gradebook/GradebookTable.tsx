@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { scoreTier, paginate, type ScoreTier } from "@/lib/gradebook/display"
 
 type ScorebookStatus = "complete" | "late" | "missing" | "none-due"
 
@@ -20,11 +21,24 @@ interface GradebookStudent {
   status: ScorebookStatus
 }
 
+interface Gradebook {
+  problems: GradebookProblem[]
+  students: GradebookStudent[]
+}
+
+const PER_PAGE = 20
+
 const STATUS_META: Record<ScorebookStatus, { dot: string; label: string }> = {
   complete: { dot: "bg-green-500", label: "ส่งครบ" },
   late: { dot: "bg-yellow-400", label: "ส่งช้า" },
   missing: { dot: "bg-red-500", label: "ค้างส่ง" },
   "none-due": { dot: "bg-slate-300", label: "ยังไม่ถึงกำหนด" },
+}
+
+const TIER_PILL: Record<Exclude<ScoreTier, "empty">, string> = {
+  hi: "bg-green-100 text-green-700",
+  mid: "bg-yellow-100 text-yellow-700",
+  lo: "bg-red-100 text-red-600",
 }
 
 function StatusDot({ status }: { status: ScorebookStatus }) {
@@ -38,29 +52,28 @@ function StatusDot({ status }: { status: ScorebookStatus }) {
   )
 }
 
-interface Gradebook {
-  problems: GradebookProblem[]
-  students: GradebookStudent[]
-}
-
-function scoreCell(score: number | null, pointsMax: number) {
-  if (score === null)
-    return <span className="text-slate-300">–</span>
-  if (score === pointsMax)
-    return <span className="font-semibold text-green-600">{score}</span>
-  if (score > 0)
-    return <span className="text-yellow-600">{score}</span>
-  return <span className="text-red-500">{score}</span>
+function ScorePill({ score, pointsMax }: { score: number | null; pointsMax: number }) {
+  const tier = scoreTier(score, pointsMax)
+  if (tier === "empty") return <span className="text-slate-300">–</span>
+  return (
+    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${TIER_PILL[tier]}`}>
+      {score}
+    </span>
+  )
 }
 
 export function GradebookTable({ courseId }: { courseId: number }) {
   const [gradebook, setGradebook] = useState<Gradebook | null>(null)
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     fetch(`/api/courses/${courseId}/gradebook`)
       .then((r) => r.json())
-      .then(({ gradebook: gb }) => setGradebook(gb))
+      .then(({ gradebook: gb }) => {
+        setGradebook(gb)
+        setPage(1)
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [courseId])
@@ -78,9 +91,11 @@ export function GradebookTable({ courseId }: { courseId: number }) {
   }
 
   const { problems, students } = gradebook
-
-  // Group problems by week
   const weekNos = [...new Set(problems.map((p) => p.weekNo))].sort((a, b) => a - b)
+  const totalMax = problems.reduce((s, p) => s + p.pointsMax, 0)
+
+  const { pageItems, pageCount, page: current } = paginate(students, page, PER_PAGE)
+  const offset = (current - 1) * PER_PAGE
 
   return (
     <div className="flex flex-col gap-3 font-thai">
@@ -95,82 +110,106 @@ export function GradebookTable({ courseId }: { courseId: number }) {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-      <table className="min-w-full text-sm">
-        <thead>
-          {/* Week header row */}
-          <tr className="bg-slate-100 text-xs font-semibold text-slate-500">
-            <th className="sticky left-0 z-10 bg-slate-100 px-5 py-2 text-left" rowSpan={2}>
-              รหัส / ชื่อ
-            </th>
-            <th className="px-3 py-2 text-center" rowSpan={2}>
-              สถานะ
-            </th>
-            {weekNos.map((wn) => {
-              const weekProblems = problems.filter((p) => p.weekNo === wn)
-              return (
+        <table className="min-w-full text-sm">
+          <thead>
+            {/* Week header row */}
+            <tr className="bg-slate-100 text-xs font-semibold text-slate-500">
+              <th className="sticky left-0 z-20 w-12 bg-slate-100 px-3 py-2 text-center" rowSpan={2}>
+                #
+              </th>
+              <th className="sticky left-12 z-20 w-52 bg-slate-100 px-5 py-2 text-left" rowSpan={2}>
+                รหัส / ชื่อ
+              </th>
+              <th className="sticky left-64 z-20 w-16 bg-slate-100 px-3 py-2 text-center" rowSpan={2}>
+                สถานะ
+              </th>
+              {weekNos.map((wn) => {
+                const weekProblems = problems.filter((p) => p.weekNo === wn)
+                return (
+                  <th
+                    key={wn}
+                    colSpan={weekProblems.length}
+                    className="border-l border-slate-200 px-3 py-2 text-center"
+                  >
+                    สัปดาห์ {wn}
+                  </th>
+                )
+              })}
+              <th className="border-l border-slate-200 bg-blue-50 px-4 py-2 text-right text-primary" rowSpan={2}>
+                รวม
+                <br />
+                <span className="font-normal text-slate-400">/{totalMax}</span>
+              </th>
+            </tr>
+            {/* Problem title row */}
+            <tr className="bg-slate-50 text-xs text-slate-400">
+              {problems.map((p) => (
                 <th
-                  key={wn}
-                  colSpan={weekProblems.length}
-                  className="border-l border-slate-200 px-3 py-2 text-center"
+                  key={p.id}
+                  className="border-l border-slate-200 px-3 py-1.5 text-center font-medium max-w-[80px] truncate"
+                  title={p.title}
                 >
-                  สัปดาห์ {wn}
+                  {p.title}
+                  <br />
+                  <span className="font-normal text-slate-300">/{p.pointsMax}</span>
                 </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {pageItems.map((student, idx) => {
+              const total = problems.reduce((sum, p) => sum + (student.scores[p.id] ?? 0), 0)
+              return (
+                <tr key={student.userId} className="group hover:bg-slate-50">
+                  <td className="sticky left-0 z-10 w-12 bg-white px-3 py-3 text-center text-slate-400 group-hover:bg-slate-50">
+                    {offset + idx + 1}
+                  </td>
+                  <td className="sticky left-12 z-10 w-52 bg-white px-5 py-3 group-hover:bg-slate-50">
+                    <p className="font-medium text-slate-700">{student.name}</p>
+                    <p className="text-xs text-slate-400 font-mono">{student.idCode ?? "–"}</p>
+                  </td>
+                  <td className="sticky left-64 z-10 w-16 bg-white px-3 py-3 text-center group-hover:bg-slate-50">
+                    <StatusDot status={student.status} />
+                  </td>
+                  {problems.map((p) => (
+                    <td key={p.id} className="border-l border-slate-100 px-3 py-3 text-center">
+                      <ScorePill score={student.scores[p.id]} pointsMax={p.pointsMax} />
+                    </td>
+                  ))}
+                  <td className="border-l border-slate-200 bg-blue-50/40 px-4 py-3 text-right font-semibold text-primary">
+                    {total}
+                  </td>
+                </tr>
               )
             })}
-            <th className="border-l border-slate-200 px-4 py-2 text-right">รวม</th>
-          </tr>
-          {/* Problem title row */}
-          <tr className="bg-slate-50 text-xs text-slate-400">
-            {problems.map((p) => (
-              <th
-                key={p.id}
-                className="border-l border-slate-200 px-3 py-1.5 text-center font-medium max-w-[80px] truncate"
-                title={p.title}
-              >
-                {p.title}
-                <br />
-                <span className="font-normal text-slate-300">/{p.pointsMax}</span>
-              </th>
-            ))}
-            <th className="border-l border-slate-200 px-4 py-1.5 text-right font-medium">
-              /{problems.reduce((s, p) => s + p.pointsMax, 0)}
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {students.map((student) => {
-            const total = problems.reduce((sum, p) => {
-              const s = student.scores[p.id]
-              return sum + (s ?? 0)
-            }, 0)
-            const totalMax = problems.reduce((s, p) => s + p.pointsMax, 0)
-            const allDone = problems.every((p) => student.scores[p.id] != null)
-
-            return (
-              <tr key={student.userId} className="hover:bg-slate-50">
-                <td className="sticky left-0 z-10 bg-white px-5 py-3 hover:bg-slate-50">
-                  <p className="font-medium text-slate-700">{student.name}</p>
-                  <p className="text-xs text-slate-400 font-mono">{student.idCode ?? "–"}</p>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <StatusDot status={student.status} />
-                </td>
-                {problems.map((p) => (
-                  <td key={p.id} className="border-l border-slate-100 px-3 py-3 text-center">
-                    {scoreCell(student.scores[p.id], p.pointsMax)}
-                  </td>
-                ))}
-                <td className="border-l border-slate-200 px-4 py-3 text-right font-semibold">
-                  <span className={allDone && total === totalMax ? "text-green-600" : "text-slate-700"}>
-                    {total}
-                  </span>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
       </div>
+
+      {/* Pagination */}
+      {pageCount > 1 && (
+        <div className="flex items-center justify-end gap-3 text-sm text-slate-500">
+          <button
+            type="button"
+            onClick={() => setPage(current - 1)}
+            disabled={current <= 1}
+            className="rounded-lg border border-gray-200 px-3 py-1 disabled:opacity-40 enabled:hover:bg-slate-50"
+          >
+            ก่อนหน้า
+          </button>
+          <span>
+            หน้า {current} / {pageCount}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage(current + 1)}
+            disabled={current >= pageCount}
+            className="rounded-lg border border-gray-200 px-3 py-1 disabled:opacity-40 enabled:hover:bg-slate-50"
+          >
+            ถัดไป
+          </button>
+        </div>
+      )}
     </div>
   )
 }
