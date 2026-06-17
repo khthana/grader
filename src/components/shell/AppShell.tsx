@@ -7,6 +7,7 @@ import { Navbar } from "./Navbar"
 import { Sidebar } from "./Sidebar"
 import { Breadcrumbs } from "./Breadcrumbs"
 import { ToastProvider } from "./ToastProvider"
+import { ImpersonationBanner } from "./ImpersonationBanner"
 
 interface CourseOption {
   id: number
@@ -21,6 +22,7 @@ interface AppShellProps {
   activeRole: Role
   courses: CourseOption[]
   activeCourseId: number | null
+  impersonatedName?: string | null
   children: ReactNode
 }
 
@@ -31,6 +33,7 @@ export function AppShell({
   activeRole,
   courses,
   activeCourseId,
+  impersonatedName,
   children,
 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false)
@@ -50,6 +53,7 @@ export function AppShell({
       <div className="flex min-h-screen bg-[#F8FAFC] pt-[64px]">
         <Sidebar menu={menu} collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
         <div className="flex min-w-0 flex-1 flex-col">
+          {impersonatedName && <ImpersonationBanner userName={impersonatedName} />}
           <Breadcrumbs />
           <main className="mx-auto w-full max-w-[1920px] px-4 py-6 lg:px-8">
             <div key={pathname} className="content-enter">

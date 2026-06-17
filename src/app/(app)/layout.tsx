@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import type { ReactNode } from "react"
-import { getCurrentUser, getActiveRoleCookie } from "@/lib/session"
+import { getCurrentUser, getActiveRoleCookie, isImpersonating } from "@/lib/session"
 import { resolveActiveRole, type Role } from "@/lib/roles"
 import { getCourseContext } from "@/lib/courses/server"
 import { AppShell } from "@/components/shell/AppShell"
@@ -23,6 +23,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   }
 
   const { courses, activeCourse } = await getCourseContext()
+  const impersonating = await isImpersonating()
 
   return (
     <AppShell
@@ -32,6 +33,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       activeRole={activeRole}
       courses={courses}
       activeCourseId={activeCourse?.id ?? null}
+      impersonatedName={impersonating ? user.name : null}
     >
       {children}
     </AppShell>

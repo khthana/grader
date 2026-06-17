@@ -24,3 +24,10 @@ export async function getActiveCourseCookie(): Promise<number | undefined> {
   const n = Number.parseInt(raw ?? "", 10)
   return Number.isFinite(n) ? n : undefined
 }
+
+// True when an Admin is currently impersonating another user — detected by the
+// presence of a valid `impersonator` token saved when impersonation began.
+export async function isImpersonating(): Promise<boolean> {
+  const token = (await cookies()).get("impersonator")?.value
+  return !!token && !!verifySessionToken(token)
+}
