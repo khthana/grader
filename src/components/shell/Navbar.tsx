@@ -1,11 +1,12 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useState } from "react"
 import { FaChevronDown, FaSignOutAlt, FaUser, FaBook, FaPlus } from "react-icons/fa"
 import { HiArrowsRightLeft } from "react-icons/hi2"
 import { getLandingRoute, type Role } from "@/lib/roles"
 import { canManageCourses } from "@/lib/courses/access"
+import { isCourseScopedPath } from "@/lib/courses/scope"
 
 interface CourseOption {
   id: number
@@ -128,8 +129,12 @@ export function Navbar({
   activeCourseId,
 }: NavbarProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const [roleOpen, setRoleOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  // The course switcher only makes sense on course-scoped pages — not on the
+  // global User Management / Activity Logs / Course management pages.
+  const showCourseSwitcher = isCourseScopedPath(pathname)
 
   function switchRole(role: Role) {
     setRoleOpen(false)
@@ -150,11 +155,13 @@ export function Navbar({
 
       {/* Center: course switcher + role switcher (role only when >1 role) */}
       <div className="flex items-center gap-3">
-        <CourseSwitcher
-          courses={courses}
-          activeCourseId={activeCourseId}
-          canManage={canManageCourses(roles)}
-        />
+        {showCourseSwitcher && (
+          <CourseSwitcher
+            courses={courses}
+            activeCourseId={activeCourseId}
+            canManage={canManageCourses(roles)}
+          />
+        )}
         {roles.length > 1 && (
           <div className="relative">
             <button
