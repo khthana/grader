@@ -7,6 +7,7 @@ import { GET, POST } from "./route"
 import { setTestDb } from "@/lib/db"
 import { createUser, assignRole, type Queryable } from "@/lib/users/repository"
 import { createCourse, assignInstructor } from "@/lib/courses/repository"
+import { listWeeks } from "@/lib/weeks/repository"
 import { createSessionToken } from "@/lib/auth"
 
 const schema = readFileSync(
@@ -128,6 +129,16 @@ describe("POST /api/courses", () => {
     )
     expect(logs.rows).toHaveLength(1)
     void ins
+  })
+
+  it("seeds 8 weeks for the newly created course", async () => {
+    await seedRole(db, "ins@kmitl.ac.th", "Instructor")
+    const res = await POST(postReq(newCourse, sessionFor("ins@kmitl.ac.th")))
+    expect(res.status).toBe(201)
+    const { id: courseId } = await res.json()
+    const weeks = await listWeeks(db, courseId)
+    expect(weeks).toHaveLength(8)
+    expect(weeks[0].topic).toBe("สัปดาห์ที่ 1")
   })
 
   it("returns 409 for a duplicate course code", async () => {

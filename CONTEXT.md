@@ -54,3 +54,41 @@ attribute of the **Enrollment** — captured per course rather than globally on 
 ### Year (ปีการศึกษา)
 The student's admission/cohort year in the Buddhist calendar (e.g. 2565), as recorded
 for a course. An attribute of the **Enrollment**.
+
+### Week (สัปดาห์)
+A numbered weekly unit within a **Course** (e.g. Week 1 · "พื้นฐาน Python และ I/O").
+Has a `week_no` (integer) and a `topic` (editable by Instructor). Eight weeks are
+auto-seeded when a Course is created; the Instructor manages topics separately.
+Week is course-scoped — `weeks` table carries `(course_id, week_no, topic)`.
+
+### Problem (โจทย์ปัญหา)
+A programming challenge belonging to one **Course** and one **Week**. Carries a title,
+description, input/output specification, and one or more **Test Cases**. Total points
+equals the sum of all Test Case scores. Problems are course-scoped and managed
+(created/edited/deleted) by Instructor; TA has view-only access.
+
+### Test Case
+An input/expected-output pair belonging to a **Problem**. Carries a `score` (points),
+an `is_hidden` flag (hidden cases run at submit time but are never shown to Students),
+and a `sort_order`. The sum of all Test Case scores is the Problem's total points.
+
+### Submission (การส่งงาน)
+A Student's attempt at a **Problem**. Records the code, `submitted_at`, `points_earned`
+(from Piston auto-grading), `points_max` (total at submission time), `is_late`, and
+`results` (per-test-case outcome as JSONB). An Instructor may override the auto-grade
+via `manual_score`; effective score = `COALESCE(manual_score, points_earned)`.
+Unreviewed submissions count toward the "รอตรวจ" badge on the problem list.
+
+### Due Date (กำหนดส่ง)
+The soft deadline on a **Problem** (`due_at TIMESTAMPTZ NULLABLE`). Submissions after
+this timestamp are accepted but flagged as **Late**. If `due_at` is NULL the problem
+has no soft deadline.
+
+### Close Date (วันปิดรับ)
+The hard cutoff on a **Problem** (`close_at TIMESTAMPTZ NULLABLE`). Submissions after
+this timestamp are rejected by `/api/grade` with 403. If `close_at` is NULL submissions
+are accepted indefinitely (subject to the Due Date late flag only).
+
+### Late Submission
+A **Submission** made after the **Due Date** but before the **Close Date**. Stored as
+`is_late = true`. Instructors can filter the student list by late submissions.

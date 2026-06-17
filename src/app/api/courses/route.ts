@@ -7,6 +7,7 @@ import {
   findCourseByCode,
   assignInstructor,
 } from "@/lib/courses/repository"
+import { seedWeeks } from "@/lib/weeks/repository"
 import { canManageCourses } from "@/lib/courses/access"
 import { validateCourseInput } from "@/lib/courses/validation"
 import { safeLog } from "@/lib/logs"
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest) {
     program: input.program ?? null,
   })
   await assignInstructor(db, course.id, user.id)
+  await seedWeeks(db, course.id)
   await safeLog(db, {
     actorId: user.id,
     actorEmail: user.email,

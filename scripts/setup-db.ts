@@ -6,6 +6,7 @@ import { Pool } from "pg"
 import { hashPassword } from "../src/lib/password"
 import { createUser, findUserByEmail, assignRole } from "../src/lib/users/repository"
 import { createCourse, assignInstructor } from "../src/lib/courses/repository"
+import { seedWeeks } from "../src/lib/weeks/repository"
 
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "admin@kmitl.ac.th"
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "Password123!"
@@ -63,6 +64,8 @@ async function main() {
       console.log(`✔ seeded course: ${SEED_COURSE.code}`)
     }
     await assignInstructor(pool, courseId, admin.id)
+    await seedWeeks(pool, courseId)
+    console.log(`✔ seeded 8 weeks for course ${SEED_COURSE.code}`)
   } finally {
     await pool.end()
   }

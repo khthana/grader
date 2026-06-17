@@ -79,3 +79,58 @@ CREATE TABLE IF NOT EXISTS enrollments (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (course_id, user_id)
 );
+
+-- Problem domain (issue #17). Problems are course-scoped, organised by Week.
+-- Eight weeks are seeded per course; topics are editable by Instructor.
+CREATE TABLE IF NOT EXISTS weeks (
+  id         SERIAL PRIMARY KEY,
+  course_id  INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  week_no    INTEGER NOT NULL,
+  topic      TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (course_id, week_no)
+);
+
+CREATE TABLE IF NOT EXISTS problems (
+  id          SERIAL PRIMARY KEY,
+  course_id   INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  week_id     INTEGER NOT NULL REFERENCES weeks(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  input_spec  TEXT NOT NULL DEFAULT '',
+  output_spec TEXT NOT NULL DEFAULT '',
+  due_at      TIMESTAMPTZ,
+  close_at    TIMESTAMPTZ,
+  language    TEXT NOT NULL DEFAULT 'python',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS test_cases (
+  id              SERIAL PRIMARY KEY,
+  problem_id      INTEGER NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
+  input           TEXT NOT NULL DEFAULT '',
+  expected_output TEXT NOT NULL DEFAULT '',
+  is_hidden       BOOLEAN NOT NULL DEFAULT FALSE,
+  score           NUMERIC NOT NULL DEFAULT 0,
+  sort_order      INTEGER NOT NULL DEFAULT 0
+);
+
+-- 'group' is reserved in SQL; course_id stored for fast per-course queries.
+CREATE TABLE IF NOT EXISTS submissions (
+  id            SERIAL PRIMARY KEY,
+  problem_id    INTEGER NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_id     INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  code          TEXT NOT NULL,
+  language      TEXT NOT NULL DEFAULT 'python',
+  points_earned NUMERIC,
+  points_max    NUMERIC,
+  is_late       BOOLEAN NOT NULL DEFAULT FALSE,
+  results       JSONB,
+  manual_score  NUMERIC,
+  reviewed_by   INTEGER REFERENCES users(id),
+  reviewed_at   TIMESTAMPTZ,
+  submitted_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
