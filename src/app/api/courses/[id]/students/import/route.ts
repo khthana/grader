@@ -1,11 +1,9 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
-import { authorizeCourse } from "@/lib/courses/authorize"
+import { courseRoute } from "@/lib/courses/route"
 import { validateRosterRows, type RawRosterRow } from "@/lib/enrollments/import"
 import { enrollStudent } from "@/lib/enrollments/enroll"
 import { safeLog } from "@/lib/logs"
-
-type RouteContext = { params: Promise<{ id: string }> }
 
 type RowStatus = "created" | "enrolled" | "skipped" | "error"
 
@@ -19,10 +17,7 @@ interface RowResult {
 // Bulk-enroll a roster from parsed spreadsheet rows. Each valid row runs through
 // the enroll service (same find-or-create / email-derivation / program-inherit
 // rules as single add). Bad rows never block good ones.
-export async function POST(request: NextRequest, context: RouteContext) {
-  const { id } = await context.params
-  const auth = await authorizeCourse(request, id, { mutate: true })
-  if (!auth.ok) return auth.response
+export const POST = courseRoute({ mutate: true }, async (request, auth) => {
   const { user, courseId } = auth
 
   const body = (await request.json().catch(() => ({}))) as { rows?: RawRosterRow[] }
@@ -69,4 +64,4 @@ export async function POST(request: NextRequest, context: RouteContext) {
     skipped: count("skipped"),
     failed: count("error"),
   })
-}
+})

@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
-import { authorizeCourse } from "@/lib/courses/authorize"
+import { courseRoute } from "@/lib/courses/route"
 import {
   getEnrollmentById,
   updateEnrollment,
@@ -10,14 +10,11 @@ import { validateEnrollInput } from "@/lib/enrollments/validation"
 import { updateUserName, getUserById } from "@/lib/users/repository"
 import { safeLog } from "@/lib/logs"
 
-type RouteContext = { params: Promise<{ id: string; enrollmentId: string }> }
-
 // Edit a roster row: enrollment fields (group/program/year) + the shared user's
 // prefix/name. รหัสนักศึกษา is read-only (any id_code in the body is ignored).
-export async function PUT(request: NextRequest, context: RouteContext) {
-  const { id, enrollmentId } = await context.params
-  const auth = await authorizeCourse(request, id, { mutate: true })
-  if (!auth.ok) return auth.response
+export const PUT = courseRoute<{ id: string; enrollmentId: string }>(
+  { mutate: true },
+  async (request, auth, { enrollmentId }) => {
   const { user, courseId } = auth
 
   const db = getDb()
@@ -71,14 +68,13 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   })
 
   return NextResponse.json({ ok: true })
-}
+})
 
 // Un-enroll: remove only the enrollment row. The user account and any
 // other-course enrollments survive.
-export async function DELETE(request: NextRequest, context: RouteContext) {
-  const { id, enrollmentId } = await context.params
-  const auth = await authorizeCourse(request, id, { mutate: true })
-  if (!auth.ok) return auth.response
+export const DELETE = courseRoute<{ id: string; enrollmentId: string }>(
+  { mutate: true },
+  async (_request, auth, { enrollmentId }) => {
   const { user, courseId } = auth
 
   const db = getDb()
@@ -100,4 +96,4 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   })
 
   return NextResponse.json({ ok: true })
-}
+})

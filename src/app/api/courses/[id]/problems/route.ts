@@ -1,18 +1,12 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
-import { authorizeCourse } from "@/lib/courses/authorize"
+import { courseRoute } from "@/lib/courses/route"
 import { createProblem, listProblems, setTestCases } from "@/lib/problems/repository"
 import { validateProblemInput } from "@/lib/problems/validation"
 import { countSubmitted, countPending } from "@/lib/submissions/repository"
 import { safeLog } from "@/lib/logs"
 
-type RouteContext = { params: Promise<{ id: string }> }
-
-export async function GET(request: NextRequest, context: RouteContext) {
-  const { id } = await context.params
-  const auth = await authorizeCourse(request, id)
-  if (!auth.ok) return auth.response
-
+export const GET = courseRoute({}, async (request, auth) => {
   const url = new URL(request.url)
   const weekParam = url.searchParams.get("week")
   const weekId = weekParam ? Number.parseInt(weekParam, 10) : undefined
@@ -37,13 +31,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
   )
 
   return NextResponse.json({ problems: enriched })
-}
+})
 
-export async function POST(request: NextRequest, context: RouteContext) {
-  const { id } = await context.params
-  const auth = await authorizeCourse(request, id, { manage: true })
-  if (!auth.ok) return auth.response
-
+export const POST = courseRoute({ manage: true }, async (request, auth) => {
   const body = (await request.json().catch(() => ({}))) as {
     title?: string
     weekId?: number
@@ -94,4 +84,4 @@ export async function POST(request: NextRequest, context: RouteContext) {
   })
 
   return NextResponse.json({ problem: { ...problem, testCases } }, { status: 201 })
-}
+})

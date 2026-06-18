@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
-import { authorizeCourse } from "@/lib/courses/authorize"
+import { courseRoute } from "@/lib/courses/route"
 import {
   getCourseById,
   updateCourse,
@@ -10,24 +10,15 @@ import {
 import { validateCourseInput } from "@/lib/courses/validation"
 import { safeLog } from "@/lib/logs"
 
-type RouteContext = { params: Promise<{ id: string }> }
-
 // Course detail (for the edit form). Entitled course managers only.
-export async function GET(request: NextRequest, context: RouteContext) {
-  const { id } = await context.params
-  const auth = await authorizeCourse(request, id, { manage: true })
-  if (!auth.ok) return auth.response
-
+export const GET = courseRoute({ manage: true }, async (_request, auth) => {
   const course = await getCourseById(getDb(), auth.courseId)
   if (!course) return NextResponse.json({ error: "Not found" }, { status: 404 })
   return NextResponse.json(course)
-}
+})
 
 // Edit a course.
-export async function PUT(request: NextRequest, context: RouteContext) {
-  const { id } = await context.params
-  const auth = await authorizeCourse(request, id, { manage: true })
-  if (!auth.ok) return auth.response
+export const PUT = courseRoute({ manage: true }, async (request, auth) => {
   const { user, courseId } = auth
 
   const body = (await request.json().catch(() => ({}))) as {
@@ -67,13 +58,10 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     targetId: courseId,
   })
   return NextResponse.json(updated)
-}
+})
 
 // Delete a course (cascades enrollments + instructor assignments via FK).
-export async function DELETE(request: NextRequest, context: RouteContext) {
-  const { id } = await context.params
-  const auth = await authorizeCourse(request, id, { manage: true })
-  if (!auth.ok) return auth.response
+export const DELETE = courseRoute({ manage: true }, async (_request, auth) => {
   const { user, courseId } = auth
 
   const db = getDb()
@@ -87,4 +75,4 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     targetId: courseId,
   })
   return NextResponse.json({ ok: true })
-}
+})

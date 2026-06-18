@@ -1,15 +1,9 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
-import { authorizeCourse } from "@/lib/courses/authorize"
+import { courseRoute } from "@/lib/courses/route"
 import { getGradebook } from "@/lib/gradebook/repository"
 
-type RouteContext = { params: Promise<{ id: string }> }
-
-export async function GET(request: NextRequest, context: RouteContext) {
-  const { id } = await context.params
-  const auth = await authorizeCourse(request, id, { staff: true })
-  if (!auth.ok) return auth.response
-
+export const GET = courseRoute({ staff: true }, async (_request, auth) => {
   const gradebook = await getGradebook(getDb(), auth.courseId)
   return NextResponse.json({ gradebook })
-}
+})

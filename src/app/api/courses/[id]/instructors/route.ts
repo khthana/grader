@@ -1,26 +1,17 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
-import { authorizeCourse } from "@/lib/courses/authorize"
+import { courseRoute } from "@/lib/courses/route"
 import { listCourseInstructors, setCourseInstructors } from "@/lib/courses/repository"
 import { safeLog } from "@/lib/logs"
 
-type RouteContext = { params: Promise<{ id: string }> }
-
 // Current staff of a course (for the assignment UI).
-export async function GET(request: NextRequest, context: RouteContext) {
-  const { id } = await context.params
-  const auth = await authorizeCourse(request, id, { manage: true })
-  if (!auth.ok) return auth.response
-
+export const GET = courseRoute({ manage: true }, async (_request, auth) => {
   const instructors = await listCourseInstructors(getDb(), auth.courseId)
   return NextResponse.json({ instructors })
-}
+})
 
 // Replace the course's staff set. Admin/Instructor managers only.
-export async function PUT(request: NextRequest, context: RouteContext) {
-  const { id } = await context.params
-  const auth = await authorizeCourse(request, id, { manage: true })
-  if (!auth.ok) return auth.response
+export const PUT = courseRoute({ manage: true }, async (request, auth) => {
   const { user, courseId } = auth
 
   const body = (await request.json().catch(() => ({}))) as { userIds?: unknown }
@@ -38,4 +29,4 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   })
 
   return NextResponse.json({ ok: true })
-}
+})
