@@ -8,7 +8,7 @@ export function courseRoute<P extends { id: string }>(
     auth: CourseAuth & { ok: true },
     params: P
   ) => Promise<NextResponse>
-): (req: NextRequest, context: { params: Promise<P> }) => Promise<NextResponse> {
+) {
   return async (req, context) => {
     const params = await context.params
     const auth = await authorizeCourse(req, params.id, options)

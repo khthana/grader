@@ -2,22 +2,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { NextRequest, NextResponse } from "next/server"
 import { courseRoute } from "./route"
 import type { CourseAuth } from "./authorize"
-import { createUser, assignRole } from "@/lib/users/repository"
-import { createCourse, assignInstructor } from "@/lib/courses/repository"
-import { freshDb, setTestDb, sessionFor, type Queryable } from "@/lib/test-support/db"
+import { courseFixture, setTestDb, sessionFor, type Queryable } from "@/lib/test-support/db"
+import type { CourseFixture } from "@/lib/test-support/db"
 
 describe("courseRoute", () => {
-  let db: Queryable
+  let f: CourseFixture
   let courseId: number
 
   beforeEach(async () => {
-    db = freshDb()
-    setTestDb(db)
-    const ins = await createUser(db, { email: "ins@kmitl.ac.th", name: "Ins" })
-    await assignRole(db, ins.id, "Instructor")
-    const course = await createCourse(db, { code: "C01", nameTh: "ก", nameEn: "A" })
-    courseId = course.id
-    await assignInstructor(db, courseId, ins.id)
+    f = await courseFixture()
+    setTestDb(f.db)
+    courseId = f.course.id
   })
 
   afterEach(() => setTestDb(null))
@@ -35,14 +30,10 @@ describe("courseRoute", () => {
   })
 
   it("returns 403 without calling handler when options.manage and caller is TA", async () => {
-    const ta = await createUser(db, { email: "ta@kmitl.ac.th", name: "TA" })
-    await assignRole(db, ta.id, "TA")
-    await assignInstructor(db, courseId, ta.id)
-
     const handler = vi.fn()
     const route = courseRoute({ manage: true }, handler)
     const req = new NextRequest(`http://localhost/api/courses/${courseId}`)
-    req.cookies.set("session", sessionFor("ta@kmitl.ac.th"))
+    req.cookies.set("session", sessionFor(f.ta.email))
     const ctx = { params: Promise.resolve({ id: String(courseId) }) }
 
     const res = await route(req, ctx)
@@ -63,7 +54,7 @@ describe("courseRoute", () => {
 
     const route = courseRoute({}, handler)
     const req = new NextRequest(`http://localhost/api/courses/${courseId}`)
-    req.cookies.set("session", sessionFor("ins@kmitl.ac.th"))
+    req.cookies.set("session", sessionFor(f.ins.email))
     const ctx = { params: Promise.resolve({ id: String(courseId) }) }
 
     const res = await route(req, ctx)
@@ -84,7 +75,7 @@ describe("courseRoute", () => {
 
     const route = courseRoute<{ id: string; pid: string }>({}, handler)
     const req = new NextRequest(`http://localhost/api/courses/${courseId}/problems/99`)
-    req.cookies.set("session", sessionFor("ins@kmitl.ac.th"))
+    req.cookies.set("session", sessionFor(f.ins.email))
     const ctx = { params: Promise.resolve({ id: String(courseId), pid: "99" }) }
 
     await route(req, ctx)
