@@ -2,12 +2,8 @@
 // Takes an injectable `Queryable` so production passes a real pool and tests
 // pass a pg-mem adapter (mirrors src/lib/users/repository.ts).
 
-export interface Queryable {
-  query<T = Record<string, unknown>>(
-    text: string,
-    params?: unknown[]
-  ): Promise<{ rows: T[] }>
-}
+import type { Queryable } from "@/lib/db"
+export type { Queryable }
 
 export interface NewCourse {
   code: string

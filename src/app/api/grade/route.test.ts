@@ -1,17 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
-import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
-import { newDb } from "pg-mem"
 import { NextRequest } from "next/server"
 import { POST } from "./route"
-import { setTestDb } from "@/lib/db"
-import { createUser, assignRole, type Queryable } from "@/lib/users/repository"
+import { createUser, assignRole } from "@/lib/users/repository"
 import { createCourse, assignInstructor } from "@/lib/courses/repository"
 import { seedWeeks, listWeeks } from "@/lib/weeks/repository"
 import { createProblem, setTestCases } from "@/lib/problems/repository"
 import { createEnrollment } from "@/lib/enrollments/repository"
 import { listSubmissions } from "@/lib/submissions/repository"
-import { createSessionToken } from "@/lib/auth"
+import { freshDb, setTestDb, sessionFor, type Queryable } from "@/lib/test-support/db"
 
 // Mock Piston — external HTTP; tested separately
 vi.mock("@/lib/piston", () => ({
@@ -20,18 +16,6 @@ vi.mock("@/lib/piston", () => ({
 
 import { runTestCases } from "@/lib/piston"
 const mockRun = vi.mocked(runTestCases)
-
-const schema = readFileSync(
-  fileURLToPath(new URL("../../../../schema.sql", import.meta.url)),
-  "utf8"
-)
-
-function freshDb(): Queryable {
-  const mem = newDb()
-  mem.public.none(schema)
-  const { Pool } = mem.adapters.createPg()
-  return new Pool() as unknown as Queryable
-}
 
 function gradeReq(body: unknown, token?: string): NextRequest {
   const r = new NextRequest("http://localhost/api/grade", {
@@ -42,8 +26,6 @@ function gradeReq(body: unknown, token?: string): NextRequest {
   if (token) r.cookies.set("session", token)
   return r
 }
-
-const sessionFor = (email: string) => createSessionToken({ email, name: "x" })
 
 const PAST = new Date(Date.now() - 2 * 86400_000).toISOString()   // 2 days ago
 const RECENT = new Date(Date.now() - 86400_000).toISOString()      // 1 day ago (due_at passed)

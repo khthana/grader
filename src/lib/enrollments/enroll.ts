@@ -4,7 +4,7 @@
 // enrollment. Returns a discriminated result so callers (single add + bulk
 // import) can react without try/catch.
 
-import type { Queryable } from "./repository"
+import type { Queryable } from "@/lib/db"
 import { createEnrollment, findEnrollment } from "./repository"
 import { getCourseById } from "@/lib/courses/repository"
 import {

@@ -1,27 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest"
-import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
-import { newDb } from "pg-mem"
 import {
   createUser,
   assignRole,
   setUserRoles,
   countUsersWithRole,
   getUserById,
-  type Queryable,
 } from "./repository"
-
-const schema = readFileSync(
-  fileURLToPath(new URL("../../../schema.sql", import.meta.url)),
-  "utf8"
-)
-
-function freshDb(): Queryable {
-  const mem = newDb()
-  mem.public.none(schema)
-  const { Pool } = mem.adapters.createPg()
-  return new Pool() as unknown as Queryable
-}
+import { freshDb, type Queryable } from "@/lib/test-support/db"
 
 async function rolesOf(db: Queryable, id: number): Promise<string[]> {
   return [...((await getUserById(db, id))?.roles ?? [])].sort()

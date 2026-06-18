@@ -1,24 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
-import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
-import { newDb } from "pg-mem"
 import { NextRequest } from "next/server"
 import { PUT } from "./route"
-import { setTestDb } from "@/lib/db"
-import { createUser, assignRole, getUserById, type Queryable } from "@/lib/users/repository"
+import { createUser, assignRole, getUserById } from "@/lib/users/repository"
 import { createSessionToken } from "@/lib/auth"
-
-const schema = readFileSync(
-  fileURLToPath(new URL("../../../../../../schema.sql", import.meta.url)),
-  "utf8"
-)
-
-function freshDb(): Queryable {
-  const mem = newDb()
-  mem.public.none(schema)
-  const { Pool } = mem.adapters.createPg()
-  return new Pool() as unknown as Queryable
-}
+import { freshDb, setTestDb, type Queryable } from "@/lib/test-support/db"
 
 const admin = () => createSessionToken({ email: "admin@kmitl.ac.th", name: "Admin" })
 

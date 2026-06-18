@@ -1,26 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
-import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
-import { newDb } from "pg-mem"
 import { NextRequest } from "next/server"
 import { GET, POST } from "./route"
-import { setTestDb } from "@/lib/db"
-import { createUser, assignRole, type Queryable } from "@/lib/users/repository"
+import { createUser, assignRole } from "@/lib/users/repository"
 import { createCourse, assignInstructor } from "@/lib/courses/repository"
 import { listWeeks, DEFAULT_WEEKS } from "@/lib/weeks/repository"
-import { createSessionToken } from "@/lib/auth"
-
-const schema = readFileSync(
-  fileURLToPath(new URL("../../../../schema.sql", import.meta.url)),
-  "utf8"
-)
-
-function freshDb(): Queryable {
-  const mem = newDb()
-  mem.public.none(schema)
-  const { Pool } = mem.adapters.createPg()
-  return new Pool() as unknown as Queryable
-}
+import { freshDb, setTestDb, sessionFor, type Queryable } from "@/lib/test-support/db"
 
 function req(sessionToken?: string): NextRequest {
   const r = new NextRequest("http://localhost/api/courses")
@@ -37,8 +21,6 @@ function postReq(body: unknown, token?: string): NextRequest {
   if (token) r.cookies.set("session", token)
   return r
 }
-
-const sessionFor = (email: string) => createSessionToken({ email, name: "x" })
 
 async function seedRole(db: Queryable, email: string, role: string) {
   const u = await createUser(db, { email, name: role })

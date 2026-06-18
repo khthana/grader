@@ -1,7 +1,4 @@
 import { describe, it, expect, beforeEach } from "vitest"
-import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
-import { newDb } from "pg-mem"
 import {
   createEnrollment,
   listEnrollments,
@@ -10,22 +7,10 @@ import {
   updateEnrollment,
   deleteEnrollment,
   getEnrollmentById,
-  type Queryable,
 } from "./repository"
 import { createCourse } from "@/lib/courses/repository"
 import { createUser } from "@/lib/users/repository"
-
-const schema = readFileSync(
-  fileURLToPath(new URL("../../../schema.sql", import.meta.url)),
-  "utf8"
-)
-
-function freshDb(): Queryable {
-  const mem = newDb()
-  mem.public.none(schema)
-  const { Pool } = mem.adapters.createPg()
-  return new Pool() as unknown as Queryable
-}
+import { freshDb, type Queryable } from "@/lib/test-support/db"
 
 async function seedCourse(db: Queryable, code = "01076021") {
   return createCourse(db, { code, nameTh: "วิชา", nameEn: "Course" })

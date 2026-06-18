@@ -1,7 +1,4 @@
 import { describe, it, expect, beforeEach } from "vitest"
-import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
-import { newDb } from "pg-mem"
 import {
   createCourse,
   getCourseById,
@@ -12,22 +9,10 @@ import {
   setCourseInstructors,
   listCourseInstructors,
   searchStaffCandidates,
-  type Queryable,
 } from "./repository"
 import { createUser, assignRole } from "@/lib/users/repository"
 import { createEnrollment, getEnrollmentById } from "@/lib/enrollments/repository"
-
-const schema = readFileSync(
-  fileURLToPath(new URL("../../../schema.sql", import.meta.url)),
-  "utf8"
-)
-
-function freshDb(): Queryable {
-  const mem = newDb()
-  mem.public.none(schema)
-  const { Pool } = mem.adapters.createPg()
-  return new Pool() as unknown as Queryable
-}
+import { freshDb, type Queryable } from "@/lib/test-support/db"
 
 describe("course repository", () => {
   let db: Queryable

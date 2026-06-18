@@ -1,12 +1,8 @@
 // Enrollment repository — raw SQL over a `pg`-compatible client (injectable
 // `Queryable`, mirrors src/lib/users/repository.ts). Course-scoped roster reads.
 
-export interface Queryable {
-  query<T = Record<string, unknown>>(
-    text: string,
-    params?: unknown[]
-  ): Promise<{ rows: T[] }>
-}
+import type { Queryable } from "@/lib/db"
+export type { Queryable }
 
 export interface NewEnrollment {
   courseId: number

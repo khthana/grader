@@ -1,4 +1,4 @@
-import type { Queryable } from "./users/repository"
+import type { Queryable } from "@/lib/db"
 
 export type LogAction =
   | "user.create"

@@ -1,25 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
-import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
-import { newDb } from "pg-mem"
 import { NextRequest } from "next/server"
 import { GET, PUT } from "./route"
-import { setTestDb } from "@/lib/db"
-import { createUser, assignRole, type Queryable } from "@/lib/users/repository"
+import { createUser, assignRole } from "@/lib/users/repository"
 import { createCourse, assignInstructor, listCoursesForUser } from "@/lib/courses/repository"
-import { createSessionToken } from "@/lib/auth"
-
-const schema = readFileSync(
-  fileURLToPath(new URL("../../../../../../schema.sql", import.meta.url)),
-  "utf8"
-)
-
-function freshDb(): Queryable {
-  const mem = newDb()
-  mem.public.none(schema)
-  const { Pool } = mem.adapters.createPg()
-  return new Pool() as unknown as Queryable
-}
+import { freshDb, setTestDb, sessionFor, type Queryable } from "@/lib/test-support/db"
 
 function putReq(courseId: number, userIds: number[], token?: string): NextRequest {
   const r = new NextRequest(`http://localhost/api/courses/${courseId}/instructors`, {
@@ -37,7 +21,6 @@ function getReq(courseId: number, token?: string): NextRequest {
 }
 
 const ctx = (courseId: number) => ({ params: Promise.resolve({ id: String(courseId) }) })
-const sessionFor = (email: string) => createSessionToken({ email, name: "x" })
 
 async function seedInstructorCourse(db: Queryable, email = "ins@kmitl.ac.th", code = "C") {
   const ins = await createUser(db, { email, name: "Ins" })

@@ -1,26 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
-import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
-import { newDb } from "pg-mem"
 import { NextRequest } from "next/server"
 import { POST } from "./route"
-import { setTestDb } from "@/lib/db"
-import { createUser, assignRole, type Queryable } from "@/lib/users/repository"
-import { createSessionToken, verifySessionToken } from "@/lib/auth"
-
-const schema = readFileSync(
-  fileURLToPath(new URL("../../../../../../schema.sql", import.meta.url)),
-  "utf8"
-)
-
-function freshDb(): Queryable {
-  const mem = newDb()
-  mem.public.none(schema)
-  const { Pool } = mem.adapters.createPg()
-  return new Pool() as unknown as Queryable
-}
-
-const sessionFor = (email: string) => createSessionToken({ email, name: "x" })
+import { createUser, assignRole } from "@/lib/users/repository"
+import { verifySessionToken } from "@/lib/auth"
+import { freshDb, setTestDb, sessionFor, type Queryable } from "@/lib/test-support/db"
 
 function makeCtx(id: number) {
   return { params: Promise.resolve({ id: String(id) }) }

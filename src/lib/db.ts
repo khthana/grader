@@ -1,5 +1,11 @@
 import { Pool } from "pg"
-import type { Queryable } from "./users/repository"
+
+export interface Queryable {
+  query<T = Record<string, unknown>>(
+    text: string,
+    params?: unknown[]
+  ): Promise<{ rows: T[] }>
+}
 
 // Lazy singleton pool. Tests inject a pg-mem adapter via setTestDb().
 let db: Queryable | null = null
