@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS problems (
   description TEXT NOT NULL DEFAULT '',
   input_spec  TEXT NOT NULL DEFAULT '',
   output_spec TEXT NOT NULL DEFAULT '',
+  score       INTEGER NOT NULL DEFAULT 10,
   due_at      TIMESTAMPTZ,
   close_at    TIMESTAMPTZ,
   language    TEXT NOT NULL DEFAULT 'python',
@@ -115,7 +116,6 @@ CREATE TABLE IF NOT EXISTS test_cases (
   input           TEXT NOT NULL DEFAULT '',
   expected_output TEXT NOT NULL DEFAULT '',
   is_hidden       BOOLEAN NOT NULL DEFAULT FALSE,
-  score           NUMERIC NOT NULL DEFAULT 0,
   sort_order      INTEGER NOT NULL DEFAULT 0
 );
 

@@ -37,6 +37,7 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
   const body = (await request.json().catch(() => ({}))) as {
     title?: string
     weekId?: number
+    score?: number
     description?: string
     inputSpec?: string
     outputSpec?: string
@@ -47,7 +48,6 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
       input: string
       expectedOutput: string
       isHidden: boolean
-      score: number
       sortOrder: number
     }>
   }
@@ -55,6 +55,7 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
   const { valid, errors } = validateProblemInput({
     title: body.title,
     weekId: body.weekId,
+    score: body.score,
     dueAt: body.dueAt,
     closeAt: body.closeAt,
     testCases: body.testCases,
@@ -66,6 +67,7 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
     courseId: auth.courseId,
     weekId: body.weekId!,
     title: body.title!.trim(),
+    score: body.score,
     description: body.description?.trim(),
     inputSpec: body.inputSpec?.trim(),
     outputSpec: body.outputSpec?.trim(),

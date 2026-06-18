@@ -18,7 +18,6 @@ interface TestCaseForm {
   input: string
   expectedOutput: string
   isHidden: boolean
-  score: number
   sortOrder: number
 }
 
@@ -39,6 +38,7 @@ interface Props {
     description: string
     inputSpec: string
     outputSpec: string
+    score: number
     dueAt: string | null
     closeAt: string | null
     language: string
@@ -48,7 +48,7 @@ interface Props {
 }
 
 function emptyCase(sortOrder: number): TestCaseForm {
-  return { input: "", expectedOutput: "", isHidden: false, score: 10, sortOrder }
+  return { input: "", expectedOutput: "", isHidden: false, sortOrder }
 }
 
 export function ProblemEditor({ courseId, weeks, mode, initialWeekId, problem }: Props) {
@@ -60,7 +60,8 @@ export function ProblemEditor({ courseId, weeks, mode, initialWeekId, problem }:
   const [description, setDescription] = useState(problem?.description ?? "")
   const [inputSpec, setInputSpec] = useState(problem?.inputSpec ?? "")
   const [outputSpec, setOutputSpec] = useState(problem?.outputSpec ?? "")
-  const [weekId] = useState(defaultWeekId) // read-only after creation
+  const [weekId] = useState(defaultWeekId)
+  const [score, setScore] = useState(problem?.score ?? 10)
   const [dueAt, setDueAt] = useState(problem?.dueAt ? toDatetimeLocal(problem.dueAt) : "")
   const [closeAt, setCloseAt] = useState(problem?.closeAt ? toDatetimeLocal(problem.closeAt) : "")
   const [language, setLanguage] = useState(problem?.language ?? "python")
@@ -72,7 +73,6 @@ export function ProblemEditor({ courseId, weeks, mode, initialWeekId, problem }:
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const totalPoints = cases.reduce((s, c) => s + (Number(c.score) || 0), 0)
   const activeWeek = weeks.find((w) => w.id === weekId)
 
   function addCase() {
@@ -95,6 +95,7 @@ export function ProblemEditor({ courseId, weeks, mode, initialWeekId, problem }:
     const payload = {
       title: title.trim(),
       weekId,
+      score: Number(score) || 10,
       description: description.trim(),
       inputSpec: inputSpec.trim(),
       outputSpec: outputSpec.trim(),
@@ -105,7 +106,6 @@ export function ProblemEditor({ courseId, weeks, mode, initialWeekId, problem }:
         input: c.input,
         expectedOutput: c.expectedOutput,
         isHidden: c.isHidden,
-        score: Number(c.score) || 0,
         sortOrder: i,
       })),
     }
@@ -204,13 +204,7 @@ export function ProblemEditor({ courseId, weeks, mode, initialWeekId, problem }:
           {/* Test cases card */}
           <div className="rounded-xl border border-gray-200 bg-white p-5">
             <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-semibold text-slate-700">Test Cases</h2>
-                <p className="mt-0.5 text-xs text-slate-400">
-                  คะแนนรวม:{" "}
-                  <span className="font-semibold text-primary">{totalPoints} คะแนน</span>
-                </p>
-              </div>
+              <h2 className="text-base font-semibold text-slate-700">Test Cases</h2>
               <button
                 type="button"
                 onClick={addCase}
@@ -249,16 +243,6 @@ export function ProblemEditor({ courseId, weeks, mode, initialWeekId, problem }:
                           <><FaEye className="h-3 w-3" /> แสดง</>
                         )}
                       </label>
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          min={0}
-                          value={tc.score}
-                          onChange={(e) => updateCase(idx, { score: Number(e.target.value) })}
-                          className="w-16 rounded border border-gray-200 bg-white px-2 py-1 text-right text-sm"
-                        />
-                        <span className="text-xs text-slate-400">คะแนน</span>
-                      </div>
                       {cases.length > 1 && (
                         <button
                           type="button"
@@ -309,6 +293,18 @@ export function ProblemEditor({ courseId, weeks, mode, initialWeekId, problem }:
                   {activeWeek
                     ? `สัปดาห์ ${activeWeek.weekNo}${activeWeek.topic ? ` · ${activeWeek.topic}` : ""}`
                     : "–"}
+                </div>
+              </Field>
+              <Field label="คะแนน *" error={errors.score}>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    value={score}
+                    onChange={(e) => setScore(Number(e.target.value))}
+                    className="input-base w-24 text-right"
+                  />
+                  <span className="text-sm text-slate-400">คะแนน</span>
                 </div>
               </Field>
               <Field label="ภาษา">
@@ -375,7 +371,6 @@ function Field({
 }
 
 function toDatetimeLocal(iso: string): string {
-  // "2026-06-20T12:00:00Z" → "2026-06-20T12:00"
   return iso.slice(0, 16)
 }
 

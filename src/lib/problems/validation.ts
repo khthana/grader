@@ -1,9 +1,10 @@
 export interface ProblemInput {
   title?: string
   weekId?: number
+  score?: number
   dueAt?: string | null
   closeAt?: string | null
-  testCases?: Array<{ score?: number }>
+  testCases?: unknown[]
 }
 
 export function validateProblemInput(input: ProblemInput): {
@@ -20,14 +21,13 @@ export function validateProblemInput(input: ProblemInput): {
     errors.weekId = "กรุณาระบุสัปดาห์"
   }
 
+  if (input.score != null && input.score < 0) {
+    errors.score = "คะแนนโจทย์ต้องไม่ต่ำกว่า 0"
+  }
+
   const cases = input.testCases ?? []
   if (cases.length === 0) {
     errors.testCases = "ต้องมีอย่างน้อย 1 test case"
-  } else {
-    const hasNegScore = cases.some((tc) => (tc.score ?? 0) < 0)
-    if (hasNegScore) {
-      errors.testCases = "คะแนนแต่ละ test case ต้องไม่ต่ำกว่า 0"
-    }
   }
 
   if (input.dueAt && input.closeAt) {

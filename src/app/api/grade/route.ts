@@ -59,13 +59,13 @@ export async function POST(request: NextRequest) {
     input: tc.input,
     expectedOutput: tc.expectedOutput,
     isHidden: tc.isHidden,
-    score: tc.score,
   }))
 
   const results = await runTestCases(code, testCases)
 
-  const pointsEarned = results.reduce((sum, r) => sum + (r.passed ? r.score : 0), 0)
-  const pointsMax = testCases.reduce((sum, tc) => sum + tc.score, 0)
+  const allPassed = results.length > 0 && results.every((r) => r.passed)
+  const pointsEarned = allPassed ? problem.score : 0
+  const pointsMax = problem.score
   const passedTests = results.filter((r) => r.passed).length
   const totalTests = results.length
 
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     passedTests,
     results,
     feedback:
-      pointsEarned === pointsMax
+      allPassed
         ? "ผ่านทุก test case!"
         : `ได้ ${pointsEarned}/${pointsMax} คะแนน`,
   }

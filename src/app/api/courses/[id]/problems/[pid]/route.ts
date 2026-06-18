@@ -37,6 +37,7 @@ export const PUT = courseRoute<{ id: string; pid: string }>(
     const body = (await request.json().catch(() => ({}))) as {
       title?: string
       weekId?: number
+      score?: number
       description?: string
       inputSpec?: string
       outputSpec?: string
@@ -47,7 +48,6 @@ export const PUT = courseRoute<{ id: string; pid: string }>(
         input: string
         expectedOutput: string
         isHidden: boolean
-        score: number
         sortOrder: number
       }>
     }
@@ -55,6 +55,7 @@ export const PUT = courseRoute<{ id: string; pid: string }>(
     const { valid, errors } = validateProblemInput({
       title: body.title,
       weekId: body.weekId,
+      score: body.score,
       dueAt: body.dueAt,
       closeAt: body.closeAt,
       testCases: body.testCases,
@@ -69,6 +70,7 @@ export const PUT = courseRoute<{ id: string; pid: string }>(
 
     const updated = await updateProblem(db, problemId, {
       title: body.title?.trim(),
+      score: body.score,
       description: body.description?.trim(),
       inputSpec: body.inputSpec?.trim(),
       outputSpec: body.outputSpec?.trim(),

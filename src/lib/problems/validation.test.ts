@@ -6,7 +6,7 @@ const validInput = {
   weekId: 1,
   dueAt: null,
   closeAt: null,
-  testCases: [{ score: 10 }],
+  testCases: [{}],
 }
 
 describe("validateProblemInput", () => {
@@ -34,10 +34,15 @@ describe("validateProblemInput", () => {
     expect(result.errors.testCases).toBeTruthy()
   })
 
-  it("test case score < 0 → error", () => {
-    const result = validateProblemInput({ ...validInput, testCases: [{ score: -1 }] })
+  it("score < 0 → error", () => {
+    const result = validateProblemInput({ ...validInput, score: -1 })
     expect(result.valid).toBe(false)
-    expect(result.errors.testCases).toBeTruthy()
+    expect(result.errors.score).toBeTruthy()
+  })
+
+  it("score = 0 → valid", () => {
+    const result = validateProblemInput({ ...validInput, score: 0 })
+    expect(result.valid).toBe(true)
   })
 
   it("close_at < due_at → error", () => {

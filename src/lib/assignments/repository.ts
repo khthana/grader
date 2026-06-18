@@ -43,12 +43,10 @@ export async function getStudentAssignments(
 ): Promise<AssignmentItem[]> {
   const { rows: problemRows } = await db.query<ProblemRow>(
     `SELECT p.id AS problem_id, p.title, w.week_no, p.due_at, p.close_at,
-            COALESCE(SUM(tc.score), 0)::text AS points_max
+            p.score::text AS points_max
      FROM problems p
      JOIN weeks w ON w.id = p.week_id
-     LEFT JOIN test_cases tc ON tc.problem_id = p.id
      WHERE p.course_id = $1::int
-     GROUP BY p.id, p.title, w.week_no, p.due_at, p.close_at
      ORDER BY w.week_no, p.id`,
     [courseId]
   )

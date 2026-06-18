@@ -9,6 +9,7 @@ export interface ProblemRecord {
   description: string
   inputSpec: string
   outputSpec: string
+  score: number
   dueAt: string | null
   closeAt: string | null
   language: string
@@ -19,7 +20,6 @@ export interface TestCaseInput {
   input: string
   expectedOutput: string
   isHidden: boolean
-  score: number
   sortOrder: number
 }
 
@@ -39,7 +39,7 @@ export interface ProblemListItem {
   weekNo: number
   title: string
   description: string
-  pointsMax: number
+  score: number
   dueAt: string | null
   closeAt: string | null
 }
@@ -52,6 +52,7 @@ interface ProblemRow {
   description: string
   input_spec: string
   output_spec: string
+  score: number
   due_at: string | null
   close_at: string | null
   language: string
@@ -64,7 +65,6 @@ interface TestCaseRow {
   input: string
   expected_output: string
   is_hidden: boolean
-  score: string
   sort_order: number
 }
 
@@ -77,6 +77,7 @@ function toRecord(row: ProblemRow): ProblemRecord {
     description: row.description,
     inputSpec: row.input_spec,
     outputSpec: row.output_spec,
+    score: row.score,
     dueAt: row.due_at,
     closeAt: row.close_at,
     language: row.language,
@@ -91,7 +92,6 @@ function toTestCaseRecord(row: TestCaseRow): TestCaseRecord {
     input: row.input,
     expectedOutput: row.expected_output,
     isHidden: row.is_hidden,
-    score: Number(row.score),
     sortOrder: row.sort_order,
   }
 }
@@ -105,6 +105,7 @@ export async function createProblem(
     description?: string
     inputSpec?: string
     outputSpec?: string
+    score?: number
     dueAt?: string | null
     closeAt?: string | null
     language?: string
@@ -112,10 +113,10 @@ export async function createProblem(
 ): Promise<ProblemRecord> {
   const { rows } = await db.query<ProblemRow>(
     `INSERT INTO problems
-       (course_id, week_id, title, description, input_spec, output_spec, due_at, close_at, language)
-     VALUES ($1::int, $2::int, $3, $4, $5, $6, $7, $8, $9)
+       (course_id, week_id, title, description, input_spec, output_spec, score, due_at, close_at, language)
+     VALUES ($1::int, $2::int, $3, $4, $5, $6, $7::int, $8, $9, $10)
      RETURNING id, course_id, week_id, title, description, input_spec, output_spec,
-               due_at, close_at, language, created_at`,
+               score, due_at, close_at, language, created_at`,
     [
       data.courseId,
       data.weekId,
@@ -123,6 +124,7 @@ export async function createProblem(
       data.description ?? "",
       data.inputSpec ?? "",
       data.outputSpec ?? "",
+      data.score ?? 10,
       data.dueAt ?? null,
       data.closeAt ?? null,
       data.language ?? "python",
@@ -137,14 +139,14 @@ export async function getProblemById(
 ): Promise<ProblemDetail | null> {
   const { rows } = await db.query<ProblemRow>(
     `SELECT id, course_id, week_id, title, description, input_spec, output_spec,
-            due_at, close_at, language, created_at
+            score, due_at, close_at, language, created_at
      FROM problems WHERE id = $1::int`,
     [id]
   )
   if (!rows[0]) return null
   const problem = toRecord(rows[0])
   const { rows: tcRows } = await db.query<TestCaseRow>(
-    `SELECT id, problem_id, input, expected_output, is_hidden, score, sort_order
+    `SELECT id, problem_id, input, expected_output, is_hidden, sort_order
      FROM test_cases WHERE problem_id = $1::int ORDER BY sort_order, id`,
     [id]
   )
@@ -167,19 +169,16 @@ export async function listProblems(
     week_no: number
     title: string
     description: string
-    points_max: string
+    score: number
     due_at: string | null
     close_at: string | null
   }>(
     `SELECT p.id, p.course_id, p.week_id, w.week_no,
-            p.title, p.description,
-            COALESCE(SUM(tc.score), 0) AS points_max,
+            p.title, p.description, p.score,
             p.due_at, p.close_at
      FROM problems p
      JOIN weeks w ON w.id = p.week_id
-     LEFT JOIN test_cases tc ON tc.problem_id = p.id
      WHERE p.course_id = $1::int ${weekFilter}
-     GROUP BY p.id, p.course_id, p.week_id, w.week_no, p.title, p.description, p.due_at, p.close_at
      ORDER BY w.week_no, p.id`,
     params
   )
@@ -190,7 +189,7 @@ export async function listProblems(
     weekNo: r.week_no,
     title: r.title,
     description: r.description,
-    pointsMax: Number(r.points_max),
+    score: r.score,
     dueAt: r.due_at,
     closeAt: r.close_at,
   }))
@@ -204,6 +203,7 @@ export async function updateProblem(
     description: string
     inputSpec: string
     outputSpec: string
+    score: number
     dueAt: string | null
     closeAt: string | null
     language: string
@@ -216,6 +216,7 @@ export async function updateProblem(
   if (data.description !== undefined) { params.push(data.description); sets.push(`description = $${params.length}`) }
   if (data.inputSpec !== undefined) { params.push(data.inputSpec); sets.push(`input_spec = $${params.length}`) }
   if (data.outputSpec !== undefined) { params.push(data.outputSpec); sets.push(`output_spec = $${params.length}`) }
+  if (data.score !== undefined) { params.push(data.score); sets.push(`score = $${params.length}::int`) }
   if ("dueAt" in data) { params.push(data.dueAt ?? null); sets.push(`due_at = $${params.length}`) }
   if ("closeAt" in data) { params.push(data.closeAt ?? null); sets.push(`close_at = $${params.length}`) }
   if (data.language !== undefined) { params.push(data.language); sets.push(`language = $${params.length}`) }
@@ -227,7 +228,7 @@ export async function updateProblem(
     `UPDATE problems SET ${sets.join(", ")}, updated_at = now()
      WHERE id = $${params.length}::int
      RETURNING id, course_id, week_id, title, description, input_spec, output_spec,
-               due_at, close_at, language, created_at`,
+               score, due_at, close_at, language, created_at`,
     params
   )
   return rows[0] ? toRecord(rows[0]) : null
@@ -251,10 +252,10 @@ export async function setTestCases(
   const result: TestCaseRecord[] = []
   for (const tc of cases) {
     const { rows } = await db.query<TestCaseRow>(
-      `INSERT INTO test_cases (problem_id, input, expected_output, is_hidden, score, sort_order)
-       VALUES ($1::int, $2, $3, $4, $5, $6::int)
-       RETURNING id, problem_id, input, expected_output, is_hidden, score, sort_order`,
-      [problemId, tc.input, tc.expectedOutput, tc.isHidden, tc.score, tc.sortOrder]
+      `INSERT INTO test_cases (problem_id, input, expected_output, is_hidden, sort_order)
+       VALUES ($1::int, $2, $3, $4, $5::int)
+       RETURNING id, problem_id, input, expected_output, is_hidden, sort_order`,
+      [problemId, tc.input, tc.expectedOutput, tc.isHidden, tc.sortOrder]
     )
     result.push(toTestCaseRecord(rows[0]))
   }

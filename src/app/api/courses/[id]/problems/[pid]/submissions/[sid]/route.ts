@@ -46,6 +46,13 @@ export const PUT = courseRoute<{ id: string; pid: string; sid: string }>(
     const body = (await request.json().catch(() => ({}))) as { manualScore?: number | null }
     const manualScore = body.manualScore !== undefined ? body.manualScore : null
 
+    if (typeof manualScore === "number" && (manualScore < 0 || manualScore > problem.score)) {
+      return NextResponse.json(
+        { error: `manual_score ต้องอยู่ระหว่าง 0–${problem.score}` },
+        { status: 400 }
+      )
+    }
+
     const submission = await reviewSubmission(db, submissionId, {
       manualScore: typeof manualScore === "number" ? manualScore : null,
       reviewedBy: auth.user.id,

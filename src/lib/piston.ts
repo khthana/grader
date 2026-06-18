@@ -44,7 +44,6 @@ export async function runTestCases(
 
         return {
           testCaseId: tc.id,
-          score: tc.score,
           passed,
           actualOutput,
           expectedOutput,
@@ -54,7 +53,6 @@ export async function runTestCases(
       } catch (error) {
         return {
           testCaseId: tc.id,
-          score: tc.score,
           passed: false,
           actualOutput: "",
           expectedOutput: tc.expectedOutput,
