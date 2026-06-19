@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { FaChevronLeft } from "react-icons/fa"
 import type { MenuItem } from "@/lib/roles"
 import { MenuIcon } from "./icons"
+import { isCourseScopedPath } from "@/lib/courses/scope"
 
 interface SidebarProps {
   menu: MenuItem[]
@@ -34,7 +35,9 @@ export function Sidebar({ menu, collapsed, onToggle }: SidebarProps) {
 
       <nav className="flex flex-col gap-1 px-3 py-6">
         {menu.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + "/")
+          const prefixMatch = pathname.startsWith(item.href + "/") &&
+            (item.courseScoped || !isCourseScopedPath(pathname))
+          const active = pathname === item.href || prefixMatch
           return (
             <Link
               key={item.href}

@@ -1,117 +1,173 @@
 # CE-Grader
 
-ระบบตรวจและให้คะแนน Python code ของนักศึกษาอัตโนมัติ (Computer Engineering Python Grader) — นักศึกษาส่ง Python code เข้ามา ระบบรันกับ test cases ผ่าน Piston แล้วให้คะแนนพร้อม feedback. มาพร้อมระบบ login, role-based shell, หน้า **จัดการผู้ใช้ (User Management)** สำหรับผู้ดูแลระบบ, และหน้า **จัดการรายวิชา + รายชื่อนักศึกษา** (course management & student roster — CRUD, นำเข้า/ส่งออก Excel, มอบหมายผู้สอน) สำหรับ Admin/Instructor/TA.
+ระบบตรวจและให้คะแนน Python code ของนักศึกษาอัตโนมัติ (Computer Engineering Python Grader)  
+Faculty of Engineering, KMITL — Standalone product (the sibling `DEEP-QA-*` repos are read-only design references).
 
-Faculty of Engineering, KMITL. Standalone product (the sibling `DEEP-QA-*` repos are read-only design references only).
+นักศึกษาส่ง Python code เข้ามา ระบบรันกับ test cases ผ่าน [Piston](https://github.com/engineer-man/piston) แล้วให้คะแนนพร้อม feedback ทันที
+
+## Features
+
+| ฟีเจอร์ | รายละเอียด |
+|---------|-----------|
+| **Auth** | Postgres-backed login (email/password + Google OAuth), HMAC-signed session cookie, 8h expiry |
+| **Roles** | Admin · Instructor · TA · Student — many-to-many, role switcher ใน navbar |
+| **User Management** | CRUD + bulk xlsx import + role assignment (Admin only) |
+| **Activity Logs** | บันทึกทุก action สำคัญ (Admin only) |
+| **Dev Impersonation** | Admin เข้าดู session ของ user อื่นได้ (dev only) |
+| **Course Management** | CRUD รายวิชา + มอบหมาย Instructor/TA (Admin/Instructor) |
+| **Student Roster** | CRUD + bulk xlsx import/export + กรองกลุ่ม (Instructor/TA) |
+| **Problems** | สร้าง/แก้ไขโจทย์พร้อม test cases, คำอธิบาย **Markdown**, กำหนดเวลา due/close |
+| **Grading** | `mode:run` รัน visible tests; `mode:submit` รัน all tests + เก็บ Submission + ตรวจ deadline |
+| **Review Queue** | Instructor ตรวจ/override คะแนน pending submissions |
+| **Gradebook** | matrix student × problem (effective score = `COALESCE(manual_score, points_earned)`) |
+| **Assignments** | นักศึกษาดูรายการโจทย์พร้อม status และคะแนนของตัวเอง |
 
 ## Tech stack
+
 - **Next.js 16** (App Router, Turbopack) · TypeScript · React 19
-- **Tailwind CSS v4** + `react-icons` (no MUI / framer-motion / react-router)
+- **Tailwind CSS v4** + `@tailwindcss/typography` · `react-icons`
 - **PostgreSQL** via raw `pg` + SQL · **bcryptjs** password hashing
-- HMAC-signed session cookie · Google OAuth (optional) · route protection via Next 16 `proxy`
-- **Vitest** + **pg-mem** for tests · `xlsx` for bulk import (client-side)
+- **Piston** — sandboxed code execution (Python 3.10.0)
+- HMAC-SHA256 session cookie · Google OAuth (optional) · route protection via Next 16 `proxy`
+- **Vitest** + **pg-mem** (in-memory Postgres) for tests · `xlsx` for bulk import/export
+- `react-markdown` + `remark-gfm` — Markdown rendering for problem descriptions
+
+> No MUI · No framer-motion · No react-router
 
 ## Prerequisites
+
 - Node.js 20+ (developed on 22)
-- A PostgreSQL database reachable via `DATABASE_URL` (see Docker quick-start below)
+- PostgreSQL reachable via `DATABASE_URL`
 
 ## Setup
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+**1. Install dependencies**
+```bash
+npm install
+```
 
-2. Create `.env.local`:
-   ```
-   DATABASE_URL=postgresql://user:pass@host:5432/db
-   SESSION_SECRET=<long-random-string>
-   NEXTAUTH_URL=http://localhost:3000
-   # optional — Google login degrades gracefully if omitted
-   GOOGLE_CLIENT_ID=
-   GOOGLE_CLIENT_SECRET=
-   ```
+**2. Create `.env.local`**
+```
+DATABASE_URL=postgresql://user:pass@host:5432/db
+SESSION_SECRET=<long-random-string>
+NEXTAUTH_URL=http://localhost:3000
+# optional — Google login degrades gracefully if omitted
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+```
 
-3. (Optional) spin up Postgres with Docker:
-   ```bash
-   docker run -d --name grader-db --restart unless-stopped \
-     -e POSTGRES_USER=grader -e POSTGRES_PASSWORD=grader -e POSTGRES_DB=grader \
-     -p 5433:5432 -v grader-db-data:/var/lib/postgresql/data postgres:16-alpine
-   # DATABASE_URL=postgresql://grader:grader@localhost:5433/grader
-   ```
+**3. (Optional) spin up Postgres with Docker**
+```bash
+docker run -d --name grader-db --restart unless-stopped \
+  -e POSTGRES_USER=grader -e POSTGRES_PASSWORD=grader -e POSTGRES_DB=grader \
+  -p 5433:5432 -v grader-db-data:/var/lib/postgresql/data postgres:16-alpine
+# DATABASE_URL=postgresql://grader:grader@localhost:5433/grader
+```
 
-4. Create tables and seed the initial Admin:
-   ```bash
-   npm run db:setup
-   ```
-   Default Admin login: **admin@kmitl.ac.th** / **Password123!**
+**4. Create tables and seed the initial Admin**
+```bash
+# On Windows (Git Bash):
+set -a; . ./.env.local; set +a; npm run db:setup
+```
+Default Admin: **admin@kmitl.ac.th** / **Password123!**
 
-5. Run the dev server:
-   ```bash
-   npm run dev
-   ```
-   Open http://localhost:3000 (you'll be redirected to `/login`).
+**5. Run the dev server**
+```bash
+npm run dev
+```
+เปิด http://localhost:3000 (redirect ไป `/login` อัตโนมัติ)
 
 ## Scripts
+
 | Command | Description |
-|---|---|
+|---------|-------------|
 | `npm run dev` | Dev server (Turbopack) |
 | `npm run build` | Production build |
 | `npm run lint` | ESLint |
-| `npm test` | Run the Vitest suite |
+| `npm test` | Run the Vitest suite (308 tests) |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run db:setup` | Apply `schema.sql` + seed Admin (needs `DATABASE_URL`) |
 
+## Database migration
+
+**Fresh install:** `npm run db:setup` ครอบคลุมทุกอย่าง
+
+**Existing dev DB** (อัปเกรดจาก schema เก่า):
+```bash
+psql $DATABASE_URL -f scripts/migrate-001-natural-keys.sql
+```
+Script นี้ migrate `courses` จาก surrogate `id` ไปเป็น natural composite PK `(code, year, semester)` — รันซ้ำได้ปลอดภัย
+
 ## Database backup & restore
-`schema.sql` recreates the **tables** on a fresh machine, but it does **not** carry your data
-(users, roles assignments, logs). Only the four roles and the seeded Admin exist after
-`npm run db:setup`. To move real data between machines, dump and restore Postgres directly.
 
-Throughout, `DB_URL` is your `DATABASE_URL`, e.g. `postgresql://grader:grader@localhost:5433/grader`.
+`schema.sql` สร้างแค่ตาราง ไม่มีข้อมูล ถ้าต้องการย้ายข้อมูลระหว่างเครื่อง dump/restore Postgres โดยตรง:
 
-**Back up (on the old machine):**
 ```bash
-# plain SQL — portable and human-readable
-pg_dump "$DB_URL" --no-owner --no-privileges -f grader-backup.sql
+# Backup
+pg_dump "$DATABASE_URL" --no-owner --no-privileges -f grader-backup.sql
 
-# or custom format — smaller, restored with pg_restore
-pg_dump "$DB_URL" --no-owner --no-privileges -Fc -f grader-backup.dump
+# Restore (create schema first, then restore data)
+npm run db:setup
+psql "$DATABASE_URL" -f grader-backup.sql
 ```
 
-**Restore (on the new machine — create the schema first):**
-```bash
-npm run db:setup                          # creates tables + roles + seed Admin
-psql "$DB_URL" -f grader-backup.sql       # for the .sql dump
-# or, for the .dump file:
-pg_restore --no-owner --no-privileges --data-only -d "$DB_URL" grader-backup.dump
-```
-> The seeded Admin from `db:setup` may collide with a row in the dump. Either skip `db:setup`
-> and restore into an empty database, or restore with `--data-only` after the schema exists and
-> resolve the duplicate `admin@kmitl.ac.th` by hand.
-
-**If Postgres runs in the Docker container above** (`grader-db`), dump/restore through it instead:
+ถ้า Postgres รันใน Docker (`grader-db`):
 ```bash
 docker exec grader-db pg_dump -U grader --no-owner --no-privileges grader > grader-backup.sql
 docker exec -i grader-db psql -U grader grader < grader-backup.sql
 ```
 
 ## Testing
-Unit tests cover the pure modules (session, password, roles, breadcrumbs, validation, import, name); repository and API routes are integration-tested against an in-memory Postgres (**pg-mem**) — no Docker needed to run the suite.
+
+Unit tests: pure modules (session, password, roles, breadcrumbs, validation, import)  
+Integration tests: repositories + API route handlers ทดสอบกับ **pg-mem** — ไม่ต้องใช้ Docker
 
 ```bash
-npm test
+npm test   # 308 tests / 48 files
 ```
 
 ## Project layout
-- `src/app/(app)/` — authenticated pages wrapped by the role-based shell (`/users`, `/logs`, `/courses`, `/students`, `/problems`, …)
-- `src/app/api/` — route handlers (auth, users, logs, grade, `courses`, `courses/[id]/students`)
-- `src/lib/` — domain logic (auth, db, roles, logs) + `users/`, `courses/`, `enrollments/` (repository · validation · access · enroll/import/export)
-- `src/components/` — shell + `users/` + `courses/` + `students/` + editor UI
-- `src/proxy.ts` — route protection (Next 16 proxy, Node runtime)
-- `schema.sql` — database schema · `CONTEXT.md` — domain glossary · `docs/adr/` — architecture decisions
 
-For architecture details and conventions, see [CLAUDE.md](CLAUDE.md). The course-roster feature spec is `requirement/prd_teacher_students_roster.md`.
+```
+src/
+  app/
+    (app)/                          # authenticated shell (layout.tsx = navbar + sidebar)
+      courses/
+        page.tsx                    # course list (Admin/Instructor)
+        [code]/[year]/[semester]/   # course-scoped pages
+          layout.tsx                # slug validation + auth gate
+          problems/                 # โจทย์ปัญหา
+          students/                 # รายชื่อนักศึกษา
+          gradebook/                # สมุดคะแนน
+          review/                   # ตรวจงาน
+          assignments/              # งานที่ได้มอบหมาย (student view)
+      users/                        # จัดการผู้ใช้ (Admin)
+      logs/                         # บันทึกกิจกรรม (Admin)
+      problems|students|...         # thin redirectors → active course URL
+    api/
+      auth/                         # login · logout · me · google OAuth
+      grade/                        # POST /api/grade — Piston execution
+      courses/                      # GET/POST /api/courses
+        [code]/[year]/[semester]/   # course-scoped API routes
+  lib/
+    courses/ enrollments/ problems/
+    weeks/ submissions/ gradebook/
+    assignments/ users/ logs/       # repositories + domain logic
+  components/
+    shell/                          # Navbar · Sidebar · Breadcrumbs · AppShell
+    problems/ students/ courses/
+    users/ editor/ ui/              # feature components
+  proxy.ts                          # Next 16 route protection (Node runtime)
 
-> **Schema changes are manual:** after editing `schema.sql`, re-apply it to your dev DB with
-> `set -a; . ./.env.local; set +a; npm run db:setup` (idempotent). The test suite uses a fresh
-> in-memory schema, so it won't warn you about an un-migrated dev DB.
+schema.sql                          # database schema (source of truth)
+scripts/
+  migrate-001-natural-keys.sql      # one-time dev DB migration
+```
+
+## Architecture & conventions
+
+ดูรายละเอียดได้ที่ [CLAUDE.md](CLAUDE.md) — ครอบคลุม routing, auth, data layer, testing patterns, และ conventions ทั้งหมด
+
+- `docs/adr/` — architecture decision records
+- `CONTEXT.md` — domain glossary
+- `requirement/` — PRDs

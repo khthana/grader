@@ -12,6 +12,7 @@ import {
   FaSave,
 } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
+import { MarkdownContent } from "@/components/ui/MarkdownContent"
 
 interface TestCaseForm {
   id?: number
@@ -73,6 +74,7 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
   )
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [descTab, setDescTab] = useState<"write" | "preview">("write")
 
   const activeWeek = weeks.find((w) => w.id === weekId)
 
@@ -171,13 +173,39 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
                 />
               </Field>
               <Field label="คำอธิบายโจทย์">
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
-                  placeholder="อธิบายปัญหาที่นักศึกษาต้องแก้ไข..."
-                  className="input-base w-full resize-y"
-                />
+                <div className="flex gap-1 mb-1.5">
+                  {(["write", "preview"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setDescTab(tab)}
+                      className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                        descTab === tab
+                          ? "bg-primary text-white"
+                          : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      {tab === "write" ? "เขียน" : "ดูตัวอย่าง"}
+                    </button>
+                  ))}
+                </div>
+                {descTab === "write" ? (
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={6}
+                    placeholder="รองรับ Markdown — เช่น **ตัวหนา**, | ตาราง |, `code`"
+                    className="input-base w-full resize-y font-mono text-sm"
+                  />
+                ) : (
+                  <div className="min-h-[144px] rounded-lg border border-gray-200 bg-slate-50 px-4 py-3">
+                    {description.trim() ? (
+                      <MarkdownContent content={description} />
+                    ) : (
+                      <span className="text-sm text-slate-400">ยังไม่มีเนื้อหา</span>
+                    )}
+                  </div>
+                )}
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="รูปแบบ Input">

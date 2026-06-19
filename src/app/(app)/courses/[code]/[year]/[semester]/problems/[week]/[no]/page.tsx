@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { FaArrowLeft, FaClock, FaExclamationTriangle } from "react-icons/fa"
 import { CodeEditor } from "@/components/editor/CodeEditor"
+import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { getDb } from "@/lib/db"
 import { parseCourseSlug, buildCoursePath } from "@/lib/courses/slug"
 import { getProblemByWeekAndNo } from "@/lib/problems/repository"
@@ -102,9 +103,7 @@ export default async function CourseProblemPage({ params }: PageProps) {
 
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         {problem.description && (
-          <p className="leading-relaxed text-slate-700 whitespace-pre-wrap">
-            {problem.description}
-          </p>
+          <MarkdownContent content={problem.description} />
         )}
         {(problem.inputSpec || problem.outputSpec) && (
           <div className="mt-4 grid gap-4 sm:grid-cols-2">

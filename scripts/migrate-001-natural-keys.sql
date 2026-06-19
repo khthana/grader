@@ -7,7 +7,7 @@ BEGIN;
 -- ── Step 1: Add year/semester to courses ─────────────────────────────────────
 
 ALTER TABLE courses
-  ADD COLUMN IF NOT EXISTS year     INTEGER NOT NULL DEFAULT 2567,
+  ADD COLUMN IF NOT EXISTS year     INTEGER NOT NULL DEFAULT 2569,
   ADD COLUMN IF NOT EXISTS semester INTEGER NOT NULL DEFAULT 1;
 
 -- ── Step 2: Add composite key columns to child tables ────────────────────────
