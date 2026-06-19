@@ -14,7 +14,7 @@ The app is **feature-complete** as of 2026-06-19. All pages are live — no Comi
 - **Roster:** รายชื่อนักศึกษา — accessible via `/courses/[code]/[year]/[semester]/students`.
 - **Problems:** `/courses/[code]/[year]/[semester]/problems` — Instructor CRUD; `/courses/.../problems/[week]/[no]` — student view with `mode:run` / `mode:submit`; `…/edit`, `…/submissions`.
 - **Grading:** `POST /api/grade` runs code via Piston, stores Submission on `mode:submit`, enforces `close_at` / `due_at` deadlines, checks enrollment.
-- **Review:** `/courses/[code]/[year]/[semester]/review` — cross-problem pending queue for Instructor; inline score-override dialog.
+- **Review:** `/courses/[code]/[year]/[semester]/review` — 3-column grading workbench (problem switcher + submission queue / CodeMirror read-only viewer + test results / score panel with bonus stepper); URL state `?pid=&sid=`; Admin/Instructor only (ADR 0005).
 - **Gradebook:** `/courses/[code]/[year]/[semester]/gradebook` — student × problem score matrix with `COALESCE(manual_score, points_earned)` effective score.
 - **Assignments:** `/courses/[code]/[year]/[semester]/assignments` — student's own problem list with status badges and effective scores.
 
@@ -100,7 +100,7 @@ parseCourseSlug(code, year, semester): CourseKey | null
 - `src/lib/enrollments/repository.ts` — `createEnrollment(db, { courseCode, courseYear, courseSemester, userId, ... })`, `findEnrollment(db, key, userId)`, `getEnrollmentByUser(db, key, userId)`, `listEnrollments(db, key, opts)`, `listAllEnrollments(db, key)`, `listGroups(db, key)`, `updateEnrollment(db, key, userId, data)`, `deleteEnrollment(db, key, userId)`.
 - `src/lib/weeks/repository.ts` — `seedWeeks(db, key: CourseKey)`, `listWeeks(db, key)`, `getWeekByNo(db, key, weekNo)`, `updateWeekTopic(db, weekId, topic)`, `addWeek(db, key)`, `weekHasProblems(db, weekId)`, `deleteWeek(db, weekId)`.
 - `src/lib/problems/repository.ts` — `createProblem(db, { courseCode, courseYear, courseSemester, weekId, title, ... })` (auto-assigns `problem_no`), `getProblemById(db, id)` (includes `testCases[]`), `getProblemByWeekAndNo(db, key, weekNo, problemNo)`, `listProblems(db, key, opts)` (includes `pointsMax`, `weekNo`, `problemNo`), `updateProblem`, `deleteProblem`, `setTestCases`.
-- `src/lib/submissions/repository.ts` — `createSubmission(db, { problemId, userId, courseCode, courseYear, courseSemester, ... })`, `listSubmissions`, `countSubmitted(db, problemId, key: CourseKey)`, `countPending`, `getSubmission`, `reviewSubmission`, `listSubmissionsForProblem`, `getLastSubmission`, `listPendingSubmissions(db, key: CourseKey)`.
+- `src/lib/submissions/repository.ts` — `createSubmission(db, { problemId, userId, courseCode, courseYear, courseSemester, ... })`, `listSubmissions`, `countSubmitted(db, problemId, key: CourseKey)`, `countPending`, `getSubmission`, `reviewSubmission`, `listSubmissionsForProblem(db, problemId)`, `getLastSubmission`, `listPendingSubmissions(db, key: CourseKey)`, `getProblemIdsWithSubmissions(db, key: CourseKey)` → `number[]`.
 - `src/lib/gradebook/repository.ts` — `getGradebook(db, key: CourseKey)` → `{ problems: GradebookProblem[], students: GradebookStudent[] }` where `student.scores[problemId]` = `COALESCE(manual_score, points_earned)`.
 - `src/lib/assignments/repository.ts` — `getStudentAssignments(db, key: CourseKey, userId)` → `AssignmentItem[]`.
 
@@ -152,7 +152,7 @@ Client components that make API calls receive `courseSlug: string` (e.g. `"01076
 | `ProblemEditor` | `courseSlug`, `coursePath`, `weeks`, `mode`, `initialWeekId?`, `problem?` |
 | `GradebookTable` | `courseSlug` |
 | `AssignmentsList` | `courseSlug`, `coursePath` |
-| `PendingQueue` | `courseSlug`, `coursePath` |
+| `ReviewWorkbench` | `problems: ProblemListItem[]`, `courseSlug` |
 | `RosterTable` | `courseSlug`, `coursePath`, `canMutate` |
 | `StudentFormDialog` | `courseSlug` |
 | `RosterImportDialog` | `courseSlug` |
@@ -172,14 +172,16 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
 - **Weeks:** `GET /api/courses/[code]/[year]/[semester]/weeks` (list); `POST` (Instructor appends); `PUT …/weeks/[wid]` (edit topic); `DELETE …/weeks/[wid]` (last only, no problems, keep ≥1). `WeekBar` component renders a wrapping `grid-cols-6` of week cards.
 - **Problems (Instructor):** `GET/POST /api/courses/.../problems`; `GET/PUT/DELETE …/problems/[pid]`. `ProblemEditor` handles create/edit with live test-case management. `validateProblemInput`: title required, weekId required, ≥1 test case, score ≥ 0, `close_at` ≥ `due_at`.
 - **Student view** (`/courses/.../problems/[week]/[no]`): loaded via `getWeekByNo` + `getProblemByWeekAndNo`.
+- **Code editor** (`src/components/editor/CodeEditor.tsx`): uses `@uiw/react-codemirror` + `@codemirror/lang-python`, dynamically imported with `ssr: false`. Dark theme, line numbers, `editable={!isClosed}`.
 - **Grading** (`POST /api/grade`): `mode:run` = visible tests only, no Submission; `mode:submit` = all tests, stores Submission, enforces `close_at` (403 if past), checks enrollment, sets `is_late` if past `due_at`. Calls Piston (`src/lib/piston.ts`, Python 3.10.0). Returns `GradeResult = { pointsEarned, pointsMax, totalTests, passedTests, results[], feedback }`.
 - **Two-tier deadline (ADR 0002):** `close_at` checked first → 403 if past; `due_at` → sets `is_late` flag.
 
-### Submission review
-- **Per-problem:** `GET /api/courses/.../problems/[pid]/submissions`; `GET/PUT …/submissions/[sid]` (PUT: Instructor/Admin only).
-- **Review queue** (`…/review`): `GET /api/courses/.../review` returns all `reviewed_at IS NULL` submissions, oldest first.
+### Submission review (ADR 0005)
+- **Per-problem submissions:** `GET /api/courses/.../problems/[pid]/submissions` → `{ submissions: SubmissionListItem[] }`; `GET/PUT …/submissions/[sid]` (PUT: Admin/Instructor only, validates `manualScore ∈ [0, problem.score]`).
+- **Legacy review queue API:** `GET /api/courses/.../review` → pending submissions oldest-first. Still exists; no longer used by the review page itself.
 - **Effective score** everywhere = `COALESCE(manual_score, points_earned)`.
-- **UI:** `SubmissionsTable` (per-problem), `PendingQueue` (review queue).
+- **Bonus stepper:** review UI shows an additive bonus (0 → `pointsMax − auto`); saves `manualScore = auto + bonus`. No schema change needed — `manual_score` absorbs the combined value.
+- **UI:** `SubmissionsTable` (per-problem submissions page), `ReviewWorkbench` (grading workbench), `PendingQueue` (unused legacy component).
 
 ### Gradebook & assignments
 - **Gradebook** (`…/gradebook`, Instructor/Admin): `GET /api/courses/.../gradebook` → matrix; `GradebookTable` with week-grouped columns, color-coded cells, per-student status dot (ADR 0003). Problem columns headed **"ข้อ N"** (per-week index resetting each week). Excel export labels columns `สัปดาห์ {w} ข้อ {n}`.
