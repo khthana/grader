@@ -1,7 +1,11 @@
 "use client"
 
-import { useState } from "react"
-import { GradeResult } from "@/types"
+import { useState, useCallback } from "react"
+import dynamic from "next/dynamic"
+import { python } from "@codemirror/lang-python"
+import type { GradeResult } from "@/types"
+
+const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), { ssr: false })
 
 interface CodeEditorProps {
   problemId: number
@@ -14,6 +18,8 @@ export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [activeMode, setActiveMode] = useState<"run" | "submit" | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const handleChange = useCallback((value: string) => setCode(value), [])
 
   async function handleGrade(mode: "run" | "submit") {
     if (!code.trim()) return
@@ -46,15 +52,26 @@ export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
 
   return (
     <div className="flex flex-col gap-4 font-thai">
-      {/* Code Input */}
-      <textarea
-        value={code}
-        onChange={(e) => setCode(e.target.value)}
-        placeholder="พิมพ์ Python code ของคุณที่นี่..."
-        className="h-64 w-full resize-none rounded-lg border border-gray-700 bg-gray-900
-                   p-4 font-mono text-sm text-green-400 focus:border-blue-500 focus:outline-none"
-        spellCheck={false}
-      />
+      {/* Code editor */}
+      <div className="overflow-hidden rounded-lg border border-gray-700">
+        <CodeMirror
+          value={code}
+          height="256px"
+          theme="dark"
+          extensions={[python()]}
+          onChange={handleChange}
+          editable={!isClosed}
+          placeholder="พิมพ์ Python code ของคุณที่นี่..."
+          basicSetup={{
+            lineNumbers: true,
+            foldGutter: false,
+            dropCursor: false,
+            allowMultipleSelections: false,
+            indentOnInput: true,
+            tabSize: 4,
+          }}
+        />
+      </div>
 
       {/* Buttons */}
       {isClosed ? (
@@ -92,7 +109,6 @@ export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
       {/* Result */}
       {result && (
         <div className="flex flex-col gap-3">
-          {/* Score banner */}
           <div
             className={`rounded-lg border p-4 ${
               perfect
@@ -109,7 +125,6 @@ export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
             )}
           </div>
 
-          {/* Test case results */}
           <div className="flex flex-col gap-2">
             {result.results.map((r, i) => (
               <div
@@ -121,7 +136,7 @@ export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
                 }`}
               >
                 <p className="font-semibold">
-                  Test {i + 1}: {r.passed ? "ผ่าน" : "ไม่ผ่าน"} ({r.score} คะแนน)
+                  Test {i + 1}: {r.passed ? "ผ่าน" : "ไม่ผ่าน"}
                 </p>
                 {!r.passed && (
                   <>

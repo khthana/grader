@@ -284,6 +284,18 @@ interface PendingRow {
   points_max: string | null
 }
 
+export async function getProblemIdsWithSubmissions(
+  db: Queryable,
+  key: CourseKey
+): Promise<number[]> {
+  const { rows } = await db.query<{ problem_id: number }>(
+    `SELECT DISTINCT problem_id FROM submissions
+     WHERE course_code = $1 AND course_year = $2::int AND course_semester = $3::int`,
+    [key.code, key.year, key.semester]
+  )
+  return rows.map((r) => r.problem_id)
+}
+
 export async function listPendingSubmissions(
   db: Queryable,
   key: CourseKey
