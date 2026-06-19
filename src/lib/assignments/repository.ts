@@ -8,6 +8,7 @@ export interface AssignmentSubmission {
   effectiveScore: number | null
   isLate: boolean
   submittedAt: string
+  reviewedAt: string | null
 }
 
 export interface AssignmentItem {
@@ -37,6 +38,7 @@ interface SubmissionRow {
   manual_score: string | null
   is_late: boolean
   submitted_at: string
+  reviewed_at: string | null
 }
 
 export async function getStudentAssignments(
@@ -57,7 +59,7 @@ export async function getStudentAssignments(
   if (problemRows.length === 0) return []
 
   const { rows: subRows } = await db.query<SubmissionRow>(
-    `SELECT s.problem_id, s.points_earned, s.manual_score, s.is_late, s.submitted_at
+    `SELECT s.problem_id, s.points_earned, s.manual_score, s.is_late, s.submitted_at, s.reviewed_at
      FROM submissions s
      INNER JOIN (
        SELECT problem_id, MAX(submitted_at) AS last_at
@@ -89,6 +91,7 @@ export async function getStudentAssignments(
         effectiveScore: manualScore ?? pointsEarned,
         isLate: sub.is_late,
         submittedAt: sub.submitted_at,
+        reviewedAt: sub.reviewed_at,
       }
     }
     return {

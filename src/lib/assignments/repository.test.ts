@@ -84,6 +84,45 @@ describe("assignments repository", () => {
     expect(items[0].submission!.isLate).toBe(false)
   })
 
+  it("returns reviewedAt null when submission has not been reviewed", async () => {
+    await createSubmission(db, {
+      problemId,
+      userId: studentId,
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      code: "print('ok')",
+      language: "python",
+      pointsEarned: 10,
+      pointsMax: 10,
+      isLate: false,
+      results: [],
+    })
+
+    const items = await getStudentAssignments(db, course, studentId)
+    expect(items[0].submission!.reviewedAt).toBeNull()
+  })
+
+  it("returns reviewedAt as a non-null string after instructor review", async () => {
+    const sub = await createSubmission(db, {
+      problemId,
+      userId: studentId,
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      code: "x",
+      language: "python",
+      pointsEarned: 10,
+      pointsMax: 10,
+      isLate: false,
+      results: [],
+    })
+    await reviewSubmission(db, sub.id, { manualScore: 10, reviewedBy: instructorId })
+
+    const items = await getStudentAssignments(db, course, studentId)
+    expect(items[0].submission!.reviewedAt).not.toBeNull()
+  })
+
   it("returns effectiveScore = manualScore after instructor review", async () => {
     const sub = await createSubmission(db, {
       problemId,
