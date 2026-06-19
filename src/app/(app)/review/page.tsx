@@ -1,14 +1,12 @@
-import { notFound } from "next/navigation"
+import { redirect, notFound } from "next/navigation"
 import { getCurrentUser } from "@/lib/session"
 import { getCourseContext } from "@/lib/courses/server"
 import { canManageCourses } from "@/lib/courses/access"
-import { PendingQueue } from "@/components/review/PendingQueue"
+import { buildCoursePath } from "@/lib/courses/slug"
 
 export default async function ReviewPage() {
   const [user, { activeCourse }] = await Promise.all([getCurrentUser(), getCourseContext()])
-
   if (!user || !canManageCourses(user.roles)) notFound()
-
   if (!activeCourse) {
     return (
       <div className="flex flex-col gap-6 font-thai">
@@ -19,16 +17,5 @@ export default async function ReviewPage() {
       </div>
     )
   }
-
-  return (
-    <div className="flex flex-col gap-6 font-thai">
-      <div>
-        <h1 className="text-2xl font-semibold text-primary">ตรวจงาน</h1>
-        <p className="mt-0.5 text-sm text-slate-500">
-          {activeCourse.nameTh} ({activeCourse.code})
-        </p>
-      </div>
-      <PendingQueue courseId={activeCourse.id} />
-    </div>
-  )
+  redirect(`${buildCoursePath(activeCourse)}/review`)
 }

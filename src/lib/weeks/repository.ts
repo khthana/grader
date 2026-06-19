@@ -1,59 +1,68 @@
 import type { Queryable } from "@/lib/db"
-export type { Queryable }
+import type { CourseKey } from "@/lib/courses/types"
+export type { Queryable, CourseKey }
 
 export interface WeekRecord {
   id: number
-  courseId: number
+  courseCode: string
+  courseYear: number
+  courseSemester: number
   weekNo: number
   topic: string
 }
 
 interface WeekRow {
   id: number
-  course_id: number
+  course_code: string
+  course_year: number
+  course_semester: number
   week_no: number
   topic: string
 }
 
 function toRecord(row: WeekRow): WeekRecord {
-  return { id: row.id, courseId: row.course_id, weekNo: row.week_no, topic: row.topic }
+  return {
+    id: row.id,
+    courseCode: row.course_code,
+    courseYear: row.course_year,
+    courseSemester: row.course_semester,
+    weekNo: row.week_no,
+    topic: row.topic,
+  }
 }
 
-// New courses start with this many weeks; instructors grow/shrink from here.
+const WEEK_COLS = `id, course_code, course_year, course_semester, week_no, topic`
+
 export const DEFAULT_WEEKS = 6
-// Upper bound on a course's week count (a generous semester).
 export const MAX_WEEKS = 16
 
-export async function seedWeeks(db: Queryable, courseId: number): Promise<void> {
-  // Topic is left empty (the schema default) — the card UI labels the week by
-  // its number, and a duplicate "สัปดาห์ที่ N" topic would just repeat that.
+export async function seedWeeks(db: Queryable, key: CourseKey): Promise<void> {
   for (let n = 1; n <= DEFAULT_WEEKS; n++) {
     await db.query(
-      `INSERT INTO weeks (course_id, week_no, topic)
-       VALUES ($1::int, $2::int, '')
-       ON CONFLICT (course_id, week_no) DO NOTHING`,
-      [courseId, n]
+      `INSERT INTO weeks (course_code, course_year, course_semester, week_no, topic)
+       VALUES ($1, $2::int, $3::int, $4::int, '')
+       ON CONFLICT (course_code, course_year, course_semester, week_no) DO NOTHING`,
+      [key.code, key.year, key.semester, n]
     )
   }
 }
 
-// Append the next week (week_no = current max + 1). Returns null when the course
-// already has MAX_WEEKS weeks.
-export async function addWeek(db: Queryable, courseId: number): Promise<WeekRecord | null> {
+export async function addWeek(db: Queryable, key: CourseKey): Promise<WeekRecord | null> {
   const { rows: maxRows } = await db.query<{ max: number | null; count: string }>(
     `SELECT MAX(week_no)::int AS max, COUNT(*)::int AS count
-     FROM weeks WHERE course_id = $1::int`,
-    [courseId]
+     FROM weeks
+     WHERE course_code = $1 AND course_year = $2::int AND course_semester = $3::int`,
+    [key.code, key.year, key.semester]
   )
   const current = Number(maxRows[0]?.count ?? 0)
   if (current >= MAX_WEEKS) return null
   const nextNo = (maxRows[0]?.max ?? 0) + 1
 
   const { rows } = await db.query<WeekRow>(
-    `INSERT INTO weeks (course_id, week_no, topic)
-     VALUES ($1::int, $2::int, '')
-     RETURNING id, course_id, week_no, topic`,
-    [courseId, nextNo]
+    `INSERT INTO weeks (course_code, course_year, course_semester, week_no, topic)
+     VALUES ($1, $2::int, $3::int, $4::int, '')
+     RETURNING ${WEEK_COLS}`,
+    [key.code, key.year, key.semester, nextNo]
   )
   return toRecord(rows[0])
 }
@@ -74,13 +83,27 @@ export async function deleteWeek(db: Queryable, weekId: number): Promise<boolean
   return rows.length > 0
 }
 
-export async function listWeeks(db: Queryable, courseId: number): Promise<WeekRecord[]> {
+export async function getWeekByNo(
+  db: Queryable,
+  key: CourseKey,
+  weekNo: number
+): Promise<WeekRecord | null> {
   const { rows } = await db.query<WeekRow>(
-    `SELECT id, course_id, week_no, topic
+    `SELECT ${WEEK_COLS} FROM weeks
+     WHERE course_code = $1 AND course_year = $2::int AND course_semester = $3::int
+       AND week_no = $4::int`,
+    [key.code, key.year, key.semester, weekNo]
+  )
+  return rows[0] ? toRecord(rows[0]) : null
+}
+
+export async function listWeeks(db: Queryable, key: CourseKey): Promise<WeekRecord[]> {
+  const { rows } = await db.query<WeekRow>(
+    `SELECT ${WEEK_COLS}
      FROM weeks
-     WHERE course_id = $1::int
+     WHERE course_code = $1 AND course_year = $2::int AND course_semester = $3::int
      ORDER BY week_no`,
-    [courseId]
+    [key.code, key.year, key.semester]
   )
   return rows.map(toRecord)
 }
@@ -93,7 +116,7 @@ export async function updateWeekTopic(
   const { rows } = await db.query<WeekRow>(
     `UPDATE weeks SET topic = $1, updated_at = now()
      WHERE id = $2::int
-     RETURNING id, course_id, week_no, topic`,
+     RETURNING ${WEEK_COLS}`,
     [topic, id]
   )
   return rows[0] ? toRecord(rows[0]) : null

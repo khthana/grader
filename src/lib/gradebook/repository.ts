@@ -1,5 +1,6 @@
 import type { Queryable } from "@/lib/db"
-export type { Queryable }
+import type { CourseKey } from "@/lib/courses/types"
+export type { Queryable, CourseKey }
 
 import { deriveScorebookStatus, type ScorebookStatus } from "./status"
 
@@ -7,6 +8,7 @@ export interface GradebookProblem {
   id: number
   title: string
   weekNo: number
+  problemNo: number
   pointsMax: number
   dueAt: string | null
 }
@@ -28,6 +30,7 @@ interface ProblemRow {
   id: number
   title: string
   week_no: number
+  problem_no: number
   points_max: string | null
   due_at: string | Date | null
 }
@@ -45,35 +48,34 @@ interface ScoreRow {
   is_late: boolean
 }
 
-export async function getGradebook(db: Queryable, courseId: number): Promise<Gradebook> {
-  // 1. Problems for this course with their pointsMax
+export async function getGradebook(db: Queryable, key: CourseKey): Promise<Gradebook> {
   const now = new Date()
 
   const { rows: problemRows } = await db.query<ProblemRow>(
-    `SELECT p.id, p.title, w.week_no, p.due_at, p.score::text AS points_max
+    `SELECT p.id, p.title, w.week_no, p.problem_no, p.due_at, p.score::text AS points_max
      FROM problems p
      JOIN weeks w ON w.id = p.week_id
-     WHERE p.course_id = $1::int
-     ORDER BY w.week_no, p.id`,
-    [courseId]
+     WHERE p.course_code = $1 AND p.course_year = $2::int AND p.course_semester = $3::int
+     ORDER BY w.week_no, p.problem_no`,
+    [key.code, key.year, key.semester]
   )
 
   const problems: GradebookProblem[] = problemRows.map((r) => ({
     id: r.id,
     title: r.title,
     weekNo: r.week_no,
+    problemNo: r.problem_no,
     pointsMax: Number(r.points_max ?? 0),
     dueAt: r.due_at == null ? null : new Date(r.due_at).toISOString(),
   }))
 
-  // 2. Enrolled students
   const { rows: studentRows } = await db.query<StudentRow>(
     `SELECT u.id AS user_id, u.name, u.id_code
      FROM enrollments e
      JOIN users u ON u.id = e.user_id
-     WHERE e.course_id = $1::int
+     WHERE e.course_code = $1 AND e.course_year = $2::int AND e.course_semester = $3::int
      ORDER BY u.name`,
-    [courseId]
+    [key.code, key.year, key.semester]
   )
 
   if (problemRows.length === 0 || studentRows.length === 0) {
@@ -84,13 +86,11 @@ export async function getGradebook(db: Queryable, courseId: number): Promise<Gra
         name: r.name,
         idCode: r.id_code,
         scores: {},
-        // No problems means nothing can be due, late, or missing.
         status: "none-due" as ScorebookStatus,
       })),
     }
   }
 
-  // 3. Best effective score per (user, problem): last submission's COALESCE(manual_score, points_earned)
   const { rows: scoreRows } = await db.query<ScoreRow>(
     `SELECT s.user_id, s.problem_id, s.is_late,
             COALESCE(s.manual_score, s.points_earned)::text AS effective_score
@@ -98,16 +98,15 @@ export async function getGradebook(db: Queryable, courseId: number): Promise<Gra
      INNER JOIN (
        SELECT user_id, problem_id, MAX(submitted_at) AS last_at
        FROM submissions
-       WHERE course_id = $1::int
+       WHERE course_code = $1 AND course_year = $2::int AND course_semester = $3::int
        GROUP BY user_id, problem_id
      ) latest ON latest.user_id = s.user_id
                AND latest.problem_id = s.problem_id
                AND s.submitted_at = latest.last_at
-     WHERE s.course_id = $1::int`,
-    [courseId]
+     WHERE s.course_code = $1 AND s.course_year = $2::int AND s.course_semester = $3::int`,
+    [key.code, key.year, key.semester]
   )
 
-  // Index scores by userId → problemId → effectiveScore, and lateness by userId → problemId.
   const scoreMap = new Map<number, Map<number, number | null>>()
   const lateMap = new Map<number, Record<number, boolean>>()
   for (const row of scoreRows) {

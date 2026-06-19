@@ -5,6 +5,7 @@ import { createUser, assignRole } from "@/lib/users/repository"
 import { createCourse, assignInstructor } from "@/lib/courses/repository"
 import { listWeeks, DEFAULT_WEEKS } from "@/lib/weeks/repository"
 import { freshDb, setTestDb, sessionFor, type Queryable } from "@/lib/test-support/db"
+import type { CourseRecord } from "@/lib/courses/types"
 
 function req(sessionToken?: string): NextRequest {
   const r = new NextRequest("http://localhost/api/courses")
@@ -28,7 +29,7 @@ async function seedRole(db: Queryable, email: string, role: string) {
   return u
 }
 
-const newCourse = { code: "01076021", nameTh: "โครงสร้างข้อมูล", nameEn: "Data Structures" }
+const newCourse = { code: "01076021", year: 2567, semester: 1, nameTh: "โครงสร้างข้อมูล", nameEn: "Data Structures" }
 
 describe("GET /api/courses", () => {
   let db: Queryable
@@ -48,8 +49,8 @@ describe("GET /api/courses", () => {
   it("returns every course for an Admin", async () => {
     const admin = await createUser(db, { email: "admin@kmitl.ac.th", name: "Admin" })
     await assignRole(db, admin.id, "Admin")
-    await createCourse(db, { code: "C1", nameTh: "หนึ่ง", nameEn: "One" })
-    await createCourse(db, { code: "C2", nameTh: "สอง", nameEn: "Two" })
+    await createCourse(db, { code: "C1", year: 2567, semester: 1, nameTh: "หนึ่ง", nameEn: "One" })
+    await createCourse(db, { code: "C2", year: 2567, semester: 1, nameTh: "สอง", nameEn: "Two" })
 
     const res = await GET(req(sessionFor("admin@kmitl.ac.th")))
     expect(res.status).toBe(200)
@@ -60,9 +61,9 @@ describe("GET /api/courses", () => {
   it("returns only assigned courses for an Instructor", async () => {
     const ins = await createUser(db, { email: "ins@kmitl.ac.th", name: "Ins" })
     await assignRole(db, ins.id, "Instructor")
-    const mine = await createCourse(db, { code: "MINE", nameTh: "ของฉัน", nameEn: "Mine" })
-    await createCourse(db, { code: "OTHER", nameTh: "อื่น", nameEn: "Other" })
-    await assignInstructor(db, mine.id, ins.id)
+    const mine = await createCourse(db, { code: "MINE", year: 2567, semester: 1, nameTh: "ของฉัน", nameEn: "Mine" })
+    await createCourse(db, { code: "OTHER", year: 2567, semester: 1, nameTh: "อื่น", nameEn: "Other" })
+    await assignInstructor(db, mine, ins.id)
 
     const res = await GET(req(sessionFor("ins@kmitl.ac.th")))
     const body = await res.json()
@@ -91,7 +92,7 @@ describe("POST /api/courses", () => {
 
   it("returns 400 when required fields are missing", async () => {
     await seedRole(db, "ins@kmitl.ac.th", "Instructor")
-    const res = await POST(postReq({ code: "", nameTh: "", nameEn: "" }, sessionFor("ins@kmitl.ac.th")))
+    const res = await POST(postReq({ code: "", year: 2567, semester: 1, nameTh: "", nameEn: "" }, sessionFor("ins@kmitl.ac.th")))
     expect(res.status).toBe(400)
   })
 
@@ -101,7 +102,6 @@ describe("POST /api/courses", () => {
     const res = await POST(postReq(newCourse, sessionFor("ins@kmitl.ac.th")))
     expect(res.status).toBe(201)
 
-    // appears in the creator's entitled courses (switcher)
     const list = await GET(req(sessionFor("ins@kmitl.ac.th")))
     const body = await list.json()
     expect(body.courses.map((c: { code: string }) => c.code)).toEqual(["01076021"])
@@ -117,8 +117,8 @@ describe("POST /api/courses", () => {
     await seedRole(db, "ins@kmitl.ac.th", "Instructor")
     const res = await POST(postReq(newCourse, sessionFor("ins@kmitl.ac.th")))
     expect(res.status).toBe(201)
-    const { id: courseId } = await res.json()
-    const weeks = await listWeeks(db, courseId)
+    const courseRecord = (await res.json()) as CourseRecord
+    const weeks = await listWeeks(db, courseRecord)
     expect(weeks).toHaveLength(DEFAULT_WEEKS)
     expect(weeks[0].topic).toBe("")
   })

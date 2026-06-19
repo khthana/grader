@@ -1,12 +1,11 @@
-import { notFound } from "next/navigation"
+import { redirect, notFound } from "next/navigation"
 import { getCurrentUser } from "@/lib/session"
 import { getCourseContext } from "@/lib/courses/server"
 import { isTeachingStaff } from "@/lib/courses/access"
-import { GradebookTable } from "@/components/gradebook/GradebookTable"
+import { buildCoursePath } from "@/lib/courses/slug"
 
 export default async function GradebookPage() {
   const [user, { activeCourse }] = await Promise.all([getCurrentUser(), getCourseContext()])
-
   if (!user || !isTeachingStaff(user.roles)) notFound()
   if (!activeCourse) {
     return (
@@ -18,16 +17,5 @@ export default async function GradebookPage() {
       </div>
     )
   }
-
-  return (
-    <div className="flex flex-col gap-6 font-thai">
-      <div>
-        <h1 className="text-2xl font-semibold text-primary">สมุดคะแนน</h1>
-        <p className="mt-0.5 text-sm text-slate-500">
-          {activeCourse.nameTh} ({activeCourse.code})
-        </p>
-      </div>
-      <GradebookTable courseId={activeCourse.id} courseCode={activeCourse.code} />
-    </div>
-  )
+  redirect(`${buildCoursePath(activeCourse)}/gradebook`)
 }

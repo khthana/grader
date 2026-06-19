@@ -30,7 +30,7 @@ const EMPTY: FormState = {
 }
 
 export interface RosterRowValue {
-  id: number
+  userId: number
   sid: string | null
   prefix: string | null
   name: string
@@ -60,13 +60,13 @@ function initialForm(enrollment?: RosterRowValue): FormState {
 }
 
 interface Props {
-  courseId: number
+  courseSlug: string
   enrollment?: RosterRowValue
   onClose: () => void
   onSaved: () => void
 }
 
-export function StudentFormDialog({ courseId, enrollment, onClose, onSaved }: Props) {
+export function StudentFormDialog({ courseSlug, enrollment, onClose, onSaved }: Props) {
   const { notify } = useToast()
   const isEdit = enrollment != null
   const [form, setForm] = useState<FormState>(() => initialForm(enrollment))
@@ -93,8 +93,8 @@ export function StudentFormDialog({ courseId, enrollment, onClose, onSaved }: Pr
     try {
       const res = await fetch(
         isEdit
-          ? `/api/courses/${courseId}/students/${enrollment!.id}`
-          : `/api/courses/${courseId}/students`,
+          ? `/api/courses/${courseSlug}/students/${enrollment!.userId}`
+          : `/api/courses/${courseSlug}/students`,
         {
           method: isEdit ? "PUT" : "POST",
           headers: { "content-type": "application/json" },

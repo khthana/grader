@@ -1,11 +1,11 @@
-// Enrollment repository — raw SQL over a `pg`-compatible client (injectable
-// `Queryable`, mirrors src/lib/users/repository.ts). Course-scoped roster reads.
-
 import type { Queryable } from "@/lib/db"
-export type { Queryable }
+import type { CourseKey } from "@/lib/courses/types"
+export type { Queryable, CourseKey }
 
 export interface NewEnrollment {
-  courseId: number
+  courseCode: string
+  courseYear: number
+  courseSemester: number
   userId: number
   studyGroup?: string | null
   program?: string | null
@@ -13,8 +13,9 @@ export interface NewEnrollment {
 }
 
 export interface EnrollmentRecord {
-  id: number
-  courseId: number
+  courseCode: string
+  courseYear: number
+  courseSemester: number
   userId: number
   studyGroup: string | null
   program: string | null
@@ -22,7 +23,6 @@ export interface EnrollmentRecord {
 }
 
 export interface EnrollmentListItem {
-  id: number
   userId: number
   sid: string | null
   prefix: string | null
@@ -33,7 +33,7 @@ export interface EnrollmentListItem {
 }
 
 export interface ListEnrollmentsParams {
-  courseId: number
+  courseKey: CourseKey
   search: string
   group: string
   page: number
@@ -46,8 +46,9 @@ export interface EnrollmentListPage {
 }
 
 interface EnrollmentRow {
-  id: number
-  course_id: number
+  course_code: string
+  course_year: number
+  course_semester: number
   user_id: number
   study_group: string | null
   program: string | null
@@ -56,8 +57,9 @@ interface EnrollmentRow {
 
 function toRecord(row: EnrollmentRow): EnrollmentRecord {
   return {
-    id: row.id,
-    courseId: row.course_id,
+    courseCode: row.course_code,
+    courseYear: row.course_year,
+    courseSemester: row.course_semester,
     userId: row.user_id,
     studyGroup: row.study_group,
     program: row.program,
@@ -65,16 +67,21 @@ function toRecord(row: EnrollmentRow): EnrollmentRecord {
   }
 }
 
+const RECORD_COLS =
+  `course_code, course_year, course_semester, user_id, study_group, program, year`
+
 export async function createEnrollment(
   db: Queryable,
   input: NewEnrollment
 ): Promise<EnrollmentRecord> {
   const { rows } = await db.query<EnrollmentRow>(
-    `INSERT INTO enrollments (course_id, user_id, study_group, program, year)
-     VALUES ($1::int, $2::int, $3, $4, $5)
-     RETURNING id, course_id, user_id, study_group, program, year`,
+    `INSERT INTO enrollments (course_code, course_year, course_semester, user_id, study_group, program, year)
+     VALUES ($1, $2::int, $3::int, $4::int, $5, $6, $7)
+     RETURNING ${RECORD_COLS}`,
     [
-      input.courseId,
+      input.courseCode,
+      input.courseYear,
+      input.courseSemester,
       input.userId,
       input.studyGroup ?? null,
       input.program ?? null,
@@ -86,33 +93,37 @@ export async function createEnrollment(
 
 export async function findEnrollment(
   db: Queryable,
-  courseId: number,
+  key: CourseKey,
   userId: number
 ): Promise<EnrollmentRecord | null> {
   const { rows } = await db.query<EnrollmentRow>(
-    `SELECT id, course_id, user_id, study_group, program, year
-     FROM enrollments WHERE course_id = $1::int AND user_id = $2::int`,
-    [courseId, userId]
+    `SELECT ${RECORD_COLS} FROM enrollments
+     WHERE course_code = $1 AND course_year = $2::int AND course_semester = $3::int
+       AND user_id = $4::int`,
+    [key.code, key.year, key.semester, userId]
   )
   return rows[0] ? toRecord(rows[0]) : null
 }
 
-export async function getEnrollmentById(
+export async function getEnrollmentByUser(
   db: Queryable,
-  id: number
+  key: CourseKey,
+  userId: number
 ): Promise<EnrollmentRecord | null> {
-  const { rows } = await db.query<EnrollmentRow>(
-    `SELECT id, course_id, user_id, study_group, program, year
-     FROM enrollments WHERE id = $1::int`,
-    [id]
-  )
-  return rows[0] ? toRecord(rows[0]) : null
+  return findEnrollment(db, key, userId)
 }
 
-export async function deleteEnrollment(db: Queryable, id: number): Promise<boolean> {
-  const { rows } = await db.query<{ id: number }>(
-    `DELETE FROM enrollments WHERE id = $1::int RETURNING id`,
-    [id]
+export async function deleteEnrollment(
+  db: Queryable,
+  key: CourseKey,
+  userId: number
+): Promise<boolean> {
+  const { rows } = await db.query<{ user_id: number }>(
+    `DELETE FROM enrollments
+     WHERE course_code = $1 AND course_year = $2::int AND course_semester = $3::int
+       AND user_id = $4::int
+     RETURNING user_id`,
+    [key.code, key.year, key.semester, userId]
   )
   return rows.length > 0
 }
@@ -125,21 +136,30 @@ export interface UpdateEnrollment {
 
 export async function updateEnrollment(
   db: Queryable,
-  id: number,
+  key: CourseKey,
+  userId: number,
   input: UpdateEnrollment
 ): Promise<EnrollmentRecord | null> {
   const { rows } = await db.query<EnrollmentRow>(
     `UPDATE enrollments
-     SET study_group = $2, program = $3, year = $4
-     WHERE id = $1::int
-     RETURNING id, course_id, user_id, study_group, program, year`,
-    [id, input.studyGroup ?? null, input.program ?? null, input.year ?? null]
+     SET study_group = $4, program = $5, year = $6
+     WHERE course_code = $1 AND course_year = $2::int AND course_semester = $3::int
+       AND user_id = $7::int
+     RETURNING ${RECORD_COLS}`,
+    [
+      key.code,
+      key.year,
+      key.semester,
+      input.studyGroup ?? null,
+      input.program ?? null,
+      input.year ?? null,
+      userId,
+    ]
   )
   return rows[0] ? toRecord(rows[0]) : null
 }
 
 interface EnrollmentListRow {
-  id: number
   user_id: number
   sid: string | null
   prefix: string | null
@@ -149,23 +169,25 @@ interface EnrollmentListRow {
   year: string | null
 }
 
-const LIST_COLUMNS = `e.id, e.user_id, u.id_code AS sid, u.title_th AS prefix, u.name,
-            e.program, e.study_group, e.year`
+const LIST_COLUMNS =
+  `e.user_id, u.id_code AS sid, u.title_th AS prefix, u.name, e.program, e.study_group, e.year`
 
 export interface RosterFilter {
-  courseId: number
+  courseKey: CourseKey
   search: string
   group: string
 }
 
-// Dynamic roster predicate: course scope is always present; search and group
-// are optional. Returns positional params so the count/select stay in sync.
-function buildRosterFilter({ courseId, search, group }: RosterFilter): {
+function buildRosterFilter({ courseKey, search, group }: RosterFilter): {
   where: string
   params: unknown[]
 } {
-  const conditions = ["e.course_id = $1::int"]
-  const params: unknown[] = [courseId]
+  const conditions = [
+    "e.course_code = $1",
+    "e.course_year = $2::int",
+    "e.course_semester = $3::int",
+  ]
+  const params: unknown[] = [courseKey.code, courseKey.year, courseKey.semester]
 
   if (search.trim() !== "") {
     params.push(`%${search.trim()}%`)
@@ -180,7 +202,6 @@ function buildRosterFilter({ courseId, search, group }: RosterFilter): {
 
 function toListItem(r: EnrollmentListRow): EnrollmentListItem {
   return {
-    id: r.id,
     userId: r.user_id,
     sid: r.sid,
     prefix: r.prefix,
@@ -193,9 +214,9 @@ function toListItem(r: EnrollmentListRow): EnrollmentListItem {
 
 export async function listEnrollments(
   db: Queryable,
-  { courseId, search, group, page, pageSize }: ListEnrollmentsParams
+  { courseKey, search, group, page, pageSize }: ListEnrollmentsParams
 ): Promise<EnrollmentListPage> {
-  const { where, params } = buildRosterFilter({ courseId, search, group })
+  const { where, params } = buildRosterFilter({ courseKey, search, group })
 
   const { rows: countRows } = await db.query<{ count: number }>(
     `SELECT COUNT(*)::int AS count
@@ -211,7 +232,7 @@ export async function listEnrollments(
      FROM enrollments e
      JOIN users u ON u.id = e.user_id
      ${where}
-     ORDER BY e.id
+     ORDER BY u.name
      LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
     [...params, pageSize, (page - 1) * pageSize]
   )
@@ -219,7 +240,6 @@ export async function listEnrollments(
   return { enrollments: rows.map(toListItem), total }
 }
 
-// All matching rows, no pagination — for roster export.
 export async function listAllEnrollments(
   db: Queryable,
   filter: RosterFilter
@@ -230,21 +250,20 @@ export async function listAllEnrollments(
      FROM enrollments e
      JOIN users u ON u.id = e.user_id
      ${where}
-     ORDER BY e.id`,
+     ORDER BY u.name`,
     params
   )
   return rows.map(toListItem)
 }
 
-// Distinct, sorted group values present in a course (nulls excluded) — drives
-// the roster's group filter.
-export async function listGroups(db: Queryable, courseId: number): Promise<string[]> {
+export async function listGroups(db: Queryable, key: CourseKey): Promise<string[]> {
   const { rows } = await db.query<{ study_group: string }>(
     `SELECT DISTINCT study_group
      FROM enrollments
-     WHERE course_id = $1::int AND study_group IS NOT NULL
+     WHERE course_code = $1 AND course_year = $2::int AND course_semester = $3::int
+       AND study_group IS NOT NULL
      ORDER BY study_group`,
-    [courseId]
+    [key.code, key.year, key.semester]
   )
   return rows.map((r) => r.study_group)
 }

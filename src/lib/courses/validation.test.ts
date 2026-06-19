@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest"
 import { validateCourseInput } from "./validation"
 
-const valid = { code: "01076021", nameTh: "โครงสร้างข้อมูล", nameEn: "Data Structures" }
+const valid = { code: "01076021", year: 2567, semester: 1, nameTh: "โครงสร้างข้อมูล", nameEn: "Data Structures" }
 
 describe("validateCourseInput", () => {
   it("requires code, Thai name, and English name", () => {
-    const { valid: ok, errors } = validateCourseInput({ code: "", nameTh: "", nameEn: "" })
+    const { valid: ok, errors } = validateCourseInput({ code: "", year: 2567, semester: 1, nameTh: "", nameEn: "" })
     expect(ok).toBe(false)
     expect(errors.code).toBeTruthy()
     expect(errors.nameTh).toBeTruthy()

@@ -19,10 +19,8 @@ export async function getActiveRoleCookie(): Promise<string | undefined> {
   return (await cookies()).get("active_role")?.value
 }
 
-export async function getActiveCourseCookie(): Promise<number | undefined> {
-  const raw = (await cookies()).get("active_course")?.value
-  const n = Number.parseInt(raw ?? "", 10)
-  return Number.isFinite(n) ? n : undefined
+export async function getActiveCourseCookie(): Promise<string | undefined> {
+  return (await cookies()).get("active_course")?.value || undefined
 }
 
 // True when an Admin is currently impersonating another user — detected by the

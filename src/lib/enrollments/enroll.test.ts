@@ -4,6 +4,9 @@ import { listEnrollments } from "./repository"
 import { createCourse } from "@/lib/courses/repository"
 import { createUser, getUserWithRoles, assignRole } from "@/lib/users/repository"
 import { freshDb, type Queryable } from "@/lib/test-support/db"
+import type { CourseKey } from "@/lib/courses/types"
+
+const KEY: CourseKey = { code: "01076021", year: 2567, semester: 1 }
 
 const student = {
   idCode: "65010100",
@@ -14,7 +17,7 @@ const student = {
 
 async function seedCourse(db: Queryable, program?: string) {
   return createCourse(db, {
-    code: "01076021",
+    ...KEY,
     nameTh: "วิชา",
     nameEn: "Course",
     program: program ?? null,
@@ -24,14 +27,12 @@ async function seedCourse(db: Queryable, program?: string) {
 describe("enrollStudent", () => {
   let db: Queryable
 
-  beforeEach(() => {
-    db = freshDb()
-  })
+  beforeEach(() => { db = freshDb() })
 
   it("creates a new user with the Student role and enrolls them", async () => {
-    const course = await seedCourse(db)
+    await seedCourse(db)
 
-    const result = await enrollStudent(db, course.id, { ...student, studyGroup: "1" })
+    const result = await enrollStudent(db, KEY, { ...student, studyGroup: "1" })
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -41,11 +42,7 @@ describe("enrollStudent", () => {
     expect(withRoles?.roles).toEqual(["Student"])
 
     const { enrollments, total } = await listEnrollments(db, {
-      courseId: course.id,
-      search: "",
-      group: "",
-      page: 1,
-      pageSize: 10,
+      courseKey: KEY, search: "", group: "", page: 1, pageSize: 10,
     })
     expect(total).toBe(1)
     expect(enrollments[0].sid).toBe("65010100")
@@ -53,14 +50,14 @@ describe("enrollStudent", () => {
   })
 
   it("reuses an existing user by id_code without overwriting their name", async () => {
-    const course = await seedCourse(db)
+    await seedCourse(db)
     const u = await createUser(db, {
       email: "real.name@kmitl.ac.th",
       name: "ชื่อเดิม นามสกุลเดิม",
       idCode: "65010100",
     })
 
-    const result = await enrollStudent(db, course.id, {
+    const result = await enrollStudent(db, KEY, {
       ...student,
       firstNameTh: "ชื่อใหม่",
       lastNameTh: "นามสกุลใหม่",
@@ -71,44 +68,39 @@ describe("enrollStudent", () => {
     expect(result.created).toBe(false)
     expect(result.userId).toBe(u.id)
 
-    // The stored display name is preserved, not clobbered by the form values.
     const withRoles = await getUserWithRoles(db, u.id)
     expect(withRoles?.name).toBe("ชื่อเดิม นามสกุลเดิม")
   })
 
   it("ensures the Student role on an existing user, keeping their other roles", async () => {
-    const course = await seedCourse(db)
+    await seedCourse(db)
     const u = await createUser(db, { email: "ta@kmitl.ac.th", name: "TA", idCode: "65010100" })
     await assignRole(db, u.id, "TA")
 
-    await enrollStudent(db, course.id, student)
+    await enrollStudent(db, KEY, student)
 
     const withRoles = await getUserWithRoles(db, u.id)
     expect([...(withRoles?.roles ?? [])].sort()).toEqual(["Student", "TA"])
   })
 
   it("rejects enrolling a student already in the course as a duplicate", async () => {
-    const course = await seedCourse(db)
-    await enrollStudent(db, course.id, student)
+    await seedCourse(db)
+    await enrollStudent(db, KEY, student)
 
-    const again = await enrollStudent(db, course.id, student)
+    const again = await enrollStudent(db, KEY, student)
     expect(again.ok).toBe(false)
     if (again.ok) return
     expect(again.reason).toBe("duplicate")
 
     const { total } = await listEnrollments(db, {
-      courseId: course.id,
-      search: "",
-      group: "",
-      page: 1,
-      pageSize: 10,
+      courseKey: KEY, search: "", group: "", page: 1, pageSize: 10,
     })
     expect(total).toBe(1)
   })
 
   it("derives {sid}@kmitl.ac.th when no email is given", async () => {
-    const course = await seedCourse(db)
-    const result = await enrollStudent(db, course.id, student)
+    await seedCourse(db)
+    const result = await enrollStudent(db, KEY, student)
     if (!result.ok) throw new Error("expected ok")
 
     const withRoles = await getUserWithRoles(db, result.userId)
@@ -116,8 +108,8 @@ describe("enrollStudent", () => {
   })
 
   it("uses the provided email when one is given", async () => {
-    const course = await seedCourse(db)
-    const result = await enrollStudent(db, course.id, { ...student, email: "real@kmitl.ac.th" })
+    await seedCourse(db)
+    const result = await enrollStudent(db, KEY, { ...student, email: "real@kmitl.ac.th" })
     if (!result.ok) throw new Error("expected ok")
 
     const withRoles = await getUserWithRoles(db, result.userId)
@@ -125,21 +117,13 @@ describe("enrollStudent", () => {
   })
 
   it("inherits the course default program when none is given, and honors an override", async () => {
-    const course = await seedCourse(db, "วิศวกรรมคอมพิวเตอร์")
+    await seedCourse(db, "วิศวกรรมคอมพิวเตอร์")
 
-    await enrollStudent(db, course.id, { ...student, idCode: "65010100" })
-    await enrollStudent(db, course.id, {
-      ...student,
-      idCode: "65010200",
-      program: "วิศวกรรมไฟฟ้า",
-    })
+    await enrollStudent(db, KEY, { ...student, idCode: "65010100" })
+    await enrollStudent(db, KEY, { ...student, idCode: "65010200", program: "วิศวกรรมไฟฟ้า" })
 
     const { enrollments } = await listEnrollments(db, {
-      courseId: course.id,
-      search: "",
-      group: "",
-      page: 1,
-      pageSize: 10,
+      courseKey: KEY, search: "", group: "", page: 1, pageSize: 10,
     })
     const byId = Object.fromEntries(enrollments.map((e) => [e.sid, e.program]))
     expect(byId["65010100"]).toBe("วิศวกรรมคอมพิวเตอร์")
@@ -147,10 +131,10 @@ describe("enrollStudent", () => {
   })
 
   it("does not reuse a legacy user that has no id_code", async () => {
-    const course = await seedCourse(db)
+    await seedCourse(db)
     const legacy = await createUser(db, { email: "legacy@kmitl.ac.th", name: "Legacy" })
 
-    const result = await enrollStudent(db, course.id, student)
+    const result = await enrollStudent(db, KEY, student)
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.created).toBe(true)

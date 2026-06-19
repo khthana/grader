@@ -43,7 +43,12 @@ export async function POST(request: NextRequest) {
       ["Admin", "Instructor", "TA"].includes(r)
     )
     if (!isPrivileged) {
-      const enrollment = await findEnrollment(db, problem.courseId, user.id)
+      const courseKey = {
+        code: problem.courseCode,
+        year: problem.courseYear,
+        semester: problem.courseSemester,
+      }
+      const enrollment = await findEnrollment(db, courseKey, user.id)
       if (!enrollment) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
       }
@@ -76,7 +81,9 @@ export async function POST(request: NextRequest) {
     await createSubmission(db, {
       problemId: problem.id,
       userId: user.id,
-      courseId: problem.courseId,
+      courseCode: problem.courseCode,
+      courseYear: problem.courseYear,
+      courseSemester: problem.courseSemester,
       code,
       language: body.language ?? "python",
       pointsEarned,

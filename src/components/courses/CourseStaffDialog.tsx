@@ -12,13 +12,13 @@ interface Staff {
 }
 
 interface Props {
-  courseId: number
+  courseSlug: string
   courseLabel: string
   onClose: () => void
   onSaved: () => void
 }
 
-export function CourseStaffDialog({ courseId, courseLabel, onClose, onSaved }: Props) {
+export function CourseStaffDialog({ courseSlug, courseLabel, onClose, onSaved }: Props) {
   const { notify } = useToast()
   const [selected, setSelected] = useState<Staff[]>([])
   const [loading, setLoading] = useState(true)
@@ -31,7 +31,7 @@ export function CourseStaffDialog({ courseId, courseLabel, onClose, onSaved }: P
     let cancelled = false
     async function load() {
       try {
-        const res = await fetch(`/api/courses/${courseId}/instructors`)
+        const res = await fetch(`/api/courses/${courseSlug}/instructors`)
         if (!res.ok) throw new Error()
         const body = await res.json()
         if (!cancelled) setSelected(body.instructors)
@@ -45,7 +45,7 @@ export function CourseStaffDialog({ courseId, courseLabel, onClose, onSaved }: P
     return () => {
       cancelled = true
     }
-  }, [courseId, notify])
+  }, [courseSlug, notify])
 
   // Debounced candidate search.
   useEffect(() => {
@@ -53,7 +53,7 @@ export function CourseStaffDialog({ courseId, courseLabel, onClose, onSaved }: P
     const t = setTimeout(async () => {
       try {
         const params = new URLSearchParams({ search })
-        const res = await fetch(`/api/courses/${courseId}/instructors/candidates?${params}`)
+        const res = await fetch(`/api/courses/${courseSlug}/instructors/candidates?${params}`)
         if (!res.ok) throw new Error()
         const body = await res.json()
         if (!cancelled) setCandidates(body.candidates)
@@ -65,7 +65,7 @@ export function CourseStaffDialog({ courseId, courseLabel, onClose, onSaved }: P
       cancelled = true
       clearTimeout(t)
     }
-  }, [courseId, search])
+  }, [courseSlug, search])
 
   function add(c: Staff) {
     setSelected((s) => (s.some((x) => x.id === c.id) ? s : [...s, c]))
@@ -77,7 +77,7 @@ export function CourseStaffDialog({ courseId, courseLabel, onClose, onSaved }: P
   async function submit() {
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/courses/${courseId}/instructors`, {
+      const res = await fetch(`/api/courses/${courseSlug}/instructors`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ userIds: selected.map((s) => s.id) }),

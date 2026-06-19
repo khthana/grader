@@ -19,7 +19,6 @@ import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
 import { rosterToSheet } from "@/lib/enrollments/export"
 
 interface RosterRow {
-  id: number
   userId: number
   sid: string | null
   prefix: string | null
@@ -40,12 +39,12 @@ interface ListResponse {
 const PAGE_SIZE = 10
 
 export function RosterTable({
-  courseId,
-  courseCode,
+  courseSlug,
+  coursePath,
   canMutate,
 }: {
-  courseId: number
-  courseCode: string
+  courseSlug: string
+  coursePath: string
   canMutate: boolean
 }) {
   const { notify } = useToast()
@@ -74,13 +73,13 @@ export function RosterTable({
     setExporting(true)
     try {
       const params = new URLSearchParams({ search: debounced, group })
-      const res = await fetch(`/api/courses/${courseId}/students/export?${params}`)
+      const res = await fetch(`/api/courses/${courseSlug}/students/export?${params}`)
       if (!res.ok) throw new Error()
       const body = await res.json()
       const ws = XLSX.utils.aoa_to_sheet(rosterToSheet(body.enrollments))
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, "roster")
-      XLSX.writeFile(wb, `roster-${courseCode}.xlsx`)
+      XLSX.writeFile(wb, `roster-${courseSlug.replace(/\//g, "-")}.xlsx`)
     } catch {
       notify("error", "ส่งออกไม่สำเร็จ")
     } finally {
@@ -92,7 +91,7 @@ export function RosterTable({
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      const res = await fetch(`/api/courses/${courseId}/students/${deleteTarget.id}`, {
+      const res = await fetch(`/api/courses/${courseSlug}/students/${deleteTarget.userId}`, {
         method: "DELETE",
       })
       if (!res.ok) throw new Error()
@@ -131,7 +130,7 @@ export function RosterTable({
         pageSize: String(PAGE_SIZE),
       })
       try {
-        const res = await fetch(`/api/courses/${courseId}/students?${params}`)
+        const res = await fetch(`/api/courses/${courseSlug}/students?${params}`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const json = (await res.json()) as ListResponse
         if (!cancelled) setData(json)
@@ -145,7 +144,7 @@ export function RosterTable({
     return () => {
       cancelled = true
     }
-  }, [courseId, debounced, group, page, notify, refreshKey])
+  }, [courseSlug, debounced, group, page, notify, refreshKey])
 
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE))
   const filtering = debounced.trim() !== "" || group !== ""
@@ -232,7 +231,7 @@ export function RosterTable({
               </tr>
             ) : (
               data.enrollments.map((e, i) => (
-                <tr key={e.id} className="hover:bg-slate-50">
+                <tr key={e.userId} className="hover:bg-slate-50">
                   <td className="px-4 py-3 text-slate-400">{(page - 1) * PAGE_SIZE + i + 1}</td>
                   <td className="px-4 py-3 font-mono text-slate-600">{e.sid ?? "—"}</td>
                   <td className="px-4 py-3 text-slate-600">{e.prefix ?? "—"}</td>
@@ -299,7 +298,7 @@ export function RosterTable({
 
       {addOpen && (
         <StudentFormDialog
-          courseId={courseId}
+          courseSlug={courseSlug}
           onClose={() => setAddOpen(false)}
           onSaved={reload}
         />
@@ -307,7 +306,7 @@ export function RosterTable({
 
       {importOpen && (
         <RosterImportDialog
-          courseId={courseId}
+          courseSlug={courseSlug}
           onClose={() => setImportOpen(false)}
           onImported={reload}
         />
@@ -315,7 +314,7 @@ export function RosterTable({
 
       {editTarget && (
         <StudentFormDialog
-          courseId={courseId}
+          courseSlug={courseSlug}
           enrollment={editTarget}
           onClose={() => setEditTarget(null)}
           onSaved={reload}

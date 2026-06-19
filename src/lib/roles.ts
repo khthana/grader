@@ -4,17 +4,18 @@ export interface MenuItem {
   label: string
   href: string
   icon: string
+  courseScoped?: boolean
 }
 
 const MENU = {
   userManagement: { label: "จัดการผู้ใช้", href: "/users", icon: "users" },
   logs: { label: "บันทึกกิจกรรม", href: "/logs", icon: "logs" },
   courses: { label: "รายวิชา", href: "/courses", icon: "courses" },
-  students: { label: "รายชื่อนักศึกษา", href: "/students", icon: "students" },
-  problems: { label: "โจทย์ปัญหา", href: "/problems", icon: "problems" },
-  review: { label: "ตรวจงาน", href: "/review", icon: "review" },
-  gradebook: { label: "สมุดคะแนน", href: "/gradebook", icon: "gradebook" },
-  assignments: { label: "งานที่ได้มอบหมาย", href: "/assignments", icon: "assignments" },
+  students: { label: "รายชื่อนักศึกษา", href: "/students", icon: "students", courseScoped: true },
+  problems: { label: "โจทย์ปัญหา", href: "/problems", icon: "problems", courseScoped: true },
+  review: { label: "ตรวจงาน", href: "/review", icon: "review", courseScoped: true },
+  gradebook: { label: "สมุดคะแนน", href: "/gradebook", icon: "gradebook", courseScoped: true },
+  assignments: { label: "งานที่ได้มอบหมาย", href: "/assignments", icon: "assignments", courseScoped: true },
 } satisfies Record<string, MenuItem>
 
 const TEACHING_MENU: MenuItem[] = [

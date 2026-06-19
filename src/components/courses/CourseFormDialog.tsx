@@ -6,14 +6,15 @@ import { validateCourseInput } from "@/lib/courses/validation"
 import { useToast } from "@/components/shell/ToastProvider"
 
 export interface CourseValue {
-  id: number
   code: string
+  year: number
+  semester: number
   nameTh: string
   nameEn: string
   program: string | null
 }
 
-type FormState = { code: string; nameTh: string; nameEn: string; program: string }
+type FormState = { code: string; year: string; semester: string; nameTh: string; nameEn: string; program: string }
 
 interface Props {
   course?: CourseValue
@@ -26,6 +27,8 @@ export function CourseFormDialog({ course, onClose, onSaved }: Props) {
   const isEdit = course != null
   const [form, setForm] = useState<FormState>({
     code: course?.code ?? "",
+    year: course ? String(course.year) : String(new Date().getFullYear() + 543),
+    semester: course ? String(course.semester) : "1",
     nameTh: course?.nameTh ?? "",
     nameEn: course?.nameEn ?? "",
     program: course?.program ?? "",
@@ -38,22 +41,28 @@ export function CourseFormDialog({ course, onClose, onSaved }: Props) {
   }
 
   async function submit() {
-    const { valid, errors: ve } = validateCourseInput(form)
+    const input = {
+      code: form.code.trim(),
+      year: Number(form.year),
+      semester: Number(form.semester),
+      nameTh: form.nameTh.trim(),
+      nameEn: form.nameEn.trim(),
+      program: form.program.trim() || undefined,
+    }
+    const { valid, errors: ve } = validateCourseInput(input)
     if (!valid) {
       setErrors(ve)
       return
     }
     setSubmitting(true)
     try {
-      const res = await fetch(isEdit ? `/api/courses/${course!.id}` : "/api/courses", {
+      const url = isEdit
+        ? `/api/courses/${course!.code}/${course!.year}/${course!.semester}`
+        : "/api/courses"
+      const res = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          code: form.code,
-          nameTh: form.nameTh,
-          nameEn: form.nameEn,
-          program: form.program || undefined,
-        }),
+        body: JSON.stringify(input),
       })
       if (res.ok) {
         notify("success", isEdit ? "บันทึกรายวิชาแล้ว" : "เพิ่มรายวิชาแล้ว")
@@ -85,8 +94,37 @@ export function CourseFormDialog({ course, onClose, onSaved }: Props) {
 
         <div className="grid grid-cols-1 gap-4">
           <Field label="รหัสวิชา *" error={errors.code}>
-            <Input value={form.code} onChange={(v) => set("code", v)} error={!!errors.code} />
+            <Input
+              value={form.code}
+              onChange={(v) => set("code", v)}
+              error={!!errors.code}
+              disabled={isEdit}
+            />
           </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="ปีการศึกษา (พ.ศ.) *" error={errors.year}>
+              <Input
+                value={form.year}
+                onChange={(v) => set("year", v)}
+                error={!!errors.year}
+                disabled={isEdit}
+              />
+            </Field>
+            <Field label="ภาคการศึกษา *" error={errors.semester}>
+              <select
+                value={form.semester}
+                onChange={(e) => set("semester", e.target.value)}
+                disabled={isEdit}
+                className={`mt-1 w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm transition focus:border-transparent focus:outline-none focus:ring-2 ${
+                  errors.semester ? "border-red-300 focus:ring-red-400" : "border-slate-200 focus:ring-blue-500"
+                } disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </Field>
+          </div>
           <Field label="ชื่อวิชา (ภาษาไทย) *" error={errors.nameTh}>
             <Input value={form.nameTh} onChange={(v) => set("nameTh", v)} error={!!errors.nameTh} />
           </Field>
@@ -132,17 +170,20 @@ function Input({
   value,
   onChange,
   error,
+  disabled,
 }: {
   value: string
   onChange: (v: string) => void
   error?: boolean
+  disabled?: boolean
 }) {
   return (
     <input
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={`mt-1 w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm transition focus:border-transparent focus:outline-none focus:ring-2 ${
+      disabled={disabled}
+      className={`mt-1 w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm transition focus:border-transparent focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${
         error ? "border-red-300 focus:ring-red-400" : "border-slate-200 focus:ring-blue-500"
       }`}
     />

@@ -14,6 +14,7 @@ interface AssignmentSubmission {
 
 interface AssignmentItem {
   problemId: number
+  problemNo: number
   title: string
   weekNo: number
   dueAt: string | null
@@ -81,17 +82,23 @@ function ScoreBadge({ item }: { item: AssignmentItem }) {
   )
 }
 
-export function AssignmentsList({ courseId }: { courseId: number }) {
+export function AssignmentsList({
+  courseSlug,
+  coursePath,
+}: {
+  courseSlug: string
+  coursePath: string
+}) {
   const [items, setItems] = useState<AssignmentItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`/api/courses/${courseId}/assignments`)
+    fetch(`/api/courses/${courseSlug}/assignments`)
       .then((r) => r.json())
       .then(({ assignments }) => setItems(assignments ?? []))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [courseId])
+  }, [courseSlug])
 
   if (loading) {
     return <div className="py-16 text-center text-sm text-slate-400 font-thai">กำลังโหลด...</div>
@@ -144,7 +151,7 @@ export function AssignmentsList({ courseId }: { courseId: number }) {
                     </td>
                     <td className="px-5 py-4 text-right">
                       <Link
-                        href={`/problems/${item.problemId}`}
+                        href={`${coursePath}/problems/${item.weekNo}/${item.problemNo}`}
                         className="inline-flex items-center gap-1 rounded-lg border border-secondary px-3 py-1 text-xs font-medium text-secondary hover:bg-blue-50"
                       >
                         เปิดโจทย์ <FaArrowRight className="h-2.5 w-2.5" />

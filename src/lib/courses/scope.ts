@@ -1,9 +1,10 @@
 // Whether a route belongs to a single course (so the navbar course switcher is
-// meaningful there). The global admin/management pages — User Management,
-// Activity Logs, and Course management — are not tied to one course, so the
-// switcher is hidden on them.
-const NON_COURSE_SCOPED = ["/users", "/logs", "/courses"]
+// meaningful there).
+const GLOBAL_PATHS = ["/users", "/logs", "/courses"]
 
 export function isCourseScopedPath(pathname: string): boolean {
-  return !NON_COURSE_SCOPED.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  // New-style course-scoped URL: /courses/{code}/{year}/{semester}[/...]
+  if (/^\/courses\/[^/]+\/\d+\/\d+(\/|$)/.test(pathname)) return true
+  // Non-course global pages
+  return !GLOBAL_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 }

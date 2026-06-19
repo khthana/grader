@@ -11,6 +11,7 @@ interface GradebookProblem {
   id: number
   title: string
   weekNo: number
+  problemNo: number
   pointsMax: number
   dueAt: string | null
 }
@@ -64,13 +65,13 @@ function ScorePill({ score, pointsMax }: { score: number | null; pointsMax: numb
   )
 }
 
-export function GradebookTable({ courseId, courseCode = "" }: { courseId: number; courseCode?: string }) {
+export function GradebookTable({ courseSlug }: { courseSlug: string }) {
   const [gradebook, setGradebook] = useState<Gradebook | null>(null)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
 
   useEffect(() => {
-    fetch(`/api/courses/${courseId}/gradebook`)
+    fetch(`/api/courses/${courseSlug}/gradebook`)
       .then((r) => r.json())
       .then(({ gradebook: gb }) => {
         setGradebook(gb)
@@ -78,7 +79,7 @@ export function GradebookTable({ courseId, courseCode = "" }: { courseId: number
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [courseId])
+  }, [courseSlug])
 
   if (loading) {
     return <div className="py-16 text-center text-sm text-slate-400 font-thai">กำลังโหลด...</div>
@@ -114,7 +115,7 @@ export function GradebookTable({ courseId, courseCode = "" }: { courseId: number
     const ws = XLSX.utils.aoa_to_sheet(gradebookToSheet(gradebook!))
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, "scorebook")
-    XLSX.writeFile(wb, `scorebook-${courseCode || courseId}.xlsx`)
+    XLSX.writeFile(wb, `scorebook-${courseSlug.replace(/\//g, "-")}.xlsx`)
   }
 
   return (

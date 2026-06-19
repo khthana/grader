@@ -15,7 +15,7 @@ const MAX_WEEKS = 16
 interface Props {
   weeks: Week[]
   activeWeekNo: number
-  courseId: number
+  courseSlug: string
   canManage: boolean
   onWeekChange: (weekNo: number) => void
   onWeeksChanged: () => void
@@ -24,7 +24,7 @@ interface Props {
 export function WeekBar({
   weeks,
   activeWeekNo,
-  courseId,
+  courseSlug,
   canManage,
   onWeekChange,
   onWeeksChanged,
@@ -56,7 +56,7 @@ export function WeekBar({
     const topic = draft.trim()
     if (topic === week.topic.trim()) return
 
-    const res = await fetch(`/api/courses/${courseId}/weeks/${week.id}`, {
+    const res = await fetch(`/api/courses/${courseSlug}/weeks/${week.id}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ topic }),
@@ -70,7 +70,7 @@ export function WeekBar({
 
   async function addWeek() {
     setBusy(true)
-    const res = await fetch(`/api/courses/${courseId}/weeks`, { method: "POST" })
+    const res = await fetch(`/api/courses/${courseSlug}/weeks`, { method: "POST" })
     setBusy(false)
     if (res.ok) {
       onWeeksChanged()
@@ -82,7 +82,7 @@ export function WeekBar({
 
   async function removeWeek(week: Week) {
     setBusy(true)
-    const res = await fetch(`/api/courses/${courseId}/weeks/${week.id}`, {
+    const res = await fetch(`/api/courses/${courseSlug}/weeks/${week.id}`, {
       method: "DELETE",
     })
     setBusy(false)

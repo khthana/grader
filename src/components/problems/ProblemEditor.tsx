@@ -28,7 +28,8 @@ interface WeekOption {
 }
 
 interface Props {
-  courseId: number
+  courseSlug: string
+  coursePath: string
   weeks: WeekOption[]
   mode: "create" | "edit"
   initialWeekId?: number
@@ -51,7 +52,7 @@ function emptyCase(sortOrder: number): TestCaseForm {
   return { input: "", expectedOutput: "", isHidden: false, sortOrder }
 }
 
-export function ProblemEditor({ courseId, weeks, mode, initialWeekId, problem }: Props) {
+export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeekId, problem }: Props) {
   const router = useRouter()
   const { notify } = useToast()
 
@@ -112,8 +113,8 @@ export function ProblemEditor({ courseId, weeks, mode, initialWeekId, problem }:
 
     const url =
       mode === "create"
-        ? `/api/courses/${courseId}/problems`
-        : `/api/courses/${courseId}/problems/${problem!.id}`
+        ? `/api/courses/${courseSlug}/problems`
+        : `/api/courses/${courseSlug}/problems/${problem!.id}`
     const method = mode === "create" ? "POST" : "PUT"
 
     const res = await fetch(url, {
@@ -132,7 +133,7 @@ export function ProblemEditor({ courseId, weeks, mode, initialWeekId, problem }:
     }
 
     notify("success", mode === "create" ? "สร้างโจทย์เรียบร้อยแล้ว" : "บันทึกโจทย์เรียบร้อยแล้ว")
-    router.push("/problems")
+    router.push(`${coursePath}/problems`)
     router.refresh()
   }
 
@@ -141,7 +142,7 @@ export function ProblemEditor({ courseId, weeks, mode, initialWeekId, problem }:
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link
-          href="/problems"
+          href={`${coursePath}/problems`}
           className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-600"
         >
           <FaArrowLeft className="h-3 w-3" />

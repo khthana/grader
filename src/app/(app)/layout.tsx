@@ -4,6 +4,7 @@ import { getCurrentUser, getActiveRoleCookie, isImpersonating } from "@/lib/sess
 import { resolveActiveRole, type Role } from "@/lib/roles"
 import { getCourseContext } from "@/lib/courses/server"
 import { AppShell } from "@/components/shell/AppShell"
+import { courseSlugString } from "@/lib/courses/slug"
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await getCurrentUser()
@@ -32,7 +33,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       roles={roles}
       activeRole={activeRole}
       courses={courses}
-      activeCourseId={activeCourse?.id ?? null}
+      activeCourseSlug={activeCourse ? courseSlugString(activeCourse) : null}
       impersonatedName={impersonating ? user.name : null}
     >
       {children}

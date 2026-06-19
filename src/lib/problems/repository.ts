@@ -1,10 +1,14 @@
 import type { Queryable } from "@/lib/db"
-export type { Queryable }
+import type { CourseKey } from "@/lib/courses/types"
+export type { Queryable, CourseKey }
 
 export interface ProblemRecord {
   id: number
-  courseId: number
+  courseCode: string
+  courseYear: number
+  courseSemester: number
   weekId: number
+  problemNo: number
   title: string
   description: string
   inputSpec: string
@@ -34,9 +38,12 @@ export interface ProblemDetail extends ProblemRecord {
 
 export interface ProblemListItem {
   id: number
-  courseId: number
+  courseCode: string
+  courseYear: number
+  courseSemester: number
   weekId: number
   weekNo: number
+  problemNo: number
   title: string
   description: string
   score: number
@@ -46,8 +53,11 @@ export interface ProblemListItem {
 
 interface ProblemRow {
   id: number
-  course_id: number
+  course_code: string
+  course_year: number
+  course_semester: number
   week_id: number
+  problem_no: number
   title: string
   description: string
   input_spec: string
@@ -71,8 +81,11 @@ interface TestCaseRow {
 function toRecord(row: ProblemRow): ProblemRecord {
   return {
     id: row.id,
-    courseId: row.course_id,
+    courseCode: row.course_code,
+    courseYear: row.course_year,
+    courseSemester: row.course_semester,
     weekId: row.week_id,
+    problemNo: row.problem_no,
     title: row.title,
     description: row.description,
     inputSpec: row.input_spec,
@@ -96,10 +109,16 @@ function toTestCaseRecord(row: TestCaseRow): TestCaseRecord {
   }
 }
 
+const PROBLEM_COLS =
+  `id, course_code, course_year, course_semester, week_id, problem_no,
+   title, description, input_spec, output_spec, score, due_at, close_at, language, created_at`
+
 export async function createProblem(
   db: Queryable,
   data: {
-    courseId: number
+    courseCode: string
+    courseYear: number
+    courseSemester: number
     weekId: number
     title: string
     description?: string
@@ -113,12 +132,16 @@ export async function createProblem(
 ): Promise<ProblemRecord> {
   const { rows } = await db.query<ProblemRow>(
     `INSERT INTO problems
-       (course_id, week_id, title, description, input_spec, output_spec, score, due_at, close_at, language)
-     VALUES ($1::int, $2::int, $3, $4, $5, $6, $7::int, $8, $9, $10)
-     RETURNING id, course_id, week_id, title, description, input_spec, output_spec,
-               score, due_at, close_at, language, created_at`,
+       (course_code, course_year, course_semester, week_id, problem_no,
+        title, description, input_spec, output_spec, score, due_at, close_at, language)
+     VALUES ($1, $2::int, $3::int, $4::int,
+             COALESCE((SELECT MAX(problem_no) FROM problems WHERE week_id = $4::int), 0) + 1,
+             $5, $6, $7, $8, $9::int, $10, $11, $12)
+     RETURNING ${PROBLEM_COLS}`,
     [
-      data.courseId,
+      data.courseCode,
+      data.courseYear,
+      data.courseSemester,
       data.weekId,
       data.title,
       data.description ?? "",
@@ -138,9 +161,7 @@ export async function getProblemById(
   id: number
 ): Promise<ProblemDetail | null> {
   const { rows } = await db.query<ProblemRow>(
-    `SELECT id, course_id, week_id, title, description, input_spec, output_spec,
-            score, due_at, close_at, language, created_at
-     FROM problems WHERE id = $1::int`,
+    `SELECT ${PROBLEM_COLS} FROM problems WHERE id = $1::int`,
     [id]
   )
   if (!rows[0]) return null
@@ -153,40 +174,63 @@ export async function getProblemById(
   return { ...problem, testCases: tcRows.map(toTestCaseRecord) }
 }
 
+// Look up a problem by its human-readable URL coordinates (weekId + problemNo).
+export async function getProblemByWeekAndNo(
+  db: Queryable,
+  weekId: number,
+  problemNo: number
+): Promise<ProblemDetail | null> {
+  const { rows } = await db.query<ProblemRow>(
+    `SELECT ${PROBLEM_COLS} FROM problems
+     WHERE week_id = $1::int AND problem_no = $2::int`,
+    [weekId, problemNo]
+  )
+  if (!rows[0]) return null
+  return getProblemById(db, rows[0].id)
+}
+
 export async function listProblems(
   db: Queryable,
-  courseId: number,
+  key: CourseKey,
   weekId?: number
 ): Promise<ProblemListItem[]> {
-  const params: unknown[] = [courseId]
-  const weekFilter = weekId != null ? `AND p.week_id = $2::int` : ""
+  const params: unknown[] = [key.code, key.year, key.semester]
+  const weekFilter = weekId != null ? `AND p.week_id = $4::int` : ""
   if (weekId != null) params.push(weekId)
 
   const { rows } = await db.query<{
     id: number
-    course_id: number
+    course_code: string
+    course_year: number
+    course_semester: number
     week_id: number
     week_no: number
+    problem_no: number
     title: string
     description: string
     score: number
     due_at: string | null
     close_at: string | null
   }>(
-    `SELECT p.id, p.course_id, p.week_id, w.week_no,
+    `SELECT p.id, p.course_code, p.course_year, p.course_semester,
+            p.week_id, w.week_no, p.problem_no,
             p.title, p.description, p.score,
             p.due_at, p.close_at
      FROM problems p
      JOIN weeks w ON w.id = p.week_id
-     WHERE p.course_id = $1::int ${weekFilter}
-     ORDER BY w.week_no, p.id`,
+     WHERE p.course_code = $1 AND p.course_year = $2::int AND p.course_semester = $3::int
+     ${weekFilter}
+     ORDER BY w.week_no, p.problem_no`,
     params
   )
   return rows.map((r) => ({
     id: r.id,
-    courseId: r.course_id,
+    courseCode: r.course_code,
+    courseYear: r.course_year,
+    courseSemester: r.course_semester,
     weekId: r.week_id,
     weekNo: r.week_no,
+    problemNo: r.problem_no,
     title: r.title,
     description: r.description,
     score: r.score,
@@ -221,14 +265,13 @@ export async function updateProblem(
   if ("closeAt" in data) { params.push(data.closeAt ?? null); sets.push(`close_at = $${params.length}`) }
   if (data.language !== undefined) { params.push(data.language); sets.push(`language = $${params.length}`) }
 
-  if (sets.length === 0) return getProblemById(db, id).then((d) => d ? { ...d } : null)
+  if (sets.length === 0) return getProblemById(db, id).then((d) => (d ? { ...d } : null))
 
   params.push(id)
   const { rows } = await db.query<ProblemRow>(
     `UPDATE problems SET ${sets.join(", ")}, updated_at = now()
      WHERE id = $${params.length}::int
-     RETURNING id, course_id, week_id, title, description, input_spec, output_spec,
-               score, due_at, close_at, language, created_at`,
+     RETURNING ${PROBLEM_COLS}`,
     params
   )
   return rows[0] ? toRecord(rows[0]) : null

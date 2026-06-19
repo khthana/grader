@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest"
 import {
   createProblem,
   getProblemById,
+  getProblemByWeekAndNo,
   listProblems,
   updateProblem,
   deleteProblem,
@@ -10,24 +11,29 @@ import {
 import { createCourse } from "@/lib/courses/repository"
 import { seedWeeks, listWeeks } from "@/lib/weeks/repository"
 import { freshDb, type Queryable } from "@/lib/test-support/db"
+import type { CourseKey } from "@/lib/courses/types"
+
+const KEY: CourseKey = { code: "C01", year: 2567, semester: 1 }
 
 describe("problem repository", () => {
   let db: Queryable
-  let courseId: number
+  let courseKey: CourseKey
   let weekId: number
 
   beforeEach(async () => {
     db = freshDb()
-    const course = await createCourse(db, { code: "C01", nameTh: "ก", nameEn: "A" })
-    courseId = course.id
-    await seedWeeks(db, courseId)
-    const weeks = await listWeeks(db, courseId)
+    const course = await createCourse(db, { ...KEY, nameTh: "ก", nameEn: "A" })
+    courseKey = { code: course.code, year: course.year, semester: course.semester }
+    await seedWeeks(db, courseKey)
+    const weeks = await listWeeks(db, courseKey)
     weekId = weeks[0].id
   })
 
   it("createProblem returns a record with the given fields", async () => {
     const p = await createProblem(db, {
-      courseId,
+      courseCode: courseKey.code,
+      courseYear: courseKey.year,
+      courseSemester: courseKey.semester,
       weekId,
       title: "Hello World",
       description: "Write a hello world program",
@@ -36,8 +42,9 @@ describe("problem repository", () => {
       language: "python",
     })
     expect(p.id).toBeGreaterThan(0)
-    expect(p.courseId).toBe(courseId)
+    expect(p.courseCode).toBe(courseKey.code)
     expect(p.weekId).toBe(weekId)
+    expect(p.problemNo).toBe(1)
     expect(p.title).toBe("Hello World")
     expect(p.language).toBe("python")
     expect(p.score).toBe(10)
@@ -45,8 +52,18 @@ describe("problem repository", () => {
     expect(p.closeAt).toBeNull()
   })
 
+  it("createProblem auto-increments problem_no within a week", async () => {
+    const p1 = await createProblem(db, { courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester, weekId, title: "Q1" })
+    const p2 = await createProblem(db, { courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester, weekId, title: "Q2" })
+    expect(p1.problemNo).toBe(1)
+    expect(p2.problemNo).toBe(2)
+  })
+
   it("createProblem uses provided score", async () => {
-    const p = await createProblem(db, { courseId, weekId, title: "Q", score: 25 })
+    const p = await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId, title: "Q", score: 25,
+    })
     expect(p.score).toBe(25)
   })
 
@@ -55,8 +72,22 @@ describe("problem repository", () => {
     expect(result).toBeNull()
   })
 
+  it("getProblemByWeekAndNo returns a problem by URL coordinates", async () => {
+    const weeks = await listWeeks(db, courseKey)
+    const p = await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId: weeks[0].id, title: "Q1",
+    })
+    const found = await getProblemByWeekAndNo(db, weeks[0].id, p.problemNo)
+    expect(found?.id).toBe(p.id)
+    expect(await getProblemByWeekAndNo(db, weeks[0].id, 999)).toBeNull()
+  })
+
   it("setTestCases replaces test cases atomically (idempotent on repeat)", async () => {
-    const p = await createProblem(db, { courseId, weekId, title: "Q1" })
+    const p = await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId, title: "Q1",
+    })
     await setTestCases(db, p.id, [
       { input: "1", expectedOutput: "1", isHidden: false, sortOrder: 0 },
       { input: "2", expectedOutput: "4", isHidden: false, sortOrder: 1 },
@@ -70,7 +101,10 @@ describe("problem repository", () => {
   })
 
   it("getProblemById returns detail with test cases after setTestCases", async () => {
-    const p = await createProblem(db, { courseId, weekId, title: "Q2" })
+    const p = await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId, title: "Q2",
+    })
     await setTestCases(db, p.id, [
       { input: "a", expectedOutput: "A", isHidden: false, sortOrder: 0 },
       { input: "b", expectedOutput: "B", isHidden: true, sortOrder: 1 },
@@ -82,12 +116,12 @@ describe("problem repository", () => {
     expect(detail!.testCases[1].isHidden).toBe(true)
   })
 
-  it("listProblems returns all problems ordered by week_no then id", async () => {
-    const weeks = await listWeeks(db, courseId)
+  it("listProblems returns all problems ordered by week_no then problem_no", async () => {
+    const weeks = await listWeeks(db, courseKey)
     const week2Id = weeks[1].id
-    await createProblem(db, { courseId, weekId: week2Id, title: "Week2 Q1" })
-    await createProblem(db, { courseId, weekId, title: "Week1 Q1" })
-    const list = await listProblems(db, courseId)
+    await createProblem(db, { courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester, weekId: week2Id, title: "Week2 Q1" })
+    await createProblem(db, { courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester, weekId, title: "Week1 Q1" })
+    const list = await listProblems(db, courseKey)
     expect(list).toHaveLength(2)
     expect(list[0].weekNo).toBe(1)
     expect(list[0].title).toBe("Week1 Q1")
@@ -95,23 +129,29 @@ describe("problem repository", () => {
   })
 
   it("listProblems includes score from problem", async () => {
-    await createProblem(db, { courseId, weekId, title: "Scored", score: 20 })
-    const list = await listProblems(db, courseId)
+    await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId, title: "Scored", score: 20,
+    })
+    const list = await listProblems(db, courseKey)
     expect(list[0].score).toBe(20)
   })
 
   it("listProblems filters by weekId", async () => {
-    const weeks = await listWeeks(db, courseId)
+    const weeks = await listWeeks(db, courseKey)
     const week2Id = weeks[1].id
-    await createProblem(db, { courseId, weekId, title: "Week1 Q" })
-    await createProblem(db, { courseId, weekId: week2Id, title: "Week2 Q" })
-    const list = await listProblems(db, courseId, weekId)
+    await createProblem(db, { courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester, weekId, title: "Week1 Q" })
+    await createProblem(db, { courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester, weekId: week2Id, title: "Week2 Q" })
+    const list = await listProblems(db, courseKey, weekId)
     expect(list).toHaveLength(1)
     expect(list[0].weekNo).toBe(1)
   })
 
   it("updateProblem persists changes and returns updated record", async () => {
-    const p = await createProblem(db, { courseId, weekId, title: "Old Title" })
+    const p = await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId, title: "Old Title",
+    })
     const updated = await updateProblem(db, p.id, { title: "New Title", description: "desc" })
     expect(updated).not.toBeNull()
     expect(updated!.title).toBe("New Title")
@@ -119,7 +159,10 @@ describe("problem repository", () => {
   })
 
   it("updateProblem updates score", async () => {
-    const p = await createProblem(db, { courseId, weekId, title: "Q", score: 10 })
+    const p = await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId, title: "Q", score: 10,
+    })
     const updated = await updateProblem(db, p.id, { score: 50 })
     expect(updated!.score).toBe(50)
   })
@@ -130,7 +173,10 @@ describe("problem repository", () => {
   })
 
   it("deleteProblem cascades to test_cases", async () => {
-    const p = await createProblem(db, { courseId, weekId, title: "To Delete" })
+    const p = await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId, title: "To Delete",
+    })
     await setTestCases(db, p.id, [
       { input: "", expectedOutput: "", isHidden: false, sortOrder: 0 },
     ])

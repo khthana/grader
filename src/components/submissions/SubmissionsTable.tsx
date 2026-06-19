@@ -86,19 +86,19 @@ function OverrideDialog({ submission, onClose, onSave }: OverrideDialogProps) {
 }
 
 interface SubmissionsTableProps {
-  courseId: number
+  courseSlug: string
   problemId: number
   pointsMax: number
 }
 
-export function SubmissionsTable({ courseId, problemId, pointsMax }: SubmissionsTableProps) {
+export function SubmissionsTable({ courseSlug, problemId, pointsMax }: SubmissionsTableProps) {
   const [submissions, setSubmissions] = useState<SubmissionItem[]>([])
   const [loading, setLoading] = useState(true)
   const [overrideTarget, setOverrideTarget] = useState<SubmissionItem | null>(null)
 
   async function load() {
     setLoading(true)
-    const res = await fetch(`/api/courses/${courseId}/problems/${problemId}/submissions`)
+    const res = await fetch(`/api/courses/${courseSlug}/problems/${problemId}/submissions`)
     if (res.ok) {
       const data = await res.json()
       setSubmissions(data.submissions ?? [])
@@ -106,11 +106,11 @@ export function SubmissionsTable({ courseId, problemId, pointsMax }: Submissions
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [courseId, problemId])
+  useEffect(() => { load() }, [courseSlug, problemId])
 
   async function handleOverrideSave(score: number | null) {
     if (!overrideTarget) return
-    await fetch(`/api/courses/${courseId}/problems/${problemId}/submissions/${overrideTarget.id}`, {
+    await fetch(`/api/courses/${courseSlug}/problems/${problemId}/submissions/${overrideTarget.id}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ manualScore: score }),

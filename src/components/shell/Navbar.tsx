@@ -7,12 +7,7 @@ import { HiArrowsRightLeft } from "react-icons/hi2"
 import { getLandingRoute, type Role } from "@/lib/roles"
 import { canManageCourses } from "@/lib/courses/access"
 import { isCourseScopedPath } from "@/lib/courses/scope"
-
-interface CourseOption {
-  id: number
-  code: string
-  nameTh: string
-}
+import type { CourseOption } from "./AppShell"
 
 interface NavbarProps {
   name: string
@@ -20,7 +15,7 @@ interface NavbarProps {
   roles: Role[]
   activeRole: Role
   courses: CourseOption[]
-  activeCourseId: number | null
+  activeCourseSlug: string | null
 }
 
 function Logo() {
@@ -38,23 +33,31 @@ function setActiveRoleCookie(role: Role) {
   document.cookie = `active_role=${role}; path=/; max-age=${60 * 60 * 8}; samesite=lax`
 }
 
-function setActiveCourseCookie(id: number) {
-  document.cookie = `active_course=${id}; path=/; max-age=${60 * 60 * 8}; samesite=lax`
+function setActiveCourseCookie(slug: string) {
+  document.cookie = `active_course=${slug}; path=/; max-age=${60 * 60 * 8}; samesite=lax`
+}
+
+function courseSlug(c: CourseOption) {
+  return `${c.code}/${c.year}/${c.semester}`
+}
+
+function coursePath(c: CourseOption) {
+  return `/courses/${c.code}/${c.year}/${c.semester}`
 }
 
 function CourseSwitcher({
   courses,
-  activeCourseId,
+  activeCourseSlug,
   canManage,
 }: {
   courses: CourseOption[]
-  activeCourseId: number | null
+  activeCourseSlug: string | null
   canManage: boolean
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
-  // Fresh course manager with no courses yet: offer a direct add shortcut.
   if (courses.length === 0) {
     if (!canManage) return null
     return (
@@ -67,13 +70,23 @@ function CourseSwitcher({
     )
   }
 
-  const active = courses.find((c) => c.id === activeCourseId) ?? courses[0]
+  // Determine active course: URL-first (most accurate), then cookie, then first.
+  const urlActive = courses.find((c) =>
+    pathname.startsWith(coursePath(c))
+  )
+  const cookieActive = activeCourseSlug
+    ? courses.find((c) => courseSlug(c) === activeCourseSlug)
+    : undefined
+  const active = urlActive ?? cookieActive ?? courses[0]
 
-  function select(id: number) {
+  function select(c: CourseOption) {
     setOpen(false)
-    if (id === active.id) return
-    setActiveCourseCookie(id)
-    router.refresh()
+    if (courseSlug(c) === courseSlug(active)) return
+    setActiveCourseCookie(courseSlug(c))
+    // Preserve the current section when switching courses.
+    const section =
+      pathname.match(/^\/courses\/[^/]+\/\d+\/\d+\/([^/]+)/)?.[1] ?? "problems"
+    router.push(`${coursePath(c)}/${section}`)
   }
 
   return (
@@ -93,14 +106,16 @@ function CourseSwitcher({
         <div className="content-enter absolute left-1/2 mt-2 w-80 -translate-x-1/2 rounded-xl bg-white py-1 shadow-xl ring-1 ring-black/5">
           {courses.map((c) => (
             <button
-              key={c.id}
-              onClick={() => select(c.id)}
+              key={courseSlug(c)}
+              onClick={() => select(c)}
               className={`flex w-full flex-col items-start px-4 py-2 text-left font-thai text-sm hover:bg-slate-50 ${
-                c.id === active.id ? "text-secondary" : "text-slate-600"
+                courseSlug(c) === courseSlug(active) ? "text-secondary" : "text-slate-600"
               }`}
             >
               <span className="font-medium">{c.code}</span>
-              <span className="truncate text-xs text-slate-400">{c.nameTh}</span>
+              <span className="truncate text-xs text-slate-400">
+                {c.year}/{c.semester} · {c.nameTh}
+              </span>
             </button>
           ))}
           {canManage && (
@@ -126,14 +141,12 @@ export function Navbar({
   roles,
   activeRole,
   courses,
-  activeCourseId,
+  activeCourseSlug,
 }: NavbarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [roleOpen, setRoleOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  // The course switcher only makes sense on course-scoped pages — not on the
-  // global User Management / Activity Logs / Course management pages.
   const showCourseSwitcher = isCourseScopedPath(pathname)
 
   function switchRole(role: Role) {
@@ -153,12 +166,11 @@ export function Navbar({
     <nav className="fixed inset-x-0 top-0 z-[60] flex h-[64px] items-center justify-between bg-primary px-6 shadow-sm">
       <Logo />
 
-      {/* Center: course switcher + role switcher (role only when >1 role) */}
       <div className="flex items-center gap-3">
         {showCourseSwitcher && (
           <CourseSwitcher
             courses={courses}
-            activeCourseId={activeCourseId}
+            activeCourseSlug={activeCourseSlug}
             canManage={canManageCourses(roles)}
           />
         )}
@@ -191,7 +203,6 @@ export function Navbar({
         )}
       </div>
 
-      {/* Right: profile */}
       <div className="relative">
         <button
           onClick={() => setProfileOpen((v) => !v)}

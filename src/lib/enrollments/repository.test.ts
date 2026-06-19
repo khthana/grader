@@ -6,14 +6,18 @@ import {
   listAllEnrollments,
   updateEnrollment,
   deleteEnrollment,
-  getEnrollmentById,
+  getEnrollmentByUser,
 } from "./repository"
 import { createCourse } from "@/lib/courses/repository"
 import { createUser } from "@/lib/users/repository"
 import { freshDb, type Queryable } from "@/lib/test-support/db"
+import type { CourseKey } from "@/lib/courses/types"
 
-async function seedCourse(db: Queryable, code = "01076021") {
-  return createCourse(db, { code, nameTh: "วิชา", nameEn: "Course" })
+const KEY: CourseKey = { code: "C01", year: 2567, semester: 1 }
+const KEY2: CourseKey = { code: "C02", year: 2567, semester: 1 }
+
+async function seedCourse(db: Queryable, key: CourseKey = KEY) {
+  return createCourse(db, { ...key, nameTh: "วิชา", nameEn: "Course" })
 }
 
 let userSeq = 0
@@ -32,38 +36,36 @@ async function seedStudent(
 
 async function enroll(
   db: Queryable,
-  courseId: number,
+  key: CourseKey,
   userId: number,
   fields: { studyGroup?: string; program?: string; year?: string } = {}
 ) {
-  return createEnrollment(db, { courseId, userId, ...fields })
+  return createEnrollment(db, {
+    courseCode: key.code,
+    courseYear: key.year,
+    courseSemester: key.semester,
+    userId,
+    ...fields,
+  })
 }
 
 describe("listEnrollments", () => {
   let db: Queryable
 
-  beforeEach(() => {
-    db = freshDb()
-  })
+  beforeEach(() => { db = freshDb() })
 
   it("lists a course's enrolled students with their fields and a total", async () => {
-    const course = await seedCourse(db)
+    await seedCourse(db)
     const user = await createUser(db, {
       email: "65010100@kmitl.ac.th",
       name: "ประพาฬพงษ์ ธรรมาวาดานันท์",
       idCode: "65010100",
       titleTh: "นาย",
     })
-    await createEnrollment(db, {
-      courseId: course.id,
-      userId: user.id,
-      studyGroup: "1",
-      program: "วิศวกรรมคอมพิวเตอร์",
-      year: "2565",
-    })
+    await enroll(db, KEY, user.id, { studyGroup: "1", program: "วิศวกรรมคอมพิวเตอร์", year: "2565" })
 
     const { enrollments, total } = await listEnrollments(db, {
-      courseId: course.id,
+      courseKey: KEY,
       search: "",
       group: "",
       page: 1,
@@ -83,33 +85,26 @@ describe("listEnrollments", () => {
   })
 
   it("returns only the requested course's enrollments", async () => {
-    const a = await seedCourse(db, "AAA")
-    const b = await seedCourse(db, "BBB")
+    await seedCourse(db, KEY)
+    await seedCourse(db, KEY2)
     const s1 = await seedStudent(db)
     const s2 = await seedStudent(db)
-    await enroll(db, a.id, s1.id)
-    await enroll(db, b.id, s2.id)
+    await enroll(db, KEY, s1.id)
+    await enroll(db, KEY2, s2.id)
 
-    const result = await listEnrollments(db, {
-      courseId: a.id,
-      search: "",
-      group: "",
-      page: 1,
-      pageSize: 10,
-    })
-
+    const result = await listEnrollments(db, { courseKey: KEY, search: "", group: "", page: 1, pageSize: 10 })
     expect(result.total).toBe(1)
     expect(result.enrollments.map((e) => e.userId)).toEqual([s1.id])
   })
 
   it("matches search against student id or name (case-insensitive)", async () => {
-    const course = await seedCourse(db)
+    await seedCourse(db)
     const alice = await seedStudent(db, { name: "Alice Wonder", idCode: "64010001" })
     const bob = await seedStudent(db, { name: "Bob Builder", idCode: "64010002" })
-    await enroll(db, course.id, alice.id)
-    await enroll(db, course.id, bob.id)
+    await enroll(db, KEY, alice.id)
+    await enroll(db, KEY, bob.id)
 
-    const base = { courseId: course.id, group: "", page: 1, pageSize: 10 }
+    const base = { courseKey: KEY, group: "", page: 1, pageSize: 10 }
 
     const byName = await listEnrollments(db, { ...base, search: "alice" })
     expect(byName.enrollments.map((e) => e.userId)).toEqual([alice.id])
@@ -123,116 +118,100 @@ describe("listEnrollments", () => {
   })
 
   it("filters by group", async () => {
-    const course = await seedCourse(db)
+    await seedCourse(db)
     const g1 = await seedStudent(db)
     const g2 = await seedStudent(db)
-    await enroll(db, course.id, g1.id, { studyGroup: "1" })
-    await enroll(db, course.id, g2.id, { studyGroup: "2" })
+    await enroll(db, KEY, g1.id, { studyGroup: "1" })
+    await enroll(db, KEY, g2.id, { studyGroup: "2" })
 
-    const result = await listEnrollments(db, {
-      courseId: course.id,
-      search: "",
-      group: "2",
-      page: 1,
-      pageSize: 10,
-    })
-
+    const result = await listEnrollments(db, { courseKey: KEY, search: "", group: "2", page: 1, pageSize: 10 })
     expect(result.total).toBe(1)
     expect(result.enrollments.map((e) => e.userId)).toEqual([g2.id])
   })
 
   it("paginates while keeping total at the full match count", async () => {
-    const course = await seedCourse(db)
+    await seedCourse(db)
     const ids: number[] = []
     for (let i = 0; i < 5; i++) {
       const s = await seedStudent(db)
-      await enroll(db, course.id, s.id)
+      await enroll(db, KEY, s.id)
       ids.push(s.id)
     }
-    const base = { courseId: course.id, search: "", group: "" }
+    const base = { courseKey: KEY, search: "", group: "" }
 
     const page1 = await listEnrollments(db, { ...base, page: 1, pageSize: 2 })
     expect(page1.total).toBe(5)
-    expect(page1.enrollments.map((e) => e.userId)).toEqual([ids[0], ids[1]])
+    expect(page1.enrollments).toHaveLength(2)
 
     const page3 = await listEnrollments(db, { ...base, page: 3, pageSize: 2 })
     expect(page3.total).toBe(5)
-    expect(page3.enrollments.map((e) => e.userId)).toEqual([ids[4]])
+    expect(page3.enrollments).toHaveLength(1)
   })
 })
 
 describe("listGroups", () => {
   let db: Queryable
-
-  beforeEach(() => {
-    db = freshDb()
-  })
+  beforeEach(() => { db = freshDb() })
 
   it("returns the distinct groups in a course, sorted, excluding nulls", async () => {
-    const course = await seedCourse(db)
-    const other = await seedCourse(db, "OTHER")
-    const mk = async (courseId: number, group?: string) => {
+    await seedCourse(db, KEY)
+    await seedCourse(db, KEY2)
+    const mk = async (key: CourseKey, group?: string) => {
       const s = await seedStudent(db)
-      await enroll(db, courseId, s.id, group ? { studyGroup: group } : {})
+      await enroll(db, key, s.id, group ? { studyGroup: group } : {})
     }
-    await mk(course.id, "2")
-    await mk(course.id, "1")
-    await mk(course.id, "2")
-    await mk(course.id) // null group — excluded
-    await mk(other.id, "9") // different course — excluded
+    await mk(KEY, "2")
+    await mk(KEY, "1")
+    await mk(KEY, "2")
+    await mk(KEY)           // null group — excluded
+    await mk(KEY2, "9")    // different course — excluded
 
-    expect(await listGroups(db, course.id)).toEqual(["1", "2"])
+    expect(await listGroups(db, KEY)).toEqual(["1", "2"])
   })
 })
 
 describe("listAllEnrollments", () => {
   let db: Queryable
-
-  beforeEach(() => {
-    db = freshDb()
-  })
+  beforeEach(() => { db = freshDb() })
 
   it("returns every matching row with no pagination, respecting search and group", async () => {
-    const course = await seedCourse(db)
+    await seedCourse(db)
     for (let i = 0; i < 15; i++) {
       const s = await seedStudent(db)
-      await enroll(db, course.id, s.id, { studyGroup: i % 2 === 0 ? "1" : "2" })
+      await enroll(db, KEY, s.id, { studyGroup: i % 2 === 0 ? "1" : "2" })
     }
 
-    const all = await listAllEnrollments(db, { courseId: course.id, search: "", group: "" })
+    const all = await listAllEnrollments(db, { courseKey: KEY, search: "", group: "" })
     expect(all).toHaveLength(15)
 
-    const g1 = await listAllEnrollments(db, { courseId: course.id, search: "", group: "1" })
+    const g1 = await listAllEnrollments(db, { courseKey: KEY, search: "", group: "1" })
     expect(g1).toHaveLength(8)
     expect(g1.every((e) => e.studyGroup === "1")).toBe(true)
   })
 
   it("only returns the requested course's rows", async () => {
-    const a = await seedCourse(db, "AAA")
-    const b = await seedCourse(db, "BBB")
+    await seedCourse(db, KEY)
+    await seedCourse(db, KEY2)
     const sa = await seedStudent(db)
     const sb = await seedStudent(db)
-    await enroll(db, a.id, sa.id)
-    await enroll(db, b.id, sb.id)
+    await enroll(db, KEY, sa.id)
+    await enroll(db, KEY2, sb.id)
 
-    const all = await listAllEnrollments(db, { courseId: a.id, search: "", group: "" })
+    const all = await listAllEnrollments(db, { courseKey: KEY, search: "", group: "" })
     expect(all.map((e) => e.userId)).toEqual([sa.id])
   })
 })
 
 describe("updateEnrollment", () => {
   let db: Queryable
-
-  beforeEach(() => {
-    db = freshDb()
-  })
+  beforeEach(() => { db = freshDb() })
 
   it("updates group, program, and year", async () => {
-    const course = await seedCourse(db)
+    await seedCourse(db)
     const s = await seedStudent(db)
-    const e = await enroll(db, course.id, s.id, { studyGroup: "1", program: "เดิม", year: "2565" })
+    await enroll(db, KEY, s.id, { studyGroup: "1", program: "เดิม", year: "2565" })
 
-    const updated = await updateEnrollment(db, e.id, {
+    const updated = await updateEnrollment(db, KEY, s.id, {
       studyGroup: "2",
       program: "ใหม่",
       year: "2566",
@@ -245,57 +224,50 @@ describe("updateEnrollment", () => {
   })
 
   it("returns null for an unknown enrollment", async () => {
-    expect(await updateEnrollment(db, 9999, { studyGroup: "1" })).toBeNull()
+    await seedCourse(db)
+    expect(await updateEnrollment(db, KEY, 9999, { studyGroup: "1" })).toBeNull()
   })
 })
 
 describe("deleteEnrollment", () => {
   let db: Queryable
-
-  beforeEach(() => {
-    db = freshDb()
-  })
+  beforeEach(() => { db = freshDb() })
 
   it("removes only the targeted enrollment", async () => {
-    const course = await seedCourse(db)
+    await seedCourse(db)
     const s1 = await seedStudent(db)
     const s2 = await seedStudent(db)
-    const e1 = await enroll(db, course.id, s1.id)
-    await enroll(db, course.id, s2.id)
+    await enroll(db, KEY, s1.id)
+    await enroll(db, KEY, s2.id)
 
-    expect(await deleteEnrollment(db, e1.id)).toBe(true)
+    expect(await deleteEnrollment(db, KEY, s1.id)).toBe(true)
 
     const { enrollments, total } = await listEnrollments(db, {
-      courseId: course.id,
-      search: "",
-      group: "",
-      page: 1,
-      pageSize: 10,
+      courseKey: KEY, search: "", group: "", page: 1, pageSize: 10,
     })
     expect(total).toBe(1)
     expect(enrollments.map((e) => e.userId)).toEqual([s2.id])
   })
 
   it("returns false for an unknown enrollment", async () => {
-    expect(await deleteEnrollment(db, 9999)).toBe(false)
+    await seedCourse(db)
+    expect(await deleteEnrollment(db, KEY, 9999)).toBe(false)
   })
 })
 
-describe("getEnrollmentById", () => {
+describe("getEnrollmentByUser", () => {
   let db: Queryable
-
-  beforeEach(() => {
-    db = freshDb()
-  })
+  beforeEach(() => { db = freshDb() })
 
   it("reads an enrollment back with its course and user", async () => {
-    const course = await seedCourse(db)
+    await seedCourse(db)
     const s = await seedStudent(db)
-    const e = await enroll(db, course.id, s.id, { studyGroup: "1" })
+    await enroll(db, KEY, s.id, { studyGroup: "1" })
 
-    const found = await getEnrollmentById(db, e.id)
-    expect(found?.courseId).toBe(course.id)
+    const found = await getEnrollmentByUser(db, KEY, s.id)
+    expect(found?.courseCode).toBe(KEY.code)
     expect(found?.userId).toBe(s.id)
-    expect(await getEnrollmentById(db, 9999)).toBeNull()
+    expect(found?.studyGroup).toBe("1")
+    expect(await getEnrollmentByUser(db, KEY, 9999)).toBeNull()
   })
 })

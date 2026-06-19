@@ -12,6 +12,7 @@ interface ProblemItem {
   id: number
   weekId: number
   weekNo: number
+  problemNo: number
   title: string
   description: string
   pointsMax: number
@@ -32,10 +33,12 @@ function formatDate(iso: string | null) {
 }
 
 export function ProblemsTable({
-  courseId,
+  courseSlug,
+  coursePath,
   canManage,
 }: {
-  courseId: number
+  courseSlug: string
+  coursePath: string
   canManage: boolean
 }) {
   const router = useRouter()
@@ -51,7 +54,7 @@ export function ProblemsTable({
   // Load (or reload) weeks. Keeps the current selection if it still exists,
   // otherwise clamps to the last week (e.g. after removing the active one).
   const loadWeeks = useCallback(() => {
-    return fetch(`/api/courses/${courseId}/weeks`)
+    return fetch(`/api/courses/${courseSlug}/weeks`)
       .then((r) => r.json())
       .then(({ weeks: w }: { weeks: Week[] }) => {
         setWeeks(w)
@@ -60,7 +63,7 @@ export function ProblemsTable({
         )
       })
       .catch(() => {})
-  }, [courseId])
+  }, [courseSlug])
 
   useEffect(() => {
     loadWeeks()
@@ -71,17 +74,17 @@ export function ProblemsTable({
     const week = weeks.find((w) => w.weekNo === activeWeekNo)
     if (!week) return
     setLoading(true)
-    fetch(`/api/courses/${courseId}/problems?week=${week.id}`)
+    fetch(`/api/courses/${courseSlug}/problems?week=${week.id}`)
       .then((r) => r.json())
       .then(({ problems: p }: { problems: ProblemItem[] }) => setProblems(p))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [courseId, weeks, activeWeekNo])
+  }, [courseSlug, weeks, activeWeekNo])
 
   async function handleDelete() {
     if (!deleteTarget) return
     setDeleting(true)
-    const res = await fetch(`/api/courses/${courseId}/problems/${deleteTarget.id}`, {
+    const res = await fetch(`/api/courses/${courseSlug}/problems/${deleteTarget.id}`, {
       method: "DELETE",
     })
     setDeleting(false)
@@ -89,10 +92,9 @@ export function ProblemsTable({
     if (res.ok) {
       notify("success", `ลบโจทย์ "${deleteTarget.title}" เรียบร้อยแล้ว`)
       router.refresh()
-      // re-fetch problems
       const week = weeks.find((w) => w.weekNo === activeWeekNo)
       if (week) {
-        const r = await fetch(`/api/courses/${courseId}/problems?week=${week.id}`)
+        const r = await fetch(`/api/courses/${courseSlug}/problems?week=${week.id}`)
         const data = await r.json()
         setProblems(data.problems ?? [])
       }
@@ -109,7 +111,7 @@ export function ProblemsTable({
         <WeekBar
           weeks={weeks}
           activeWeekNo={activeWeekNo}
-          courseId={courseId}
+          courseSlug={courseSlug}
           canManage={canManage}
           onWeekChange={setActiveWeekNo}
           onWeeksChanged={loadWeeks}
@@ -123,7 +125,7 @@ export function ProblemsTable({
           </span>
           {canManage && (
             <Link
-              href={`/problems/new?courseId=${courseId}&weekId=${activeWeek?.id ?? ""}`}
+              href={`${coursePath}/problems/new?weekId=${activeWeek?.id ?? ""}`}
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm text-white transition hover:bg-primary-hover"
             >
               <FaPlus className="h-3 w-3" />
@@ -141,7 +143,7 @@ export function ProblemsTable({
               <span>
                 {" "}—{" "}
                 <Link
-                  href={`/problems/new?courseId=${courseId}&weekId=${activeWeek?.id ?? ""}`}
+                  href={`${coursePath}/problems/new?weekId=${activeWeek?.id ?? ""}`}
                   className="text-secondary hover:underline"
                 >
                   สร้างโจทย์แรก
@@ -192,14 +194,14 @@ export function ProblemsTable({
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-2">
                         <Link
-                          href={`/problems/${p.id}/submissions?courseId=${courseId}`}
+                          href={`${coursePath}/problems/${p.weekNo}/${p.problemNo}/submissions`}
                           className="rounded p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
                           title="ดูการส่งงาน"
                         >
                           <FaEye className="h-3.5 w-3.5" />
                         </Link>
                         <Link
-                          href={`/problems/${p.id}/edit?courseId=${courseId}`}
+                          href={`${coursePath}/problems/${p.weekNo}/${p.problemNo}/edit`}
                           className="rounded p-1.5 text-slate-400 transition hover:bg-blue-50 hover:text-secondary"
                           title="แก้ไข"
                         >

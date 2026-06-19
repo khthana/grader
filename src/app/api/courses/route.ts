@@ -4,7 +4,7 @@ import { getDb } from "@/lib/db"
 import {
   listCoursesForUser,
   createCourse,
-  findCourseByCode,
+  getCourseByKey,
   assignInstructor,
 } from "@/lib/courses/repository"
 import { seedWeeks } from "@/lib/weeks/repository"
@@ -43,12 +43,16 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => ({}))) as {
     code?: string
+    year?: number
+    semester?: number
     nameTh?: string
     nameEn?: string
     program?: string
   }
   const input = {
     code: (body.code ?? "").trim(),
+    year: Number(body.year ?? 0),
+    semester: Number(body.semester ?? 0),
     nameTh: (body.nameTh ?? "").trim(),
     nameEn: (body.nameEn ?? "").trim(),
     program: body.program?.trim() || undefined,
@@ -58,23 +62,29 @@ export async function POST(request: NextRequest) {
   if (!valid) return NextResponse.json({ errors }, { status: 400 })
 
   const db = getDb()
-  if (await findCourseByCode(db, input.code)) {
-    return NextResponse.json({ errors: { code: "รหัสวิชานี้ถูกใช้งานแล้ว" } }, { status: 409 })
+  const key = { code: input.code, year: input.year, semester: input.semester }
+  if (await getCourseByKey(db, key)) {
+    return NextResponse.json(
+      { errors: { code: "รายวิชา (รหัส/ปี/ภาค) นี้มีอยู่แล้ว" } },
+      { status: 409 }
+    )
   }
 
   const course = await createCourse(db, {
     code: input.code,
+    year: input.year,
+    semester: input.semester,
     nameTh: input.nameTh,
     nameEn: input.nameEn,
     program: input.program ?? null,
   })
-  await assignInstructor(db, course.id, user.id)
-  await seedWeeks(db, course.id)
+  await assignInstructor(db, course, user.id)
+  await seedWeeks(db, course)
   await safeLog(db, {
     actorId: user.id,
     actorEmail: user.email,
     action: "course.create",
-    targetId: course.id,
+    targetEmail: course.code,
   })
 
   return NextResponse.json(course, { status: 201 })

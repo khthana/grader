@@ -1,15 +1,16 @@
 import { describe, it, expect } from "vitest"
 import { resolveActiveCourse, canMutateRoster, canManageCourses, isTeachingStaff } from "./access"
+import type { CourseRecord } from "./types"
 
-const courses = [
-  { id: 1, code: "C1" },
-  { id: 2, code: "C2" },
-  { id: 3, code: "C3" },
+const courses: CourseRecord[] = [
+  { code: "C1", year: 2567, semester: 1, nameTh: "ก", nameEn: "A", program: null, createdAt: "" },
+  { code: "C2", year: 2567, semester: 1, nameTh: "ข", nameEn: "B", program: null, createdAt: "" },
+  { code: "C3", year: 2567, semester: 1, nameTh: "ค", nameEn: "C", program: null, createdAt: "" },
 ]
 
 describe("resolveActiveCourse", () => {
   it("returns the requested course when it is in the list", () => {
-    expect(resolveActiveCourse(courses, 2)?.code).toBe("C2")
+    expect(resolveActiveCourse(courses, "C2/2567/1")?.code).toBe("C2")
   })
 
   it("falls back to the first course when none is requested", () => {
@@ -17,11 +18,11 @@ describe("resolveActiveCourse", () => {
   })
 
   it("falls back to the first course when the requested id is not entitled", () => {
-    expect(resolveActiveCourse(courses, 999)?.code).toBe("C1")
+    expect(resolveActiveCourse(courses, "ZZ/2567/1")?.code).toBe("C1")
   })
 
   it("returns null for an empty list", () => {
-    expect(resolveActiveCourse([], 1)).toBeNull()
+    expect(resolveActiveCourse([], "C1/2567/1")).toBeNull()
   })
 })
 

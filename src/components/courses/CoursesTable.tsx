@@ -53,7 +53,7 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      const res = await fetch(`/api/courses/${deleteTarget.id}`, { method: "DELETE" })
+      const res = await fetch(`/api/courses/${deleteTarget.code}/${deleteTarget.year}/${deleteTarget.semester}`, { method: "DELETE" })
       if (!res.ok) throw new Error()
       notify("success", "ลบรายวิชาแล้ว")
       setDeleteTarget(null)
@@ -85,6 +85,7 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
           <thead className="border-b border-gray-200 bg-slate-100 text-slate-600">
             <tr>
               <th className="px-4 py-3 text-left font-medium">รหัสวิชา</th>
+              <th className="px-4 py-3 text-left font-medium">ปี/ภาค</th>
               <th className="px-4 py-3 text-left font-medium">ชื่อวิชา</th>
               <th className="px-4 py-3 text-left font-medium">หลักสูตร</th>
               <th className="px-4 py-3 text-center font-medium">จัดการ</th>
@@ -93,20 +94,21 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={4} className="px-4 py-12 text-center text-slate-400">
+                <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
                   กำลังโหลด...
                 </td>
               </tr>
             ) : courses.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-12 text-center text-slate-400">
+                <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
                   ยังไม่มีรายวิชา — กด “เพิ่มรายวิชา” เพื่อเริ่มต้น
                 </td>
               </tr>
             ) : (
               courses.map((c) => (
-                <tr key={c.id} className="hover:bg-slate-50">
+                <tr key={`${c.code}/${c.year}/${c.semester}`} className="hover:bg-slate-50">
                   <td className="px-4 py-3 font-mono text-slate-600">{c.code}</td>
+                  <td className="px-4 py-3 text-slate-500 text-xs">{c.year}/{c.semester}</td>
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-800">{c.nameTh}</div>
                     <div className="text-xs text-slate-400">{c.nameEn}</div>
@@ -154,7 +156,7 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
 
       {staffTarget && (
         <CourseStaffDialog
-          courseId={staffTarget.id}
+          courseSlug={`${staffTarget.code}/${staffTarget.year}/${staffTarget.semester}`}
           courseLabel={`${staffTarget.code} · ${staffTarget.nameTh}`}
           onClose={() => setStaffTarget(null)}
           onSaved={reload}

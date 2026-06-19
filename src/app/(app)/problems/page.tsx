@@ -1,14 +1,10 @@
+import { redirect } from "next/navigation"
 import { getCourseContext } from "@/lib/courses/server"
-import { getCurrentUser } from "@/lib/session"
-import { canManageCourses } from "@/lib/courses/access"
+import { buildCoursePath } from "@/lib/courses/slug"
 import { PageTitle } from "@/components/shell/ComingSoon"
-import { ProblemsTable } from "@/components/problems/ProblemsTable"
 
 export default async function ProblemsPage() {
   const { activeCourse } = await getCourseContext()
-  const user = await getCurrentUser()
-  const canManage = canManageCourses(user?.roles ?? [])
-
   if (!activeCourse) {
     return (
       <div className="font-thai">
@@ -22,17 +18,5 @@ export default async function ProblemsPage() {
       </div>
     )
   }
-
-  return (
-    <div className="font-thai">
-      <div className="mb-1 flex items-center gap-3">
-        <h1 className="text-2xl font-semibold text-primary">โจทย์ปัญหา</h1>
-      </div>
-      <p className="mb-6 text-sm text-slate-500">
-        {activeCourse.code} · {activeCourse.nameTh}
-      </p>
-
-      <ProblemsTable courseId={activeCourse.id} canManage={canManage} />
-    </div>
-  )
+  redirect(`${buildCoursePath(activeCourse)}/problems`)
 }

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { authorizeCourse, type CourseAuth } from "./authorize"
 
-export function courseRoute<P extends { id: string }>(
+export function courseRoute<P extends { code: string; year: string; semester: string }>(
   options: { staff?: boolean; mutate?: boolean; manage?: boolean },
   handler: (
     req: NextRequest,
@@ -9,9 +9,9 @@ export function courseRoute<P extends { id: string }>(
     params: P
   ) => Promise<NextResponse>
 ) {
-  return async (req, context) => {
+  return async (req: NextRequest, context: { params: Promise<P> }) => {
     const params = await context.params
-    const auth = await authorizeCourse(req, params.id, options)
+    const auth = await authorizeCourse(req, params, options)
     if (!auth.ok) return auth.response
     return handler(req, auth, params)
   }

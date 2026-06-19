@@ -1,39 +1,27 @@
 import { notFound, redirect } from "next/navigation"
-import { getCourseContext } from "@/lib/courses/server"
-import { getCurrentUser } from "@/lib/session"
-import { canManageCourses } from "@/lib/courses/access"
-import { listWeeks } from "@/lib/weeks/repository"
-import { getProblemById } from "@/lib/problems/repository"
 import { getDb } from "@/lib/db"
-import { ProblemEditor } from "@/components/problems/ProblemEditor"
+import { getProblemById } from "@/lib/problems/repository"
+import { buildCoursePath } from "@/lib/courses/slug"
 
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
-export default async function EditProblemPage({ params }: PageProps) {
-  const user = await getCurrentUser()
-  if (!user || !canManageCourses(user.roles)) redirect("/problems")
-
-  const { activeCourse } = await getCourseContext()
-  if (!activeCourse) redirect("/problems")
-
+export default async function LegacyEditProblemPage({ params }: PageProps) {
   const { id } = await params
   const problemId = Number.parseInt(id, 10)
   if (!Number.isFinite(problemId)) notFound()
 
   const db = getDb()
   const problem = await getProblemById(db, problemId)
-  if (!problem || problem.courseId !== activeCourse.id) notFound()
+  if (!problem) notFound()
 
-  const weeks = await listWeeks(db, activeCourse.id)
-
-  return (
-    <ProblemEditor
-      courseId={activeCourse.id}
-      weeks={weeks}
-      mode="edit"
-      problem={problem}
-    />
+  const { rows } = await db.query<{ week_no: number }>(
+    "SELECT week_no FROM weeks WHERE id = $1::int",
+    [problem.weekId]
   )
+  if (!rows[0]) notFound()
+
+  const key = { code: problem.courseCode, year: problem.courseYear, semester: problem.courseSemester }
+  redirect(`${buildCoursePath(key)}/problems/${rows[0].week_no}/${problem.problemNo}/edit`)
 }

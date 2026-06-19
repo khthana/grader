@@ -48,66 +48,87 @@ CREATE TABLE IF NOT EXISTS user_logs (
 INSERT INTO roles (name) VALUES ('Admin'), ('Instructor'), ('TA'), ('Student')
 ON CONFLICT (name) DO NOTHING;
 
--- Course domain (issue #9 / ADR 0001). A Course owns a roster of enrolled
--- Students; course-local fields (group/program/year) live on the Enrollment.
+-- Course domain. Natural composite PK: (code, year, semester) uniquely identifies
+-- a course offering. year is Thai Buddhist year (พ.ศ., e.g. 2567).
 CREATE TABLE IF NOT EXISTS courses (
-  id         SERIAL PRIMARY KEY,
-  code       TEXT NOT NULL UNIQUE,
-  name_th    TEXT NOT NULL,
-  name_en    TEXT NOT NULL,
+  code       TEXT    NOT NULL,
+  year       INTEGER NOT NULL,          -- Thai Buddhist year, e.g. 2567
+  semester   INTEGER NOT NULL,          -- 1, 2, or 3
+  name_th    TEXT    NOT NULL,
+  name_en    TEXT    NOT NULL,
   program    TEXT,                       -- default program for new enrollments
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (code, year, semester),
+  CHECK (semester IN (1, 2, 3))
 );
 
 -- Which Users (Instructor/TA, by their global role) may manage a Course.
 CREATE TABLE IF NOT EXISTS course_instructors (
-  course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-  user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  PRIMARY KEY (course_id, user_id)
+  course_code     TEXT    NOT NULL,
+  course_year     INTEGER NOT NULL,
+  course_semester INTEGER NOT NULL,
+  user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (course_code, course_year, course_semester, user_id),
+  FOREIGN KEY (course_code, course_year, course_semester)
+    REFERENCES courses(code, year, semester) ON DELETE CASCADE
 );
 
--- A Student's membership in a Course's roster. 'group' is a SQL reserved word,
--- so the column is named study_group (app-level field stays "group").
+-- A Student's membership in a Course's roster. Composite PK eliminates the
+-- surrogate id. 'group' is a SQL reserved word, so the column is study_group.
 CREATE TABLE IF NOT EXISTS enrollments (
-  id          SERIAL PRIMARY KEY,
-  course_id   INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  study_group TEXT,
-  program     TEXT,
-  year        TEXT,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (course_id, user_id)
+  course_code     TEXT    NOT NULL,
+  course_year     INTEGER NOT NULL,
+  course_semester INTEGER NOT NULL,
+  user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  study_group     TEXT,
+  program         TEXT,
+  year            TEXT,                  -- student cohort year (distinct from course_year)
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (course_code, course_year, course_semester, user_id),
+  FOREIGN KEY (course_code, course_year, course_semester)
+    REFERENCES courses(code, year, semester) ON DELETE CASCADE
 );
 
--- Problem domain (issue #17). Problems are course-scoped, organised by Week.
--- New courses seed DEFAULT_WEEKS (6) weeks with empty topics; Instructors can
--- append weeks up to MAX_WEEKS (16) or remove the last empty one, and edit
--- topics. Week count is app-enforced (see src/lib/weeks/repository.ts).
+-- Problem domain. Problems are course-scoped, organised by Week.
+-- New courses seed DEFAULT_WEEKS (6) weeks; Instructors can append up to MAX_WEEKS (16).
+-- weeks keeps a surrogate id to anchor the problems FK without 5-level cascades.
 CREATE TABLE IF NOT EXISTS weeks (
-  id         SERIAL PRIMARY KEY,
-  course_id  INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-  week_no    INTEGER NOT NULL,
-  topic      TEXT NOT NULL DEFAULT '',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (course_id, week_no)
+  id              SERIAL PRIMARY KEY,
+  course_code     TEXT    NOT NULL,
+  course_year     INTEGER NOT NULL,
+  course_semester INTEGER NOT NULL,
+  week_no         INTEGER NOT NULL,
+  topic           TEXT NOT NULL DEFAULT '',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (course_code, course_year, course_semester, week_no),
+  FOREIGN KEY (course_code, course_year, course_semester)
+    REFERENCES courses(code, year, semester) ON DELETE CASCADE
 );
 
+-- problems keeps a surrogate id as FK anchor for test_cases and submissions.
+-- problem_no is a per-week sequential number used in the public URL.
 CREATE TABLE IF NOT EXISTS problems (
-  id          SERIAL PRIMARY KEY,
-  course_id   INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-  week_id     INTEGER NOT NULL REFERENCES weeks(id) ON DELETE CASCADE,
-  title       TEXT NOT NULL,
-  description TEXT NOT NULL DEFAULT '',
-  input_spec  TEXT NOT NULL DEFAULT '',
-  output_spec TEXT NOT NULL DEFAULT '',
-  score       INTEGER NOT NULL DEFAULT 10,
-  due_at      TIMESTAMPTZ,
-  close_at    TIMESTAMPTZ,
-  language    TEXT NOT NULL DEFAULT 'python',
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  id              SERIAL PRIMARY KEY,
+  course_code     TEXT    NOT NULL,
+  course_year     INTEGER NOT NULL,
+  course_semester INTEGER NOT NULL,
+  week_id         INTEGER NOT NULL REFERENCES weeks(id) ON DELETE CASCADE,
+  problem_no      INTEGER NOT NULL,
+  title           TEXT NOT NULL,
+  description     TEXT NOT NULL DEFAULT '',
+  input_spec      TEXT NOT NULL DEFAULT '',
+  output_spec     TEXT NOT NULL DEFAULT '',
+  score           INTEGER NOT NULL DEFAULT 10,
+  due_at          TIMESTAMPTZ,
+  close_at        TIMESTAMPTZ,
+  language        TEXT NOT NULL DEFAULT 'python',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (week_id, problem_no),
+  FOREIGN KEY (course_code, course_year, course_semester)
+    REFERENCES courses(code, year, semester) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS test_cases (
@@ -119,20 +140,25 @@ CREATE TABLE IF NOT EXISTS test_cases (
   sort_order      INTEGER NOT NULL DEFAULT 0
 );
 
--- 'group' is reserved in SQL; course_id stored for fast per-course queries.
+-- course_code/year/semester stored for fast per-course queries without joining
+-- up through problems → weeks → courses.
 CREATE TABLE IF NOT EXISTS submissions (
-  id            SERIAL PRIMARY KEY,
-  problem_id    INTEGER NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
-  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  course_id     INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-  code          TEXT NOT NULL,
-  language      TEXT NOT NULL DEFAULT 'python',
-  points_earned NUMERIC,
-  points_max    NUMERIC,
-  is_late       BOOLEAN NOT NULL DEFAULT FALSE,
-  results       JSONB,
-  manual_score  NUMERIC,
-  reviewed_by   INTEGER REFERENCES users(id),
-  reviewed_at   TIMESTAMPTZ,
-  submitted_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  id              SERIAL PRIMARY KEY,
+  problem_id      INTEGER NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
+  user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_code     TEXT    NOT NULL,
+  course_year     INTEGER NOT NULL,
+  course_semester INTEGER NOT NULL,
+  code            TEXT NOT NULL,
+  language        TEXT NOT NULL DEFAULT 'python',
+  points_earned   NUMERIC,
+  points_max      NUMERIC,
+  is_late         BOOLEAN NOT NULL DEFAULT FALSE,
+  results         JSONB,
+  manual_score    NUMERIC,
+  reviewed_by     INTEGER REFERENCES users(id),
+  reviewed_at     TIMESTAMPTZ,
+  submitted_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  FOREIGN KEY (course_code, course_year, course_semester)
+    REFERENCES courses(code, year, semester) ON DELETE CASCADE
 );

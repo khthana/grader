@@ -9,6 +9,7 @@ interface PendingItem {
   problemId: number
   problemTitle: string
   weekNo: number
+  problemNo: number
   userId: number
   studentName: string
   studentIdCode: string | null
@@ -83,14 +84,14 @@ function formatDate(iso: string) {
   })
 }
 
-export function PendingQueue({ courseId }: { courseId: number }) {
+export function PendingQueue({ courseSlug, coursePath }: { courseSlug: string; coursePath: string }) {
   const [items, setItems] = useState<PendingItem[]>([])
   const [loading, setLoading] = useState(true)
   const [reviewTarget, setReviewTarget] = useState<PendingItem | null>(null)
 
   async function load() {
     setLoading(true)
-    const res = await fetch(`/api/courses/${courseId}/review`)
+    const res = await fetch(`/api/courses/${courseSlug}/review`)
     if (res.ok) {
       const data = await res.json()
       setItems(data.submissions ?? [])
@@ -98,12 +99,12 @@ export function PendingQueue({ courseId }: { courseId: number }) {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [courseId])
+  useEffect(() => { load() }, [courseSlug])
 
   async function handleSave(score: number | null) {
     if (!reviewTarget) return
     await fetch(
-      `/api/courses/${courseId}/problems/${reviewTarget.problemId}/submissions/${reviewTarget.id}`,
+      `/api/courses/${courseSlug}/problems/${reviewTarget.problemId}/submissions/${reviewTarget.id}`,
       {
         method: "PUT",
         headers: { "content-type": "application/json" },
@@ -178,7 +179,7 @@ export function PendingQueue({ courseId }: { courseId: number }) {
               <td className="px-5 py-4 text-right">
                 <div className="flex items-center justify-end gap-2">
                   <Link
-                    href={`/problems/${item.problemId}/submissions?courseId=${courseId}`}
+                    href={`${coursePath}/problems/${item.weekNo}/${item.problemNo}/submissions`}
                     className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                   >
                     ดูทั้งหมด

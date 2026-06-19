@@ -1,105 +1,103 @@
-// Course repository — raw SQL over a `pg`-compatible client.
-// Takes an injectable `Queryable` so production passes a real pool and tests
-// pass a pg-mem adapter (mirrors src/lib/users/repository.ts).
-
 import type { Queryable } from "@/lib/db"
-export type { Queryable }
+import type { CourseKey, CourseRecord } from "./types"
+export type { Queryable, CourseKey, CourseRecord }
 
 export interface NewCourse {
   code: string
+  year: number
+  semester: number
   nameTh: string
   nameEn: string
   program?: string | null
 }
 
-export interface CourseRecord {
-  id: number
-  code: string
-  nameTh: string
-  nameEn: string
-  program: string | null
-}
-
 interface CourseRow {
-  id: number
   code: string
+  year: number
+  semester: number
   name_th: string
   name_en: string
   program: string | null
+  created_at: string
 }
 
 function toRecord(row: CourseRow): CourseRecord {
   return {
-    id: row.id,
     code: row.code,
+    year: row.year,
+    semester: row.semester,
     nameTh: row.name_th,
     nameEn: row.name_en,
     program: row.program,
+    createdAt: row.created_at,
   }
 }
 
-export async function createCourse(db: Queryable, input: NewCourse): Promise<CourseRecord> {
+const SELECT_COLS =
+  `code, year, semester, name_th, name_en, program, created_at`
+
+export async function createCourse(
+  db: Queryable,
+  input: NewCourse
+): Promise<CourseRecord> {
   const { rows } = await db.query<CourseRow>(
-    `INSERT INTO courses (code, name_th, name_en, program)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, code, name_th, name_en, program`,
-    [input.code, input.nameTh, input.nameEn, input.program ?? null]
+    `INSERT INTO courses (code, year, semester, name_th, name_en, program)
+     VALUES ($1, $2::int, $3::int, $4, $5, $6)
+     RETURNING ${SELECT_COLS}`,
+    [input.code, input.year, input.semester, input.nameTh, input.nameEn, input.program ?? null]
   )
   return toRecord(rows[0])
 }
 
-export async function findCourseByCode(
+export async function getCourseByKey(
   db: Queryable,
-  code: string
+  key: CourseKey
 ): Promise<CourseRecord | null> {
   const { rows } = await db.query<CourseRow>(
-    `SELECT id, code, name_th, name_en, program FROM courses WHERE code = $1`,
-    [code.trim()]
-  )
-  return rows[0] ? toRecord(rows[0]) : null
-}
-
-export async function getCourseById(db: Queryable, id: number): Promise<CourseRecord | null> {
-  const { rows } = await db.query<CourseRow>(
-    `SELECT id, code, name_th, name_en, program FROM courses WHERE id = $1`,
-    [id]
+    `SELECT ${SELECT_COLS} FROM courses
+     WHERE code = $1 AND year = $2::int AND semester = $3::int`,
+    [key.code, key.year, key.semester]
   )
   return rows[0] ? toRecord(rows[0]) : null
 }
 
 export async function updateCourse(
   db: Queryable,
-  id: number,
-  input: NewCourse
+  key: CourseKey,
+  input: Pick<NewCourse, "nameTh" | "nameEn" | "program">
 ): Promise<CourseRecord | null> {
   const { rows } = await db.query<CourseRow>(
     `UPDATE courses
-     SET code = $2, name_th = $3, name_en = $4, program = $5, updated_at = now()
-     WHERE id = $1::int
-     RETURNING id, code, name_th, name_en, program`,
-    [id, input.code, input.nameTh, input.nameEn, input.program ?? null]
+     SET name_th = $4, name_en = $5, program = $6, updated_at = now()
+     WHERE code = $1 AND year = $2::int AND semester = $3::int
+     RETURNING ${SELECT_COLS}`,
+    [key.code, key.year, key.semester, input.nameTh, input.nameEn, input.program ?? null]
   )
   return rows[0] ? toRecord(rows[0]) : null
 }
 
-export async function deleteCourse(db: Queryable, id: number): Promise<boolean> {
-  const { rows } = await db.query<{ id: number }>(
-    `DELETE FROM courses WHERE id = $1::int RETURNING id`,
-    [id]
+export async function deleteCourse(
+  db: Queryable,
+  key: CourseKey
+): Promise<boolean> {
+  const { rows } = await db.query<{ code: string }>(
+    `DELETE FROM courses WHERE code = $1 AND year = $2::int AND semester = $3::int
+     RETURNING code`,
+    [key.code, key.year, key.semester]
   )
   return rows.length > 0
 }
 
 export async function assignInstructor(
   db: Queryable,
-  courseId: number,
+  key: CourseKey,
   userId: number
 ): Promise<void> {
   await db.query(
-    `INSERT INTO course_instructors (course_id, user_id)
-     VALUES ($1::int, $2::int)
-     ON CONFLICT (course_id, user_id) DO NOTHING`,
-    [courseId, userId]
+    `INSERT INTO course_instructors (course_code, course_year, course_semester, user_id)
+     VALUES ($1, $2::int, $3::int, $4::int)
+     ON CONFLICT (course_code, course_year, course_semester, user_id) DO NOTHING`,
+    [key.code, key.year, key.semester, userId]
   )
 }
 
@@ -116,9 +114,6 @@ export interface StaffCandidate {
   roles: string[]
 }
 
-// Users eligible to be course staff: those carrying the Instructor or TA role,
-// optionally filtered by a name/email search. For the assignment picker (which
-// course managers use, so it can't go through the Admin-only user list).
 export async function searchStaffCandidates(
   db: Queryable,
   search: string
@@ -143,7 +138,6 @@ export async function searchStaffCandidates(
   )
   if (rows.length === 0) return []
 
-  // Roles in a second pass (pg-mem lacks STRING_AGG), grouped per user.
   const ids = rows.map((r) => r.id)
   const placeholders = ids.map((_, i) => `$${i + 1}`).join(",")
   const { rows: roleRows } = await db.query<{ user_id: number; name: string }>(
@@ -170,34 +164,34 @@ export async function searchStaffCandidates(
 
 export async function listCourseInstructors(
   db: Queryable,
-  courseId: number
+  key: CourseKey
 ): Promise<CourseStaff[]> {
   const { rows } = await db.query<{ id: number; name: string; email: string }>(
     `SELECT u.id, u.name, u.email
      FROM course_instructors ci
      JOIN users u ON u.id = ci.user_id
-     WHERE ci.course_id = $1::int
+     WHERE ci.course_code = $1 AND ci.course_year = $2::int AND ci.course_semester = $3::int
      ORDER BY u.name`,
-    [courseId]
+    [key.code, key.year, key.semester]
   )
   return rows
 }
 
-// Replace a course's entire staff set with `userIds` (assign missing, revoke
-// dropped). Mirrors setUserRoles.
 export async function setCourseInstructors(
   db: Queryable,
-  courseId: number,
+  key: CourseKey,
   userIds: number[]
 ): Promise<void> {
-  await db.query(`DELETE FROM course_instructors WHERE course_id = $1::int`, [courseId])
+  await db.query(
+    `DELETE FROM course_instructors
+     WHERE course_code = $1 AND course_year = $2::int AND course_semester = $3::int`,
+    [key.code, key.year, key.semester]
+  )
   for (const userId of userIds) {
-    await assignInstructor(db, courseId, userId)
+    await assignInstructor(db, key, userId)
   }
 }
 
-// Courses a user is entitled to: Admin sees all; otherwise any course where
-// the user appears as staff (course_instructors) OR as an enrolled student.
 export async function listCoursesForUser(
   db: Queryable,
   userId: number,
@@ -205,21 +199,30 @@ export async function listCoursesForUser(
 ): Promise<CourseRecord[]> {
   if (roles.includes("Admin")) {
     const { rows } = await db.query<CourseRow>(
-      `SELECT id, code, name_th, name_en, program FROM courses ORDER BY code`
+      `SELECT ${SELECT_COLS} FROM courses ORDER BY code, year, semester`
     )
     return rows.map(toRecord)
   }
 
   const { rows } = await db.query<CourseRow>(
-    `SELECT c.id, c.code, c.name_th, c.name_en, c.program
+    `SELECT DISTINCT c.code, c.year, c.semester, c.name_th, c.name_en, c.program, c.created_at
      FROM courses c
-     WHERE c.id IN (
-       SELECT course_id FROM course_instructors WHERE user_id = $1::int
+     JOIN (
+       SELECT course_code, course_year, course_semester FROM course_instructors WHERE user_id = $1::int
        UNION
-       SELECT course_id FROM enrollments WHERE user_id = $1::int
-     )
-     ORDER BY c.code`,
+       SELECT course_code, course_year, course_semester FROM enrollments WHERE user_id = $1::int
+     ) entitled ON entitled.course_code = c.code
+               AND entitled.course_year = c.year
+               AND entitled.course_semester = c.semester
+     ORDER BY c.code, c.year, c.semester`,
     [userId]
+  )
+  return rows.map(toRecord)
+}
+
+export async function listCourses(db: Queryable): Promise<CourseRecord[]> {
+  const { rows } = await db.query<CourseRow>(
+    `SELECT ${SELECT_COLS} FROM courses ORDER BY code, year, semester`
   )
   return rows.map(toRecord)
 }

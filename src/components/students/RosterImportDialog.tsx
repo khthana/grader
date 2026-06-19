@@ -22,12 +22,12 @@ interface ImportResponse {
 }
 
 interface Props {
-  courseId: number
+  courseSlug: string
   onClose: () => void
   onImported: () => void
 }
 
-export function RosterImportDialog({ courseId, onClose, onImported }: Props) {
+export function RosterImportDialog({ courseSlug, onClose, onImported }: Props) {
   const { notify } = useToast()
   const [rows, setRows] = useState<Record<string, string>[] | null>(null)
   const [fileName, setFileName] = useState("")
@@ -84,7 +84,7 @@ export function RosterImportDialog({ courseId, onClose, onImported }: Props) {
     if (!rows) return
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/courses/${courseId}/students/import`, {
+      const res = await fetch(`/api/courses/${courseSlug}/students/import`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ rows }),

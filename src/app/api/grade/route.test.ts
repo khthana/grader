@@ -33,7 +33,6 @@ const FUTURE = new Date(Date.now() + 86400_000).toISOString()
 
 describe("POST /api/grade", () => {
   let db: Queryable
-  let courseId: number
   let problemId: number
   let studentId: number
 
@@ -48,15 +47,21 @@ describe("POST /api/grade", () => {
     await assignRole(db, student.id, "Student")
     studentId = student.id
 
-    const course = await createCourse(db, { code: "C01", nameTh: "ก", nameEn: "A" })
-    courseId = course.id
-    await assignInstructor(db, courseId, ins.id)
-    await createEnrollment(db, { courseId, userId: student.id })
+    const course = await createCourse(db, { code: "C01", year: 2567, semester: 1, nameTh: "ก", nameEn: "A" })
+    await assignInstructor(db, course, ins.id)
+    await createEnrollment(db, {
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      userId: student.id,
+    })
 
-    await seedWeeks(db, courseId)
-    const weeks = await listWeeks(db, courseId)
+    await seedWeeks(db, course)
+    const weeks = await listWeeks(db, course)
     const problem = await createProblem(db, {
-      courseId,
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
       weekId: weeks[0].id,
       title: "Hello",
       score: 30,
@@ -148,9 +153,12 @@ describe("POST /api/grade", () => {
   // ── Deadline enforcement ─────────────────────────────────────────────────
 
   it("mode:submit past close_at → 403, no submission stored", async () => {
-    const weeks = await listWeeks(db, courseId)
+    const course = await createCourse(db, { code: "C02", year: 2567, semester: 1, nameTh: "ข", nameEn: "B" })
+    await seedWeeks(db, course)
+    const weeks = await listWeeks(db, course)
     const p = await createProblem(db, {
-      courseId, weekId: weeks[0].id, title: "Closed",
+      courseCode: course.code, courseYear: course.year, courseSemester: course.semester,
+      weekId: weeks[0].id, title: "Closed",
       dueAt: PAST, closeAt: RECENT,
     })
     const token = sessionFor("student@kmitl.ac.th")
@@ -161,9 +169,15 @@ describe("POST /api/grade", () => {
   })
 
   it("mode:submit past due_at but before close_at → 200, is_late = true", async () => {
-    const weeks = await listWeeks(db, courseId)
+    const course = await createCourse(db, { code: "C03", year: 2567, semester: 1, nameTh: "ค", nameEn: "C" })
+    const student = await createUser(db, { email: "student2@kmitl.ac.th", name: "S2", idCode: "64010002" })
+    await assignRole(db, student.id, "Student")
+    await createEnrollment(db, { courseCode: course.code, courseYear: course.year, courseSemester: course.semester, userId: student.id })
+    await seedWeeks(db, course)
+    const weeks = await listWeeks(db, course)
     const p = await createProblem(db, {
-      courseId, weekId: weeks[0].id, title: "Late",
+      courseCode: course.code, courseYear: course.year, courseSemester: course.semester,
+      weekId: weeks[0].id, title: "Late",
       dueAt: RECENT, closeAt: FUTURE,
     })
     await setTestCases(db, p.id, [
@@ -172,7 +186,7 @@ describe("POST /api/grade", () => {
     mockRun.mockResolvedValue([
       { testCaseId: 1, passed: true, actualOutput: "x", expectedOutput: "x", executionTime: 0 },
     ])
-    const token = sessionFor("student@kmitl.ac.th")
+    const token = sessionFor("student2@kmitl.ac.th")
     const res = await POST(gradeReq({ problemId: p.id, code: "print('x')", mode: "submit" }, token))
     expect(res.status).toBe(200)
     const subs = await listSubmissions(db, p.id)
