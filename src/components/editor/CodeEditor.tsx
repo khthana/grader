@@ -14,6 +14,7 @@ type TabSize = 2 | 4
 
 interface CodeEditorProps {
   problemId: number
+  draftKey?: string
   isClosed?: boolean
 }
 
@@ -42,6 +43,15 @@ function useEditorPrefs() {
   }
 
   return { theme, fontSize, tabSize, setTheme, setFontSize, setTabSize }
+}
+
+function PrefSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-3">
+      <p className="mb-1.5 text-xs text-slate-400">{label}</p>
+      <div className="flex gap-2">{children}</div>
+    </div>
+  )
 }
 
 function SettingsPopover({
@@ -75,37 +85,29 @@ function SettingsPopover({
       className="absolute right-0 top-8 z-20 w-52 rounded-xl border border-gray-700 bg-[#1e1e2e] p-4 shadow-xl"
     >
       <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">ตั้งค่า Editor</p>
-
-      <div className="mb-3">
-        <p className="mb-1.5 text-xs text-slate-400">ธีม</p>
-        <div className="flex gap-2">
-          <button className={btnClass(theme === "dark")} onClick={() => setTheme("dark")}>Dark</button>
-          <button className={btnClass(theme === "light")} onClick={() => setTheme("light")}>Light</button>
-        </div>
-      </div>
-
-      <div className="mb-3">
-        <p className="mb-1.5 text-xs text-slate-400">ขนาดตัวอักษร</p>
-        <div className="flex gap-2">
-          {([13, 15, 17] as FontSize[]).map((s) => (
-            <button key={s} className={btnClass(fontSize === s)} onClick={() => setFontSize(s)}>{s}</button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <p className="mb-1.5 text-xs text-slate-400">Tab size</p>
-        <div className="flex gap-2">
-          <button className={btnClass(tabSize === 2)} onClick={() => setTabSize(2)}>2</button>
-          <button className={btnClass(tabSize === 4)} onClick={() => setTabSize(4)}>4</button>
-        </div>
-      </div>
+      <PrefSection label="ธีม">
+        {(["dark", "light"] as Theme[]).map((v) => (
+          <button key={v} className={btnClass(theme === v)} onClick={() => setTheme(v)}>
+            {v === "dark" ? "Dark" : "Light"}
+          </button>
+        ))}
+      </PrefSection>
+      <PrefSection label="ขนาดตัวอักษร">
+        {([13, 15, 17] as FontSize[]).map((s) => (
+          <button key={s} className={btnClass(fontSize === s)} onClick={() => setFontSize(s)}>{s}</button>
+        ))}
+      </PrefSection>
+      <PrefSection label="Tab size">
+        {([2, 4] as TabSize[]).map((n) => (
+          <button key={n} className={btnClass(tabSize === n)} onClick={() => setTabSize(n)}>{n}</button>
+        ))}
+      </PrefSection>
     </div>
   )
 }
 
-export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
-  const storageKey = `editor-code-${problemId}`
+export function CodeEditor({ problemId, draftKey, isClosed = false }: CodeEditorProps) {
+  const key = draftKey ?? `editor-code-${problemId}`
   const [code, setCode] = useState("")
   const [result, setResult] = useState<GradeResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -116,14 +118,16 @@ export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
   const { theme, fontSize, tabSize, setTheme, setFontSize, setTabSize } = useEditorPrefs()
 
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey)
+    const saved = localStorage.getItem(key)
     if (saved) setCode(saved)
-  }, [storageKey])
+  }, [key])
 
   const handleChange = useCallback((value: string) => {
     setCode(value)
-    localStorage.setItem(storageKey, value)
-  }, [storageKey])
+    localStorage.setItem(key, value)
+  }, [key])
+
+  const handleCloseSettings = useCallback(() => setShowSettings(false), [])
 
   async function handleGrade(mode: "run" | "submit") {
     if (!code.trim()) return
@@ -178,7 +182,7 @@ export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
                 setTheme={setTheme}
                 setFontSize={setFontSize}
                 setTabSize={setTabSize}
-                onClose={() => setShowSettings(false)}
+                onClose={handleCloseSettings}
               />
             )}
           </div>
