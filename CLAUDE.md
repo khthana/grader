@@ -19,7 +19,7 @@ The app is **feature-complete** as of 2026-06-20. All pages are live — no Comi
 - **Assignments:** `/courses/[code]/[year]/[semester]/assignments` — student's own problem list with status badges and effective scores.
 - **Scorebook:** `/courses/[code]/[year]/[semester]/scorebook` — student's own score summary per week; WeekBar + SVG donut banner + score table; Student-only sidebar menu item; reuses `/assignments` + `/weeks` endpoints, no new API route.
 
-Specs: `requirement/prd_auth_shell_user_management.md`, `requirement/prd_teacher_students_roster.md`. Design rationale: `CONTEXT.md` (glossary), `docs/adr/`. Dev migration script: `scripts/migrate-001-natural-keys.sql`.
+Specs: `requirement/PRD.md` (all PRDs consolidated). Design rationale: `CONTEXT.md` (glossary), `docs/adr/`. Dev migration script: `scripts/migrate-001-natural-keys.sql`.
 
 ## Commands
 - `npm run dev` — start dev server (Turbopack)
