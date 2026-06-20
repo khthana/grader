@@ -16,6 +16,7 @@ const MENU = {
   review: { label: "ตรวจงาน", href: "/review", icon: "review", courseScoped: true },
   gradebook: { label: "สมุดคะแนน", href: "/gradebook", icon: "gradebook", courseScoped: true },
   assignments: { label: "งานที่ได้มอบหมาย", href: "/assignments", icon: "assignments", courseScoped: true },
+  scorebook: { label: "สมุดคะแนน", href: "/scorebook", icon: "scorebook", courseScoped: true },
 } satisfies Record<string, MenuItem>
 
 const TEACHING_MENU: MenuItem[] = [
@@ -31,8 +32,7 @@ const SIDEBAR_MENU: Record<Role, MenuItem[]> = {
   // Instructor manages courses; TA gets the teaching menu without course mgmt.
   Instructor: [MENU.courses, ...TEACHING_MENU],
   TA: TEACHING_MENU,
-  // The Scorebook is staff-only; a Student sees only their own assignments.
-  Student: [MENU.assignments],
+  Student: [MENU.assignments, MENU.scorebook],
 }
 
 export function getSidebarMenu(role: Role): MenuItem[] {

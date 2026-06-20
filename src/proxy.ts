@@ -38,5 +38,6 @@ export const config = {
     "/review/:path*",
     "/gradebook/:path*",
     "/assignments/:path*",
+    "/scorebook/:path*",
   ],
 }
