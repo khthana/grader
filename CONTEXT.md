@@ -93,3 +93,21 @@ are accepted indefinitely (subject to the Due Date late flag only).
 ### Late Submission
 A **Submission** made after the **Due Date** but before the **Close Date**. Stored as
 `is_late = true`. Instructors can filter the student list by late submissions.
+
+### Effective Score
+The score that counts for a **Submission**: `COALESCE(manual_score, points_earned)` —
+the Instructor's `manual_score` override when present, otherwise the Piston auto-grade.
+The single number shown wherever a student's score appears (Gradebook, Scorebook,
+Assignments). A submission that has been auto-graded but not yet reviewed still has an
+effective score (its auto-grade).
+
+### Gradebook (สมุดคะแนน — มุมมองอาจารย์/Staff)
+The staff-facing matrix of **every** enrolled Student × every **Problem** in a Course,
+each cell holding that student's **Effective Score**. Read by Admin/Instructor/TA. The
+instructor's overview of the whole class. Distinct from **Scorebook**.
+
+### Scorebook (สมุดคะแนนของฉัน — มุมมองนักศึกษา)
+A single **Student's** own scores across all **Problems** in a Course — one row per
+Problem, plus a course total and progress ring. Read-only and strictly self-scoped: a
+Student sees only their own **Effective Scores**, never another student's. The
+single-student counterpart to the **Gradebook**.
