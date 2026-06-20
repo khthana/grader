@@ -1,6 +1,6 @@
 import { TestCase, TestResult } from "@/types"
 
-const PISTON_API = "https://emkc.org/api/v2/piston"
+const PISTON_API = process.env.PISTON_URL ?? "https://emkc.org/api/v2/piston"
 
 interface PistonResponse {
   run: {

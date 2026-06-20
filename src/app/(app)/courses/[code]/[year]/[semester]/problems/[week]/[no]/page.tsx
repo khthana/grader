@@ -110,7 +110,7 @@ export default async function CourseProblemPage({ params }: PageProps) {
             {problem.inputSpec && (
               <div>
                 <h2 className="mb-1 text-sm font-semibold text-slate-500">รูปแบบ Input</h2>
-                <pre className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 whitespace-pre-wrap">
+                <pre className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 whitespace-pre-wrap break-all">
                   {problem.inputSpec}
                 </pre>
               </div>
@@ -118,7 +118,7 @@ export default async function CourseProblemPage({ params }: PageProps) {
             {problem.outputSpec && (
               <div>
                 <h2 className="mb-1 text-sm font-semibold text-slate-500">รูปแบบ Output</h2>
-                <pre className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 whitespace-pre-wrap">
+                <pre className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 whitespace-pre-wrap break-all">
                   {problem.outputSpec}
                 </pre>
               </div>
@@ -132,8 +132,8 @@ export default async function CourseProblemPage({ params }: PageProps) {
               {visibleCases.map((tc, i) => (
                 <div key={tc.id} className="rounded-lg bg-slate-50 p-4 font-mono text-sm text-slate-600">
                   <p className="mb-1 text-xs font-semibold text-slate-400">ตัวอย่าง {i + 1}</p>
-                  <p>Input: {tc.input || "(ไม่มี)"}</p>
-                  <p>Output: {tc.expectedOutput}</p>
+                  <p className="break-all">Input: {tc.input || "(ไม่มี)"}</p>
+                  <p className="break-all">Output: {tc.expectedOutput}</p>
                 </div>
               ))}
             </div>

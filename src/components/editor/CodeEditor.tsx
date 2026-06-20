@@ -1,25 +1,129 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import dynamic from "next/dynamic"
 import { python } from "@codemirror/lang-python"
+import { FaCog } from "react-icons/fa"
 import type { GradeResult } from "@/types"
 
 const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), { ssr: false })
+
+type Theme = "dark" | "light"
+type FontSize = 13 | 15 | 17
+type TabSize = 2 | 4
 
 interface CodeEditorProps {
   problemId: number
   isClosed?: boolean
 }
 
+function useEditorPrefs() {
+  const [theme, setThemeState] = useState<Theme>("dark")
+  const [fontSize, setFontSizeState] = useState<FontSize>(15)
+  const [tabSize, setTabSizeState] = useState<TabSize>(4)
+
+  useEffect(() => {
+    setThemeState((localStorage.getItem("editor-theme") as Theme) ?? "dark")
+    setFontSizeState((Number(localStorage.getItem("editor-font-size")) as FontSize) || 15)
+    setTabSizeState((Number(localStorage.getItem("editor-tab-size")) as TabSize) || 4)
+  }, [])
+
+  function setTheme(v: Theme) {
+    setThemeState(v)
+    localStorage.setItem("editor-theme", v)
+  }
+  function setFontSize(v: FontSize) {
+    setFontSizeState(v)
+    localStorage.setItem("editor-font-size", String(v))
+  }
+  function setTabSize(v: TabSize) {
+    setTabSizeState(v)
+    localStorage.setItem("editor-tab-size", String(v))
+  }
+
+  return { theme, fontSize, tabSize, setTheme, setFontSize, setTabSize }
+}
+
+function SettingsPopover({
+  theme, fontSize, tabSize, setTheme, setFontSize, setTabSize, onClose,
+}: {
+  theme: Theme; fontSize: FontSize; tabSize: TabSize
+  setTheme: (v: Theme) => void; setFontSize: (v: FontSize) => void; setTabSize: (v: TabSize) => void
+  onClose: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener("mousedown", handle)
+    return () => document.removeEventListener("mousedown", handle)
+  }, [onClose])
+
+  function btnClass(active: boolean) {
+    return `rounded px-2.5 py-1 text-xs font-medium transition ${
+      active
+        ? "bg-primary text-white"
+        : "border border-gray-600 text-slate-300 hover:border-primary hover:text-white"
+    }`
+  }
+
+  return (
+    <div
+      ref={ref}
+      className="absolute right-0 top-8 z-20 w-52 rounded-xl border border-gray-700 bg-[#1e1e2e] p-4 shadow-xl"
+    >
+      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">ตั้งค่า Editor</p>
+
+      <div className="mb-3">
+        <p className="mb-1.5 text-xs text-slate-400">ธีม</p>
+        <div className="flex gap-2">
+          <button className={btnClass(theme === "dark")} onClick={() => setTheme("dark")}>Dark</button>
+          <button className={btnClass(theme === "light")} onClick={() => setTheme("light")}>Light</button>
+        </div>
+      </div>
+
+      <div className="mb-3">
+        <p className="mb-1.5 text-xs text-slate-400">ขนาดตัวอักษร</p>
+        <div className="flex gap-2">
+          {([13, 15, 17] as FontSize[]).map((s) => (
+            <button key={s} className={btnClass(fontSize === s)} onClick={() => setFontSize(s)}>{s}</button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-1.5 text-xs text-slate-400">Tab size</p>
+        <div className="flex gap-2">
+          <button className={btnClass(tabSize === 2)} onClick={() => setTabSize(2)}>2</button>
+          <button className={btnClass(tabSize === 4)} onClick={() => setTabSize(4)}>4</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
+  const storageKey = `editor-code-${problemId}`
   const [code, setCode] = useState("")
   const [result, setResult] = useState<GradeResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [activeMode, setActiveMode] = useState<"run" | "submit" | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
 
-  const handleChange = useCallback((value: string) => setCode(value), [])
+  const { theme, fontSize, tabSize, setTheme, setFontSize, setTabSize } = useEditorPrefs()
+
+  useEffect(() => {
+    const saved = localStorage.getItem(storageKey)
+    if (saved) setCode(saved)
+  }, [storageKey])
+
+  const handleChange = useCallback((value: string) => {
+    setCode(value)
+    localStorage.setItem(storageKey, value)
+  }, [storageKey])
 
   async function handleGrade(mode: "run" | "submit") {
     if (!code.trim()) return
@@ -54,23 +158,51 @@ export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
     <div className="flex flex-col gap-4 font-thai">
       {/* Code editor */}
       <div className="overflow-hidden rounded-lg border border-gray-700">
-        <CodeMirror
-          value={code}
-          height="256px"
-          theme="dark"
-          extensions={[python()]}
-          onChange={handleChange}
-          editable={!isClosed}
-          placeholder="พิมพ์ Python code ของคุณที่นี่..."
-          basicSetup={{
-            lineNumbers: true,
-            foldGutter: false,
-            dropCursor: false,
-            allowMultipleSelections: false,
-            indentOnInput: true,
-            tabSize: 4,
-          }}
-        />
+        {/* Toolbar */}
+        <div className="flex items-center justify-between border-b border-gray-700/60 bg-[#1e1e2e] px-3 py-1.5">
+          <span className="font-mono text-xs text-slate-400">Python</span>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowSettings((v) => !v)}
+              className="rounded p-1 text-slate-400 transition hover:bg-gray-700 hover:text-slate-200"
+              title="ตั้งค่า Editor"
+            >
+              <FaCog className="h-3.5 w-3.5" />
+            </button>
+            {showSettings && (
+              <SettingsPopover
+                theme={theme}
+                fontSize={fontSize}
+                tabSize={tabSize}
+                setTheme={setTheme}
+                setFontSize={setFontSize}
+                setTabSize={setTabSize}
+                onClose={() => setShowSettings(false)}
+              />
+            )}
+          </div>
+        </div>
+
+        <div style={{ fontSize: `${fontSize}px` }}>
+          <CodeMirror
+            value={code}
+            height="256px"
+            theme={theme}
+            extensions={[python()]}
+            onChange={handleChange}
+            editable={!isClosed}
+            placeholder="พิมพ์ Python code ของคุณที่นี่..."
+            basicSetup={{
+              lineNumbers: true,
+              foldGutter: false,
+              dropCursor: false,
+              allowMultipleSelections: false,
+              indentOnInput: true,
+              tabSize,
+            }}
+          />
+        </div>
       </div>
 
       {/* Buttons */}
@@ -101,7 +233,7 @@ export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
 
       {/* Error */}
       {error && (
-        <div className="rounded-lg border border-red-700 bg-red-900/50 p-4 text-red-300">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
           {error}
         </div>
       )}
@@ -112,8 +244,8 @@ export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
           <div
             className={`rounded-lg border p-4 ${
               perfect
-                ? "border-green-700 bg-green-900/50 text-green-300"
-                : "border-yellow-700 bg-yellow-900/50 text-yellow-300"
+                ? "border-green-200 bg-green-50 text-green-800"
+                : "border-yellow-200 bg-yellow-50 text-yellow-800"
             }`}
           >
             <p className="text-2xl font-bold">
@@ -121,7 +253,7 @@ export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
             </p>
             <p className="mt-1 text-sm">{result.feedback}</p>
             {activeMode === "run" && (
-              <p className="mt-1 text-xs opacity-75">* รันเฉพาะ test cases ที่แสดงได้</p>
+              <p className="mt-1 text-xs opacity-60">* รันเฉพาะ test cases ที่แสดงได้</p>
             )}
           </div>
 
@@ -129,21 +261,23 @@ export function CodeEditor({ problemId, isClosed = false }: CodeEditorProps) {
             {result.results.map((r, i) => (
               <div
                 key={r.testCaseId}
-                className={`rounded-lg border p-3 font-mono text-sm ${
+                className={`rounded-lg border p-3 text-sm ${
                   r.passed
-                    ? "border-green-700 bg-green-900/30 text-green-300"
-                    : "border-red-700 bg-red-900/30 text-red-300"
+                    ? "border-green-200 bg-green-50 text-green-800"
+                    : "border-red-200 bg-red-50 text-red-800"
                 }`}
               >
                 <p className="font-semibold">
-                  Test {i + 1}: {r.passed ? "ผ่าน" : "ไม่ผ่าน"}
+                  Test {i + 1}: {r.passed ? "ผ่าน ✓" : "ไม่ผ่าน ✗"}
                 </p>
                 {!r.passed && (
-                  <>
-                    <p>Expected: {r.expectedOutput}</p>
-                    <p>Got: {r.actualOutput || "(ไม่มี output)"}</p>
-                    {r.error && <p className="text-yellow-400">Error: {r.error}</p>}
-                  </>
+                  <div className="mt-2 flex flex-col gap-1 font-mono text-xs">
+                    <p><span className="font-sans font-semibold text-slate-500">Expected:</span></p>
+                    <pre className="whitespace-pre-wrap rounded bg-white/60 px-2 py-1">{r.expectedOutput}</pre>
+                    <p><span className="font-sans font-semibold text-slate-500">Got:</span></p>
+                    <pre className="whitespace-pre-wrap rounded bg-white/60 px-2 py-1">{r.actualOutput || "(ไม่มี output)"}</pre>
+                    {r.error && <p className="text-orange-600"><span className="font-sans font-semibold">Error:</span> {r.error}</p>}
+                  </div>
                 )}
               </div>
             ))}
