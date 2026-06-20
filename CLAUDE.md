@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CE-Grader is a **standalone product**. The `DEEP-QA-FRONTEND/` and `DEEP-QA-BACKEND/` repos (siblings of this folder) are **read-only references only** — used for design-system look/feel and UX patterns, never extended or imported at runtime.
 
-The app is **feature-complete** as of 2026-06-19. All pages are live — no ComingSoon stubs remain. Delivered features:
+The app is **feature-complete** as of 2026-06-20. All pages are live — no ComingSoon stubs remain. Delivered features:
 - **Auth + shell:** Postgres-backed login (email/password + Google OAuth), role-based shell, navbar course switcher.
 - **Admin:** User Management (`/users` — CRUD + bulk xlsx import + role assignment), Activity Logs (`/logs`), **dev-only impersonation** (enter another user's session to test their view; persistent banner + one-click exit).
 - **Course management:** รายวิชา (`/courses` — CRUD + staff assignment, Admin/Instructor).
@@ -17,6 +17,7 @@ The app is **feature-complete** as of 2026-06-19. All pages are live — no Comi
 - **Review:** `/courses/[code]/[year]/[semester]/review` — 3-column grading workbench (problem switcher + submission queue / CodeMirror read-only viewer + test results / score panel with bonus stepper); URL state `?pid=&sid=`; Admin/Instructor only (ADR 0005).
 - **Gradebook:** `/courses/[code]/[year]/[semester]/gradebook` — student × problem score matrix with `COALESCE(manual_score, points_earned)` effective score.
 - **Assignments:** `/courses/[code]/[year]/[semester]/assignments` — student's own problem list with status badges and effective scores.
+- **Scorebook:** `/courses/[code]/[year]/[semester]/scorebook` — student's own score summary per week; WeekBar + SVG donut banner + score table; Student-only sidebar menu item; reuses `/assignments` + `/weeks` endpoints, no new API route.
 
 Specs: `requirement/prd_auth_shell_user_management.md`, `requirement/prd_teacher_students_roster.md`. Design rationale: `CONTEXT.md` (glossary), `docs/adr/`. Dev migration script: `scripts/migrate-001-natural-keys.sql`.
 
@@ -33,8 +34,8 @@ Specs: `requirement/prd_auth_shell_user_management.md`, `requirement/prd_teacher
 ### Routing & the authed shell
 - **Next.js 16 (App Router) · TypeScript · Tailwind v4.** All routes live under `src/app/`.
 - Authenticated pages live in the **`src/app/(app)/` route group**, whose `layout.tsx` renders the shell (navbar + collapsible sidebar + breadcrumb + toast host) around every page.
-- **Course-scoped pages** live under `src/app/(app)/courses/[code]/[year]/[semester]/` with a layout (`layout.tsx`) that resolves and validates the slug before rendering children. Sub-routes: `problems/`, `problems/new/`, `problems/[week]/[no]/`, `problems/[week]/[no]/edit/`, `problems/[week]/[no]/submissions/`, `students/`, `gradebook/`, `review/`, `assignments/`.
-- **Legacy shortcut pages** (`/problems`, `/students`, `/gradebook`, `/review`, `/assignments`) are thin Server Component redirectors — they read the `active_course` cookie and issue a `redirect()` to the equivalent course-scoped URL.
+- **Course-scoped pages** live under `src/app/(app)/courses/[code]/[year]/[semester]/` with a layout (`layout.tsx`) that resolves and validates the slug before rendering children. Sub-routes: `problems/`, `problems/new/`, `problems/[week]/[no]/`, `problems/[week]/[no]/edit/`, `problems/[week]/[no]/submissions/`, `students/`, `gradebook/`, `review/`, `assignments/`, `scorebook/`.
+- **Legacy shortcut pages** (`/problems`, `/students`, `/gradebook`, `/review`, `/assignments`, `/scorebook`) are thin Server Component redirectors — they read the `active_course` cookie and issue a `redirect()` to the equivalent course-scoped URL.
 - The navbar hosts a **course switcher** (active course persists in `active_course` cookie). `src/lib/courses/server.ts#getCourseContext()` resolves `{ courses, activeCourse }`. **Course entitlement follows the active role:** `getCourseContext` and `GET /api/courses` narrow to `[resolveActiveRole(roles, cookie)]`; falls back to full roles when no `active_role` cookie is set.
 - **Route protection is `src/proxy.ts`** — Next 16 renamed `middleware` to **`proxy`**, which runs on the **Node.js runtime** (so `node:crypto` session verification works). The `config.matcher` lists every protected path; add new authed page routes there.
 - `/login` and the auth API routes are outside the `(app)` group.
@@ -103,6 +104,7 @@ parseCourseSlug(code, year, semester): CourseKey | null
 - `src/lib/submissions/repository.ts` — `createSubmission(db, { problemId, userId, courseCode, courseYear, courseSemester, ... })`, `listSubmissions`, `countSubmitted(db, problemId, key: CourseKey)`, `countPending`, `getSubmission`, `reviewSubmission`, `listSubmissionsForProblem(db, problemId)`, `getLastSubmission`, `listPendingSubmissions(db, key: CourseKey)`, `getProblemIdsWithSubmissions(db, key: CourseKey)` → `number[]`.
 - `src/lib/gradebook/repository.ts` — `getGradebook(db, key: CourseKey)` → `{ problems: GradebookProblem[], students: GradebookStudent[] }` where `student.scores[problemId]` = `COALESCE(manual_score, points_earned)`.
 - `src/lib/assignments/repository.ts` — `getStudentAssignments(db, key: CourseKey, userId)` → `AssignmentItem[]`.
+- `src/lib/scorebook/summary.ts` — `deriveScorebookSummary(weekItems: AssignmentItem[])` → `{ earned, max, percent, solvedCount, totalCount }` (pure, no DB/React). Guards 0/0 → 0% (no NaN). Used by `ScoreList` banner and total row.
 
 ### API Route Layer
 
@@ -151,7 +153,8 @@ Client components that make API calls receive `courseSlug: string` (e.g. `"01076
 | `ProblemsTable` | `courseSlug`, `coursePath`, `canManage` |
 | `ProblemEditor` | `courseSlug`, `coursePath`, `weeks`, `mode`, `initialWeekId?`, `problem?` |
 | `GradebookTable` | `courseSlug` |
-| `AssignmentsList` | `courseSlug`, `coursePath` |
+| `AssignmentsList` | `courseSlug`, `coursePath`, `initialWeek` |
+| `ScoreList` | `courseSlug`, `coursePath`, `initialWeek` |
 | `ReviewWorkbench` | `problems: ProblemListItem[]`, `courseSlug` |
 | `RosterTable` | `courseSlug`, `coursePath`, `canMutate` |
 | `StudentFormDialog` | `courseSlug` |
@@ -183,9 +186,10 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
 - **Bonus stepper:** review UI shows an additive bonus (0 → `pointsMax − auto`); saves `manualScore = auto + bonus`. No schema change needed — `manual_score` absorbs the combined value.
 - **UI:** `SubmissionsTable` (per-problem submissions page), `ReviewWorkbench` (grading workbench), `PendingQueue` (unused legacy component).
 
-### Gradebook & assignments
+### Gradebook, assignments & scorebook
 - **Gradebook** (`…/gradebook`, Instructor/Admin): `GET /api/courses/.../gradebook` → matrix; `GradebookTable` with week-grouped columns, color-coded cells, per-student status dot (ADR 0003). Problem columns headed **"ข้อ N"** (per-week index resetting each week). Excel export labels columns `สัปดาห์ {w} ข้อ {n}`.
-- **Assignments** (`…/assignments`, Student): `GET /api/courses/.../assignments` → problem list with last submission data; `AssignmentsList` grouped by week with status badges.
+- **Assignments** (`…/assignments`, Student): `GET /api/courses/.../assignments` → problem list with last submission data; `AssignmentsList` with WeekBar, 4-state badges, and action buttons.
+- **Scorebook** (`…/scorebook`, Student-only): reuses `/assignments` + `/weeks` endpoints — no new API route. `ScoreList` client component: WeekBar (`canManage={false}`) + SVG donut banner (percent, X/Y คะแนน, a/b โจทย์) + score table (ลำดับ/ชื่อโจทย์/สถานะ/คะแนนที่ได้/เต็ม) + total row. Banner and total row both read `deriveScorebookSummary`. Three-state badge: reviewed/pending/ยังไม่ส่ง (collapses `closed` and `not-submitted` into yellow). Page subtitle shows `{idCode} · {firstNameTh} {lastNameTh}` via `getUserById`.
 
 ### User Management (Admin only — every `/api/users*` route is Admin-gated via `requireAdmin`)
 - `GET /api/users` — search + pagination. `POST /api/users` — create. `GET/PUT/PATCH/DELETE /api/users/[id]`. `PUT /api/users/[id]/roles` — **409 if removes last Admin**. `POST /api/users/import` — bulk xlsx import.
@@ -209,7 +213,7 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
 5. `GradeResult = { pointsEarned, pointsMax, totalTests, passedTests, results[], feedback }` returned to client.
 
 ## Testing
-- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **308 tests / 48 files** as of 2026-06-19.
+- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **325 tests / 51 files** as of 2026-06-20.
 - Pure modules are unit-tested directly (session, password, roles, breadcrumbs, validation, import, name).
 - Repository + route handlers are integration-tested against **pg-mem** (in-memory Postgres, no Docker): build a pool with `newDb()` + `mem.public.none(schema.sql)` + `mem.adapters.createPg()`, inject via `setTestDb`, seed through the repository. Route handlers are imported and called with a `NextRequest`; auth is exercised with real `createSessionToken` cookies.
 - **pg-mem gotchas:** explicit casts (`$1::int`); no `STRING_AGG` (use second query + JS); no `DISTINCT ON` (use subquery with `MAX(submitted_at)` + inner join); schema path `../` count must match test file depth exactly.
