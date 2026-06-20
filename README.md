@@ -18,9 +18,10 @@ Faculty of Engineering, KMITL — Standalone product (the sibling `DEEP-QA-*` re
 | **Student Roster** | CRUD + bulk xlsx import/export + กรองกลุ่ม (Instructor/TA) |
 | **Problems** | สร้าง/แก้ไขโจทย์พร้อม test cases, คำอธิบาย **Markdown**, กำหนดเวลา due/close |
 | **Grading** | `mode:run` รัน visible tests; `mode:submit` รัน all tests + เก็บ Submission + ตรวจ deadline |
-| **Review Queue** | Instructor ตรวจ/override คะแนน pending submissions |
-| **Gradebook** | matrix student × problem (effective score = `COALESCE(manual_score, points_earned)`) |
-| **Assignments** | นักศึกษาดูรายการโจทย์พร้อม status และคะแนนของตัวเอง |
+| **Review Workbench** | 3-column grading UI — problem switcher + code viewer + score panel; bonus stepper; URL state `?pid=&sid=` (Instructor/Admin) |
+| **Gradebook** | matrix student × problem (effective score = `COALESCE(manual_score, points_earned)`) (Instructor/Admin) |
+| **Assignments** | นักศึกษาดูรายการโจทย์ต่อสัปดาห์พร้อม 4-state badge และคะแนนของตัวเอง |
+| **Scorebook** | นักศึกษาดูคะแนนสรุปของตัวเองต่อสัปดาห์ — donut SVG banner + ตารางคะแนน (Student only) |
 
 ## Tech stack
 
@@ -84,7 +85,7 @@ npm run dev
 | `npm run dev` | Dev server (Turbopack) |
 | `npm run build` | Production build |
 | `npm run lint` | ESLint |
-| `npm test` | Run the Vitest suite (308 tests) |
+| `npm test` | Run the Vitest suite (325 tests) |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run db:setup` | Apply `schema.sql` + seed Admin (needs `DATABASE_URL`) |
 
@@ -123,7 +124,7 @@ Unit tests: pure modules (session, password, roles, breadcrumbs, validation, imp
 Integration tests: repositories + API route handlers ทดสอบกับ **pg-mem** — ไม่ต้องใช้ Docker
 
 ```bash
-npm test   # 308 tests / 48 files
+npm test   # 325 tests / 51 files
 ```
 
 ## Project layout
@@ -138,12 +139,14 @@ src/
           layout.tsx                # slug validation + auth gate
           problems/                 # โจทย์ปัญหา
           students/                 # รายชื่อนักศึกษา
-          gradebook/                # สมุดคะแนน
-          review/                   # ตรวจงาน
-          assignments/              # งานที่ได้มอบหมาย (student view)
+          gradebook/                # สมุดคะแนน (Instructor/Admin)
+          review/                   # ตรวจงาน — grading workbench (Instructor/Admin)
+          assignments/              # งานที่ได้รับมอบหมาย (Student)
+          scorebook/                # สมุดคะแนนของฉัน (Student)
       users/                        # จัดการผู้ใช้ (Admin)
       logs/                         # บันทึกกิจกรรม (Admin)
-      problems|students|...         # thin redirectors → active course URL
+      problems|students|gradebook|
+      review|assignments|scorebook/ # thin redirectors → active course URL
     api/
       auth/                         # login · logout · me · google OAuth
       grade/                        # POST /api/grade — Piston execution
@@ -152,11 +155,11 @@ src/
   lib/
     courses/ enrollments/ problems/
     weeks/ submissions/ gradebook/
-    assignments/ users/ logs/       # repositories + domain logic
+    assignments/ scorebook/ users/ logs/  # repositories + domain logic
   components/
     shell/                          # Navbar · Sidebar · Breadcrumbs · AppShell
     problems/ students/ courses/
-    users/ editor/ ui/              # feature components
+    scorebook/ users/ editor/ ui/   # feature components
   proxy.ts                          # Next 16 route protection (Node runtime)
 
 schema.sql                          # database schema (source of truth)
@@ -170,4 +173,4 @@ scripts/
 
 - `docs/adr/` — architecture decision records
 - `CONTEXT.md` — domain glossary
-- `requirement/` — PRDs
+- `requirement/PRD.md` — ข้อกำหนดทุก feature รวมในไฟล์เดียว
