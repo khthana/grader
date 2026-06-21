@@ -1,49 +1,84 @@
-# Handoff — Week Release Toggle (COMPLETE)
+# Handoff — CE-Grader (Current State)
 
 Date: 2026-06-21  
-Project: `C:\Users\Terry\Desktop\Code\grader` (CE-Grader)  
-Repo: https://github.com/khthana/grader.git
+Project: `C:\Users\Terry\Desktop\Code\grader`  
+Repo: https://github.com/khthana/grader.git  
+Branch: `main`
 
 ---
 
-## Status: All 4 issues shipped ✅
+## Status: Feature-complete ✅
 
-| # | Title | Commit |
-|---|---|---|
-| [#37](https://github.com/khthana/grader/issues/37) | Schema + Repository: week release flag | `da24d7d` |
-| [#38](https://github.com/khthana/grader/issues/38) | API: role-aware GET /weeks + isReleased toggle | `aa8eaec` |
-| [#39](https://github.com/khthana/grader/issues/39) | WeekBar: lock/unlock toggle on week card | `68544a2` |
-| [#40](https://github.com/khthana/grader/issues/40) | Problem page gate "ยังไม่เปิดรับ" | `6a02f7d` |
-
-Plus post-ship fixes:
-- `527fa12` — migration script `scripts/migrate-002-week-is-released.sql`
-- `836e800` — lock icon moved to top-right, delete to top-left
-- `c22b9c5` — icons brought inside card boundary
+All planned features are shipped. No open GitHub issues. 368 tests / 57 files — all pass.
 
 ---
 
-## What was built
+## Features Shipped (chronological)
 
-- **`schema.sql`** — `is_released BOOLEAN NOT NULL DEFAULT FALSE` on `weeks`
-- **`src/lib/weeks/repository.ts`** — `WeekRecord.isReleased`, `listWeeks(opts?)`, `setWeekReleased()`
-- **`src/app/api/…/weeks/route.ts`** — GET filters by role (Student → releasedOnly)
-- **`src/app/api/…/weeks/[wid]/route.ts`** — PUT accepts `{ topic?, isReleased? }`
-- **`src/components/problems/WeekBar.tsx`** — `Week.isReleased`, lock/unlock button (top-right)
-- **`src/app/(app)/…/problems/[week]/[no]/page.tsx`** — "ยังไม่เปิดรับ" gate for Students
-- **`scripts/migrate-002-week-is-released.sql`** — idempotent ALTER for existing DBs
-
-## Test count: 339 tests / 53 files (all pass)
-
----
-
-## Deploy checklist
-
-- [ ] Run `psql $DATABASE_URL -f scripts/migrate-002-week-is-released.sql` on production DB
-- [ ] After deploy: Instructors must manually release Weeks — existing Weeks all default to hidden
-- [ ] Fresh install: `db:setup` includes the column automatically
+| Feature | Key commits |
+|---|---|
+| Auth + shell (login, Google OAuth, roles, navbar) | early history |
+| User Management + Activity Logs + Impersonation | early history |
+| Course management + Roster | early history |
+| Problems CRUD + student view + grading (Piston) | early history |
+| Review workbench + Gradebook + Assignments | early history |
+| Scorebook | early history |
+| Natural key migration (courses composite PK) | `migrate-001` |
+| Week Release Toggle | `da24d7d`–`c22b9c5` + `migrate-002` |
+| Reference Solution + Verify (Piston runner) | `ab7bf5b`, `c8257f4` + `migrate-003` |
+| LLM module + generate endpoint | `6a92bff` |
+| "สร้างด้วย AI" button in ProblemEditor | `b7799de` |
 
 ---
 
-## Next session
+## Database Migrations Required
 
-No known blockers. Feature is complete and verified in dev.
+Apply in order on any existing DB. Use `npx tsx scripts/migrate.ts <file>` if `psql` is unavailable:
+
+```sh
+# Windows / Git-Bash — load .env.local then run each migration
+set -a; . ./.env.local; set +a
+npx tsx scripts/migrate.ts scripts/migrate-001-natural-keys.sql
+npx tsx scripts/migrate.ts scripts/migrate-002-week-is-released.sql
+npx tsx scripts/migrate.ts scripts/migrate-003-problem-reference-solution.sql
+```
+
+Fresh installs (`npm run db:setup`) get all columns via `schema.sql` automatically, but the seed step will error on an existing DB — safe to ignore.
+
+**Post-migration note:** After applying migrate-002, all existing Weeks default to `is_released = false`. Instructors must manually release Weeks before students can see them.
+
+---
+
+## Environment Variables
+
+Required in `.env.local`:
+
+```
+DATABASE_URL=postgresql://grader:grader@localhost:5433/grader
+SESSION_SECRET=<long random string>
+GOOGLE_CLIENT_ID=         # optional
+GOOGLE_CLIENT_SECRET=     # optional
+NEXTAUTH_URL=http://localhost:3000
+```
+
+Optional for AI generation:
+```
+ANTHROPIC_API_KEY=        # or LLM_API_KEY
+LLM_MODEL=                # default: claude-haiku-4-5-20251001
+```
+
+---
+
+## Key Architecture Notes
+
+- **No psql needed for migrations** — use `npx tsx scripts/migrate.ts <sql-file>`
+- **Reference solution security** — `getReferenceSolution(db, problemId)` is the only reader; never add `reference_solution` to `PROBLEM_COLS` / `ProblemRecord` / `ProblemDetail`
+- **AI generate endpoint** — accepts `{ problemId }` (edit mode) OR `{ title, description, inputSpec?, outputSpec? }` (create mode); returns 503 when no LLM key
+- **Test seam** — `setTestDb(pool)` injects pg-mem; route tests call handlers directly with `NextRequest`
+- **`courseFixture()`** — baseline for any test needing a course: freshDb + Instructor + TA + Course C01/2567/1 + seedWeeks
+
+---
+
+## No Known Blockers
+
+No open issues. No in-progress features. Next session can start fresh with new requirements.

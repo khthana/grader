@@ -19,8 +19,10 @@ The app is **feature-complete** as of 2026-06-21. All pages are live — no Comi
 - **Assignments:** `/courses/[code]/[year]/[semester]/assignments` — student's own problem list with status badges and effective scores.
 - **Scorebook:** `/courses/[code]/[year]/[semester]/scorebook` — student's own score summary per week; WeekBar + SVG donut banner + score table; Student-only sidebar menu item; reuses `/assignments` + `/weeks` endpoints, no new API route.
 - **Week Release Toggle:** Instructor/Admin toggle `is_released` per Week via lock icon on WeekBar; Students see only released Weeks everywhere (Assignments, Scorebook, Problems); direct URL to unreleased week's problem renders "ยังไม่เปิดรับ" notice (not 404). New Weeks default to hidden. DB migration: `scripts/migrate-002-week-is-released.sql`.
+- **Reference Solution + Verify:** Instructor stores a Python reference solution per problem in `ProblemEditor` (`SolutionEditor` CodeMirror widget). "รันเฉลย" runs it against all test-case inputs via Piston and shows ✅/⚠️/🔴 per case with per-case "ใช้ค่านี้" + bulk "ใช้ค่าจากเฉลยทั้งหมด". Reference solution is **never** exposed to Students — `getReferenceSolution(db, problemId)` is the only reader, callable only from staff-gated paths. DB migration: `scripts/migrate-003-problem-reference-solution.sql`.
+- **AI Test-Case Generation:** "สร้างด้วย AI" button in ProblemEditor calls `POST /api/courses/.../problems/generate`; AI writes a solution + diverse test inputs; result fills `refSolution` and replaces test cases; Instructor clicks "รันเฉลย" to compute outputs before saving. Button is hidden after a 503 (no LLM key). Works in both create mode (sends raw title/description) and edit mode (sends `problemId`).
 
-Specs: `requirement/PRD.md` + `requirement/PRD-week-release.md`. Design rationale: `CONTEXT.md` (glossary), `docs/adr/`. DB migration scripts: `scripts/migrate-001-natural-keys.sql`, `scripts/migrate-002-week-is-released.sql`.
+Specs: `requirement/PRD.md` + `requirement/PRD-week-release.md` + `requirement/PRD-reference-solution-ai.md`. Design rationale: `CONTEXT.md` (glossary), `docs/adr/`. DB migration scripts: `scripts/migrate-001-natural-keys.sql`, `scripts/migrate-002-week-is-released.sql`, `scripts/migrate-003-problem-reference-solution.sql`.
 
 ## Commands
 - `npm run dev` — start dev server (Turbopack)
@@ -28,7 +30,8 @@ Specs: `requirement/PRD.md` + `requirement/PRD-week-release.md`. Design rational
 - `npm run lint` — ESLint
 - `npm test` — run the Vitest suite once (`vitest run`)
 - `npm run test:watch` — Vitest in watch mode
-- `npm run db:setup` — apply `schema.sql` and seed the initial Admin (needs `DATABASE_URL`)
+- `npm run db:setup` — apply `schema.sql` and seed the initial Admin (needs `DATABASE_URL`). **Note:** the seed script uses an old surrogate `courses.id` — it applies the schema correctly but the seed step will fail on an existing DB. Use only for fresh installs.
+- `npx tsx scripts/migrate.ts <sql-file>` — apply a single migration SQL file (use when `psql` is unavailable). Example: `DATABASE_URL=... npx tsx scripts/migrate.ts scripts/migrate-003-problem-reference-solution.sql`
 
 ## Architecture
 
@@ -66,7 +69,7 @@ Course domain — **natural composite PKs, no surrogate `id`:**
 
 Problems domain — **surrogate `id` + composite FK to courses:**
 - `weeks` — `id SERIAL` PK, FK `(course_code, course_year, course_semester)` → courses, `UNIQUE (course_code, course_year, course_semester, week_no)`. New courses seed `DEFAULT_WEEKS`=6 (growable to `MAX_WEEKS`=16). **`is_released BOOLEAN DEFAULT FALSE`** — controls student visibility (Week Release Toggle feature).
-- `problems` — `id SERIAL` PK, FK `(course_code, course_year, course_semester)` → courses, FK `week_id` → weeks, `problem_no INTEGER` (per-week sequential, auto-assigned), `UNIQUE (week_id, problem_no)`. Fields: `title`, `description`, `input_spec`, `output_spec`, `score`, `due_at`, `close_at`, `language`.
+- `problems` — `id SERIAL` PK, FK `(course_code, course_year, course_semester)` → courses, FK `week_id` → weeks, `problem_no INTEGER` (per-week sequential, auto-assigned), `UNIQUE (week_id, problem_no)`. Fields: `title`, `description`, `input_spec`, `output_spec`, `score`, `due_at`, `close_at`, `language`, **`reference_solution TEXT NOT NULL DEFAULT ''`** (staff-only; never in student-reachable projections).
 - `test_cases` — `id SERIAL` PK, FK `problem_id`. Fields: `input`, `expected_output`, `is_hidden`, `score`, `sort_order`.
 - `submissions` — `id SERIAL` PK, FK `problem_id`, FK `user_id`, FK `(course_code, course_year, course_semester)` → courses. Fields: `code`, `language`, `points_earned`, `points_max`, `is_late`, `results jsonb`, `reviewed_at`, `reviewed_by`, `manual_score`.
 
@@ -101,7 +104,7 @@ parseCourseSlug(code, year, semester): CourseKey | null
 - `src/lib/courses/repository.ts` — `createCourse(db, { code, year, semester, nameTh, nameEn, program? })`, `getCourseByKey(db, key: CourseKey)`, `updateCourse(db, key, data)`, `deleteCourse(db, key)`, `listCoursesForUser(db, userId, roles)` (**entitlement: Admin all; others: `course_instructors` UNION `enrollments`**), `assignInstructor(db, key: CourseKey, userId)`, `setCourseInstructors(db, key, userIds)`, `listCourseInstructors(db, key)`, `searchStaffCandidates(db, key, query)`.
 - `src/lib/enrollments/repository.ts` — `createEnrollment(db, { courseCode, courseYear, courseSemester, userId, ... })`, `findEnrollment(db, key, userId)`, `getEnrollmentByUser(db, key, userId)`, `listEnrollments(db, key, opts)`, `listAllEnrollments(db, key)`, `listGroups(db, key)`, `updateEnrollment(db, key, userId, data)`, `deleteEnrollment(db, key, userId)`.
 - `src/lib/weeks/repository.ts` — `seedWeeks(db, key: CourseKey)`, `listWeeks(db, key, opts?)` (`releasedOnly?: boolean`), `getWeekByNo(db, key, weekNo)`, `updateWeekTopic(db, weekId, topic)`, `setWeekReleased(db, weekId, isReleased)`, `addWeek(db, key)`, `weekHasProblems(db, weekId)`, `deleteWeek(db, weekId)`.
-- `src/lib/problems/repository.ts` — `createProblem(db, { courseCode, courseYear, courseSemester, weekId, title, ... })` (auto-assigns `problem_no`), `getProblemById(db, id)` (includes `testCases[]`), `getProblemByWeekAndNo(db, key, weekNo, problemNo)`, `listProblems(db, key, opts)` (includes `pointsMax`, `weekNo`, `problemNo`), `updateProblem`, `deleteProblem`, `setTestCases`.
+- `src/lib/problems/repository.ts` — `createProblem(db, { courseCode, courseYear, courseSemester, weekId, title, ..., referenceSolution? })` (auto-assigns `problem_no`), `getProblemById(db, id)` (includes `testCases[]`; **no** `reference_solution`), `getProblemByWeekAndNo(db, key, weekNo, problemNo)`, `listProblems(db, key, opts)` (includes `pointsMax`, `weekNo`, `problemNo`), `updateProblem(db, id, { ..., referenceSolution? })`, `deleteProblem`, `setTestCases`, **`getReferenceSolution(db, problemId): Promise<string>`** (staff-only projection — the only safe way to read it).
 - `src/lib/submissions/repository.ts` — `createSubmission(db, { problemId, userId, courseCode, courseYear, courseSemester, ... })`, `listSubmissions`, `countSubmitted(db, problemId, key: CourseKey)`, `countPending`, `getSubmission`, `reviewSubmission`, `listSubmissionsForProblem(db, problemId)`, `getLastSubmission`, `listPendingSubmissions(db, key: CourseKey)`, `getProblemIdsWithSubmissions(db, key: CourseKey)` → `number[]`.
 - `src/lib/gradebook/repository.ts` — `getGradebook(db, key: CourseKey)` → `{ problems: GradebookProblem[], students: GradebookStudent[] }` where `student.scores[problemId]` = `COALESCE(manual_score, points_earned)`.
 - `src/lib/assignments/repository.ts` — `getStudentAssignments(db, key: CourseKey, userId)` → `AssignmentItem[]`.
@@ -120,6 +123,8 @@ GET/POST   /api/courses/[code]/[year]/[semester]/weeks
 PUT/DELETE /api/courses/[code]/[year]/[semester]/weeks/[wid]
 GET/POST   /api/courses/[code]/[year]/[semester]/problems
 GET/PUT/DELETE /api/courses/[code]/[year]/[semester]/problems/[pid]
+POST       /api/courses/[code]/[year]/[semester]/problems/run-reference  (manage:true)
+POST       /api/courses/[code]/[year]/[semester]/problems/generate        (manage:true)
 GET        /api/courses/[code]/[year]/[semester]/problems/[pid]/submissions
 GET/PUT    /api/courses/[code]/[year]/[semester]/problems/[pid]/submissions/[sid]
 GET/POST   /api/courses/[code]/[year]/[semester]/students
@@ -152,7 +157,7 @@ Client components that make API calls receive `courseSlug: string` (e.g. `"01076
 | Component | Props |
 |-----------|-------|
 | `ProblemsTable` | `courseSlug`, `coursePath`, `canManage` |
-| `ProblemEditor` | `courseSlug`, `coursePath`, `weeks`, `mode`, `initialWeekId?`, `problem?` |
+| `ProblemEditor` | `courseSlug`, `coursePath`, `weeks`, `mode`, `initialWeekId?`, `referenceSolution?`, `problem?` |
 | `GradebookTable` | `courseSlug` |
 | `AssignmentsList` | `courseSlug`, `coursePath`, `initialWeek` |
 | `ScoreList` | `courseSlug`, `coursePath`, `initialWeek` |
@@ -178,6 +183,8 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
 - **Problems (Instructor):** `GET/POST /api/courses/.../problems`; `GET/PUT/DELETE …/problems/[pid]`. `ProblemEditor` handles create/edit with live test-case management. `validateProblemInput`: title required, weekId required, ≥1 test case, score ≥ 0, `close_at` ≥ `due_at`.
 - **Student view** (`/courses/.../problems/[week]/[no]`): loaded via `getWeekByNo` + `getProblemByWeekAndNo`.
 - **Code editor** (`src/components/editor/CodeEditor.tsx`): uses `@uiw/react-codemirror` + `@codemirror/lang-python`, dynamically imported with `ssr: false`. Dark theme, line numbers, `editable={!isClosed}`.
+- **Reference solution:** `ProblemEditor` has a `SolutionEditor` (`src/components/editor/SolutionEditor.tsx`) CodeMirror widget for the reference solution. "รันเฉลย" button POSTs to `run-reference` (`src/lib/piston.ts#runReferenceSolution`) with `{ code, inputs[] }` → `{ outputs: [{ stdout, stderr, ok }] }`. Per-case result badges: ✅ match / ⚠️ mismatch (+ "ใช้ค่านี้") / 🔴 error. **Security:** `reference_solution` is in `schema.sql` but **never** in `PROBLEM_COLS`, `ProblemRecord`, or `ProblemDetail`; only `getReferenceSolution(db, problemId)` reads it, called exclusively from staff-gated paths (edit page, run-reference route).
+- **AI generation:** `src/lib/llm/index.ts` exports `generateTestPlan(problem) → { solution, inputs[] }` and `LlmNotConfiguredError`. Uses `ANTHROPIC_API_KEY || LLM_API_KEY`; model via `LLM_MODEL` (default `claude-haiku-4-5-20251001`). `POST .../problems/generate` (`manage:true`) accepts `{ problemId }` (edit mode, reads from DB) OR `{ title, description, inputSpec?, outputSpec? }` (create mode, raw fields). Returns 503 when no key. "สร้างด้วย AI" button in ProblemEditor hides after 503; on success replaces all test cases + fills refSolution.
 - **Grading** (`POST /api/grade`): `mode:run` = visible tests only, no Submission; `mode:submit` = all tests, stores Submission, enforces `close_at` (403 if past), checks enrollment, sets `is_late` if past `due_at`. Calls Piston (`src/lib/piston.ts`, Python 3.10.0). Returns `GradeResult = { pointsEarned, pointsMax, totalTests, passedTests, results[], feedback }`.
 - **Two-tier deadline (ADR 0002):** `close_at` checked first → 403 if past; `due_at` → sets `is_late` flag.
 
@@ -215,7 +222,7 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
 5. `GradeResult = { pointsEarned, pointsMax, totalTests, passedTests, results[], feedback }` returned to client.
 
 ## Testing
-- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **325 tests / 51 files** as of 2026-06-20.
+- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **368 tests / 57 files** as of 2026-06-21.
 - Pure modules are unit-tested directly (session, password, roles, breadcrumbs, validation, import, name).
 - Repository + route handlers are integration-tested against **pg-mem** (in-memory Postgres, no Docker): build a pool with `newDb()` + `mem.public.none(schema.sql)` + `mem.adapters.createPg()`, inject via `setTestDb`, seed through the repository. Route handlers are imported and called with a `NextRequest`; auth is exercised with real `createSessionToken` cookies.
 - **pg-mem gotchas:** explicit casts (`$1::int`); no `STRING_AGG` (use second query + JS); no `DISTINCT ON` (use subquery with `MAX(submitted_at)` + inner join); schema path `../` count must match test file depth exactly.
@@ -247,7 +254,7 @@ docker run -d --name grader-db --restart unless-stopped \
 # then: DATABASE_URL=postgresql://grader:grader@localhost:5433/grader npm run db:setup
 ```
 
-**After schema changes on the dev DB:** apply `scripts/migrate-001-natural-keys.sql` for the natural-key migration, or re-create the DB with `db:setup` for a clean slate.
+**After schema changes on the dev DB:** apply the relevant migration script via `npx tsx scripts/migrate.ts <file>` (or `psql $DATABASE_URL -f <file>` if psql is available). Migration scripts in order: `migrate-001-natural-keys.sql`, `migrate-002-week-is-released.sql`, `migrate-003-problem-reference-solution.sql`. Fresh installs can use `db:setup` (applies `schema.sql` which includes all columns), but the seed step will error on an existing DB — that's safe to ignore.
 
 ## Conventions
 - Server Components by default; `'use client'` for interactive components.
@@ -255,6 +262,6 @@ docker run -d --name grader-db --restart unless-stopped \
 - Tailwind CSS v4 with `@import "tailwindcss"` in `globals.css`; brand tokens (`primary` `#0F2A60`, `primary-hover`, `secondary` `#003296`, `secondary-hover`, `font-thai`) via `@theme` there.
 - **Icons: `react-icons` (installed).** `framer-motion` and MUI are intentionally **not** used — animations are CSS; dialogs/toasts are small custom components.
 - Route protection lives in `src/proxy.ts` (Next 16 proxy, Node runtime) — **not** `middleware.ts`. Add new authed **page** routes to `config.matcher`; API routes self-guard.
-- **Schema migrations are manual:** `schema.sql` uses `CREATE TABLE IF NOT EXISTS`, and `db:setup` is idempotent — but it doesn't auto-load `.env.local`. On Windows/Git-Bash: `set -a; . ./.env.local; set +a; npm run db:setup`.
+- **Schema migrations are manual:** `schema.sql` uses `CREATE TABLE IF NOT EXISTS`. For existing DBs, apply individual migration scripts via `npx tsx scripts/migrate.ts scripts/migrate-00N-*.sql` (loads `.env.local` automatically if `DATABASE_URL` is set). On Windows/Git-Bash for a fresh install: `set -a; . ./.env.local; set +a; npm run db:setup`.
 - **No surrogate IDs on courses or enrollments.** Always identify a course by `CourseKey = { code, year, semester }`. Client components receive `courseSlug: string` (`"code/year/semester"`) for API fetch paths, and `coursePath: string` (`"/courses/code/year/semester"`) for navigation links.
 - **Problem URLs use week + position:** `/courses/.../problems/[weekNo]/[problemNo]`, not problem ID. The surrogate `id` is only used as a stable FK anchor in `test_cases` and `submissions`.
