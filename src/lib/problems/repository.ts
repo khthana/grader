@@ -128,15 +128,17 @@ export async function createProblem(
     dueAt?: string | null
     closeAt?: string | null
     language?: string
+    referenceSolution?: string
   }
 ): Promise<ProblemRecord> {
   const { rows } = await db.query<ProblemRow>(
     `INSERT INTO problems
        (course_code, course_year, course_semester, week_id, problem_no,
-        title, description, input_spec, output_spec, score, due_at, close_at, language)
+        title, description, input_spec, output_spec, score, due_at, close_at, language,
+        reference_solution)
      VALUES ($1, $2::int, $3::int, $4::int,
              COALESCE((SELECT MAX(problem_no) FROM problems WHERE week_id = $4::int), 0) + 1,
-             $5, $6, $7, $8, $9::int, $10, $11, $12)
+             $5, $6, $7, $8, $9::int, $10, $11, $12, $13)
      RETURNING ${PROBLEM_COLS}`,
     [
       data.courseCode,
@@ -151,9 +153,21 @@ export async function createProblem(
       data.dueAt ?? null,
       data.closeAt ?? null,
       data.language ?? "python",
+      data.referenceSolution ?? "",
     ]
   )
   return toRecord(rows[0])
+}
+
+export async function getReferenceSolution(
+  db: Queryable,
+  problemId: number
+): Promise<string> {
+  const { rows } = await db.query<{ reference_solution: string }>(
+    `SELECT reference_solution FROM problems WHERE id = $1::int`,
+    [problemId]
+  )
+  return rows[0]?.reference_solution ?? ""
 }
 
 export async function getProblemById(
@@ -251,6 +265,7 @@ export async function updateProblem(
     dueAt: string | null
     closeAt: string | null
     language: string
+    referenceSolution: string
   }>
 ): Promise<ProblemRecord | null> {
   const sets: string[] = []
@@ -264,6 +279,7 @@ export async function updateProblem(
   if ("dueAt" in data) { params.push(data.dueAt ?? null); sets.push(`due_at = $${params.length}`) }
   if ("closeAt" in data) { params.push(data.closeAt ?? null); sets.push(`close_at = $${params.length}`) }
   if (data.language !== undefined) { params.push(data.language); sets.push(`language = $${params.length}`) }
+  if (data.referenceSolution !== undefined) { params.push(data.referenceSolution); sets.push(`reference_solution = $${params.length}`) }
 
   if (sets.length === 0) return getProblemById(db, id).then((d) => (d ? { ...d } : null))
 

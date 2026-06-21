@@ -44,6 +44,7 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
     dueAt?: string | null
     closeAt?: string | null
     language?: string
+    referenceSolution?: string
     testCases?: Array<{
       input: string
       expectedOutput: string
@@ -76,6 +77,7 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
     dueAt: body.dueAt ?? null,
     closeAt: body.closeAt ?? null,
     language: body.language ?? "python",
+    referenceSolution: body.referenceSolution,
   })
 
   const testCases = await setTestCases(db, problem.id, body.testCases ?? [])

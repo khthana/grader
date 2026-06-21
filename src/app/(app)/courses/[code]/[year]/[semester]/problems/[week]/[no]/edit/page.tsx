@@ -3,7 +3,7 @@ import { parseCourseSlug, buildCoursePath, courseSlugString } from "@/lib/course
 import { getCurrentUser } from "@/lib/session"
 import { canManageCourses } from "@/lib/courses/access"
 import { getDb } from "@/lib/db"
-import { getProblemByWeekAndNo } from "@/lib/problems/repository"
+import { getProblemByWeekAndNo, getReferenceSolution } from "@/lib/problems/repository"
 import { getWeekByNo, listWeeks } from "@/lib/weeks/repository"
 import { ProblemEditor } from "@/components/problems/ProblemEditor"
 
@@ -33,6 +33,8 @@ export default async function EditProblemPage({ params }: PageProps) {
   const problem = await getProblemByWeekAndNo(db, weekRecord.id, problemNo)
   if (!problem) notFound()
 
+  const referenceSolution = await getReferenceSolution(db, problem.id)
+
   const coursePath = buildCoursePath(slug)
   const courseSlug = courseSlugString(slug)
 
@@ -43,6 +45,7 @@ export default async function EditProblemPage({ params }: PageProps) {
       weeks={weeks}
       mode="edit"
       problem={problem}
+      referenceSolution={referenceSolution}
     />
   )
 }

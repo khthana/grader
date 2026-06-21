@@ -55,6 +55,7 @@ export const PUT = courseRoute<{ code: string; year: string; semester: string; p
       dueAt?: string | null
       closeAt?: string | null
       language?: string
+      referenceSolution?: string
       testCases?: Array<{
         input: string
         expectedOutput: string
@@ -88,6 +89,7 @@ export const PUT = courseRoute<{ code: string; year: string; semester: string; p
       dueAt: body.dueAt,
       closeAt: body.closeAt,
       language: body.language,
+      referenceSolution: body.referenceSolution,
     })
 
     const testCases = await setTestCases(db, problemId, body.testCases ?? [])

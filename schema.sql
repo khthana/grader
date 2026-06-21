@@ -124,9 +124,10 @@ CREATE TABLE IF NOT EXISTS problems (
   score           INTEGER NOT NULL DEFAULT 10,
   due_at          TIMESTAMPTZ,
   close_at        TIMESTAMPTZ,
-  language        TEXT NOT NULL DEFAULT 'python',
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  language            TEXT NOT NULL DEFAULT 'python',
+  reference_solution  TEXT NOT NULL DEFAULT '',
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (week_id, problem_no),
   FOREIGN KEY (course_code, course_year, course_semester)
     REFERENCES courses(code, year, semester) ON DELETE CASCADE

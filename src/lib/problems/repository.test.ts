@@ -3,6 +3,7 @@ import {
   createProblem,
   getProblemById,
   getProblemByWeekAndNo,
+  getReferenceSolution,
   listProblems,
   updateProblem,
   deleteProblem,
@@ -170,6 +171,45 @@ describe("problem repository", () => {
   it("updateProblem returns null for unknown id", async () => {
     const result = await updateProblem(db, 99999, { title: "X" })
     expect(result).toBeNull()
+  })
+
+  describe("reference solution", () => {
+    it("createProblem persists referenceSolution and getReferenceSolution returns it", async () => {
+      const p = await createProblem(db, {
+        courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+        weekId, title: "Q", referenceSolution: "print('hello')",
+      })
+      const solution = await getReferenceSolution(db, p.id)
+      expect(solution).toBe("print('hello')")
+    })
+
+    it("getReferenceSolution returns empty string when created without referenceSolution", async () => {
+      const p = await createProblem(db, {
+        courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+        weekId, title: "Q",
+      })
+      const solution = await getReferenceSolution(db, p.id)
+      expect(solution).toBe("")
+    })
+
+    it("updateProblem persists referenceSolution", async () => {
+      const p = await createProblem(db, {
+        courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+        weekId, title: "Q",
+      })
+      await updateProblem(db, p.id, { referenceSolution: "print(42)" })
+      expect(await getReferenceSolution(db, p.id)).toBe("print(42)")
+    })
+
+    it("getProblemById does not expose referenceSolution (leak prevention)", async () => {
+      const SECRET = "SECRET_SOLUTION_XK9Z"
+      const p = await createProblem(db, {
+        courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+        weekId, title: "Q", referenceSolution: SECRET,
+      })
+      const detail = await getProblemById(db, p.id)
+      expect(JSON.stringify(detail)).not.toContain(SECRET)
+    })
   })
 
   it("deleteProblem cascades to test_cases", async () => {

@@ -13,6 +13,7 @@ import {
 } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
+import { SolutionEditor } from "@/components/editor/SolutionEditor"
 
 interface TestCaseForm {
   id?: number
@@ -34,6 +35,7 @@ interface Props {
   weeks: WeekOption[]
   mode: "create" | "edit"
   initialWeekId?: number
+  referenceSolution?: string
   problem?: {
     id: number
     title: string
@@ -53,7 +55,7 @@ function emptyCase(sortOrder: number): TestCaseForm {
   return { input: "", expectedOutput: "", isHidden: false, sortOrder }
 }
 
-export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeekId, problem }: Props) {
+export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeekId, referenceSolution: initialRefSolution, problem }: Props) {
   const router = useRouter()
   const { notify } = useToast()
 
@@ -72,6 +74,7 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
       ? problem.testCases
       : [emptyCase(0)]
   )
+  const [refSolution, setRefSolution] = useState(initialRefSolution ?? "")
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [descTab, setDescTab] = useState<"write" | "preview">("write")
@@ -105,6 +108,7 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
       dueAt: dueAt ? toISO(dueAt) : null,
       closeAt: closeAt ? toISO(closeAt) : null,
       language,
+      referenceSolution: refSolution,
       testCases: cases.map((c, i) => ({
         input: c.input,
         expectedOutput: c.expectedOutput,
@@ -228,6 +232,15 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
                 </Field>
               </div>
             </div>
+          </div>
+
+          {/* Reference solution card */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <h2 className="mb-3 text-base font-semibold text-slate-700">เฉลยอ้างอิง</h2>
+            <p className="mb-3 text-xs text-slate-400">
+              เฉลยนี้จัดเก็บในระบบเพื่อใช้ตรวจสอบ test cases — นักศึกษาไม่สามารถเห็นได้
+            </p>
+            <SolutionEditor value={refSolution} onChange={setRefSolution} />
           </div>
 
           {/* Test cases card */}
