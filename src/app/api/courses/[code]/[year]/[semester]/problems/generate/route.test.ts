@@ -95,8 +95,28 @@ describe("POST /api/courses/[code]/[year]/[semester]/problems/generate", () => {
     expect(res.status).toBe(403)
   })
 
-  it("missing problemId returns 400", async () => {
+  it("missing problemId and title returns 400", async () => {
     const res = await POST(req({}), ctx())
+    expect(res.status).toBe(400)
+  })
+
+  it("raw fields path (create mode): returns 200 with generated result", async () => {
+    mockGenerate.mockResolvedValue({ solution: "print('hi')", inputs: ["a", "b"] })
+    const res = await POST(
+      req({ title: "Hello", description: "Print hello", inputSpec: "", outputSpec: "" }),
+      ctx()
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.solution).toBe("print('hi')")
+    expect(body.inputs).toEqual(["a", "b"])
+    expect(mockGenerate).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Hello", description: "Print hello" })
+    )
+  })
+
+  it("raw fields path: empty title returns 400", async () => {
+    const res = await POST(req({ title: "  ", description: "desc" }), ctx())
     expect(res.status).toBe(400)
   })
 

@@ -19,29 +19,40 @@ export const POST = courseRoute<{ code: string; year: string; semester: string }
   { manage: true },
   async (request, auth) => {
     const body = await request.json().catch(() => null)
-    const problemId =
-      body && typeof body.problemId === "number" ? (body.problemId as number) : null
 
-    if (!problemId) {
-      return NextResponse.json(
-        { error: "problemId (number) is required" },
-        { status: 400 }
-      )
-    }
+    let fields: { title: string; description: string; inputSpec?: string | null; outputSpec?: string | null }
 
-    const db = getDb()
-    const problem = await getProblemById(db, problemId)
-    if (!problem || !ownsProblem(problem, auth.course)) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 })
-    }
-
-    try {
-      const result = await generateTestPlan({
+    if (body && typeof body.problemId === "number") {
+      const db = getDb()
+      const problem = await getProblemById(db, body.problemId as number)
+      if (!problem || !ownsProblem(problem, auth.course)) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 })
+      }
+      fields = {
         title: problem.title,
         description: problem.description,
         inputSpec: problem.inputSpec,
         outputSpec: problem.outputSpec,
-      })
+      }
+    } else if (body && typeof body.title === "string") {
+      if (!body.title.trim()) {
+        return NextResponse.json({ error: "title is required" }, { status: 400 })
+      }
+      fields = {
+        title: body.title as string,
+        description: typeof body.description === "string" ? (body.description as string) : "",
+        inputSpec: typeof body.inputSpec === "string" ? (body.inputSpec as string) : null,
+        outputSpec: typeof body.outputSpec === "string" ? (body.outputSpec as string) : null,
+      }
+    } else {
+      return NextResponse.json(
+        { error: "problemId (number) or title (string) is required" },
+        { status: 400 }
+      )
+    }
+
+    try {
+      const result = await generateTestPlan(fields)
       return NextResponse.json(result)
     } catch (err) {
       if (err instanceof LlmNotConfiguredError) {

@@ -11,6 +11,7 @@ import {
   FaEye,
   FaSave,
   FaPlay,
+  FaMagic,
 } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
@@ -76,6 +77,8 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
       : [emptyCase(0)]
   )
   const [refSolution, setRefSolution] = useState(initialRefSolution ?? "")
+  const [generating, setGenerating] = useState(false)
+  const [llmUnavailable, setLlmUnavailable] = useState(false)
   const [saving, setSaving] = useState(false)
   type RefResult = { stdout: string; stderr: string; ok: boolean }
   const [refResults, setRefResults] = useState<RefResult[] | null>(null)
@@ -128,6 +131,42 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
       notify("error", "รันเฉลยไม่สำเร็จ")
     } finally {
       setVerifying(false)
+    }
+  }
+
+  async function handleGenerate() {
+    if (!title.trim()) {
+      notify("error", "กรุณากรอกชื่อโจทย์ก่อนสร้างด้วย AI")
+      return
+    }
+    setGenerating(true)
+    try {
+      const body = problem?.id
+        ? { problemId: problem.id }
+        : { title, description, inputSpec, outputSpec }
+      const res = await fetch(`/api/courses/${courseSlug}/problems/generate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      if (res.status === 503) {
+        setLlmUnavailable(true)
+        notify("error", "ยังไม่ได้ตั้งค่า API key ของ LLM")
+        return
+      }
+      if (!res.ok) {
+        notify("error", "สร้างด้วย AI ไม่สำเร็จ")
+        return
+      }
+      const data = (await res.json()) as { solution: string; inputs: string[] }
+      setRefSolution(data.solution)
+      setCases(data.inputs.map((input, i) => ({ input, expectedOutput: "", isHidden: false, sortOrder: i })))
+      setRefResults(null)
+      notify("success", "AI สร้าง test cases เรียบร้อย — กด 'รันเฉลย' เพื่อเติม output")
+    } catch {
+      notify("error", "สร้างด้วย AI ไม่สำเร็จ")
+    } finally {
+      setGenerating(false)
     }
   }
 
@@ -285,7 +324,21 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
 
           {/* Reference solution card */}
           <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <h2 className="mb-3 text-base font-semibold text-slate-700">เฉลยอ้างอิง</h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-slate-700">เฉลยอ้างอิง</h2>
+              {!llmUnavailable && (
+                <button
+                  type="button"
+                  onClick={handleGenerate}
+                  disabled={generating || !title.trim()}
+                  title={!title.trim() ? "กรอกชื่อโจทย์ก่อน" : undefined}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-40"
+                >
+                  <FaMagic className="h-3 w-3" />
+                  {generating ? "กำลังสร้าง..." : "สร้างด้วย AI"}
+                </button>
+              )}
+            </div>
             <p className="mb-3 text-xs text-slate-400">
               เฉลยนี้จัดเก็บในระบบเพื่อใช้ตรวจสอบ test cases — นักศึกษาไม่สามารถเห็นได้
             </p>
