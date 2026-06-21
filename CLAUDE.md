@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CE-Grader is a **standalone product**. The `DEEP-QA-FRONTEND/` and `DEEP-QA-BACKEND/` repos (siblings of this folder) are **read-only references only** — used for design-system look/feel and UX patterns, never extended or imported at runtime.
 
-The app is **feature-complete** as of 2026-06-21. All pages are live — no ComingSoon stubs remain. Delivered features:
+All pages are live — no ComingSoon stubs remain. Delivered features:
 - **Auth + shell:** Postgres-backed login (email/password + Google OAuth), role-based shell, navbar course switcher.
 - **Admin:** User Management (`/users` — CRUD + bulk xlsx import + role assignment), Activity Logs (`/logs`), **dev-only impersonation** (enter another user's session to test their view; persistent banner + one-click exit).
 - **Course management:** รายวิชา (`/courses` — CRUD + staff assignment, Admin/Instructor).
@@ -21,8 +21,9 @@ The app is **feature-complete** as of 2026-06-21. All pages are live — no Comi
 - **Week Release Toggle:** Instructor/Admin toggle `is_released` per Week via lock icon on WeekBar; Students see only released Weeks everywhere (Assignments, Scorebook, Problems); direct URL to unreleased week's problem renders "ยังไม่เปิดรับ" notice (not 404). New Weeks default to hidden. DB migration: `scripts/migrate-002-week-is-released.sql`.
 - **Reference Solution + Verify:** Instructor stores a Python reference solution per problem in `ProblemEditor` (`SolutionEditor` CodeMirror widget). "รันเฉลย" runs it against all test-case inputs via Piston and shows ✅/⚠️/🔴 per case with per-case "ใช้ค่านี้" + bulk "ใช้ค่าจากเฉลยทั้งหมด". Reference solution is **never** exposed to Students — `getReferenceSolution(db, problemId)` is the only reader, callable only from staff-gated paths. DB migration: `scripts/migrate-003-problem-reference-solution.sql`.
 - **AI Test-Case Generation:** "สร้างด้วย AI" button in ProblemEditor calls `POST /api/courses/.../problems/generate`; AI writes a solution + diverse test inputs; result fills `refSolution` and replaces test cases; Instructor clicks "รันเฉลย" to compute outputs before saving. Button is hidden after a 503 (no LLM key). Works in both create mode (sends raw title/description) and edit mode (sends `problemId`).
+- **User Profile** *(in development — issues #46–#49):* `/profile` page for all roles — set nickname (shown in navbar instead of official name) + upload avatar (Canvas API client-side resize → 256×256px → base64 → DB), change password (disabled for Google accounts). API: `GET/PUT /api/profile`, `PUT /api/profile/password` (non-admin-gated). Schema: `users.nickname TEXT` + `migrate-004-user-nickname.sql`.
 
-Specs: `requirement/PRD.md` + `requirement/PRD-week-release.md` + `requirement/PRD-reference-solution-ai.md`. Design rationale: `CONTEXT.md` (glossary), `docs/adr/`. DB migration scripts: `scripts/migrate-001-natural-keys.sql`, `scripts/migrate-002-week-is-released.sql`, `scripts/migrate-003-problem-reference-solution.sql`.
+Specs: `requirement/PRD.md` + `requirement/PRD-week-release.md` + `requirement/PRD-reference-solution-ai.md` + `requirement/PRD-profile.md`. Design rationale: `CONTEXT.md` (glossary), `docs/adr/`. DB migration scripts: `scripts/migrate-001-natural-keys.sql`, `scripts/migrate-002-week-is-released.sql`, `scripts/migrate-003-problem-reference-solution.sql`, `scripts/migrate-004-user-nickname.sql` *(pending).*
 
 ## Commands
 - `npm run dev` — start dev server (Turbopack)
@@ -100,7 +101,7 @@ parseCourseSlug(code, year, semester): CourseKey | null
 `src/lib/db.ts` — lazy singleton `pg` Pool via `getDb()`. **Test seam:** `setTestDb(pool)` injects a pg-mem pool; `setTestDb(null)` resets.
 
 #### Repositories
-- `src/lib/users/repository.ts` — `createUser`, `findUserByEmail`, `getUserById`, `getUserWithRoles`, `listUsers`, `updateUser`, `deleteUser`, `setUserActive`, `assignRole`, `setUserRoles`, `countUsersWithRole`.
+- `src/lib/users/repository.ts` — `createUser`, `findUserByEmail`, `getUserById`, `getUserWithRoles` *(includes `nickname`)*, `listUsers`, `updateUser`, `deleteUser`, `setUserActive`, `assignRole`, `setUserRoles`, `countUsersWithRole`, **`updateProfile(db, userId, { nickname?, picture? })`** *(profile self-update, no admin gate)*.
 - `src/lib/courses/repository.ts` — `createCourse(db, { code, year, semester, nameTh, nameEn, program? })`, `getCourseByKey(db, key: CourseKey)`, `updateCourse(db, key, data)`, `deleteCourse(db, key)`, `listCoursesForUser(db, userId, roles)` (**entitlement: Admin all; others: `course_instructors` UNION `enrollments`**), `assignInstructor(db, key: CourseKey, userId)`, `setCourseInstructors(db, key, userIds)`, `listCourseInstructors(db, key)`, `searchStaffCandidates(db, key, query)`.
 - `src/lib/enrollments/repository.ts` — `createEnrollment(db, { courseCode, courseYear, courseSemester, userId, ... })`, `findEnrollment(db, key, userId)`, `getEnrollmentByUser(db, key, userId)`, `listEnrollments(db, key, opts)`, `listAllEnrollments(db, key)`, `listGroups(db, key)`, `updateEnrollment(db, key, userId, data)`, `deleteEnrollment(db, key, userId)`.
 - `src/lib/weeks/repository.ts` — `seedWeeks(db, key: CourseKey)`, `listWeeks(db, key, opts?)` (`releasedOnly?: boolean`), `getWeekByNo(db, key, weekNo)`, `updateWeekTopic(db, weekId, topic)`, `setWeekReleased(db, weekId, isReleased)`, `addWeek(db, key)`, `weekHasProblems(db, weekId)`, `deleteWeek(db, weekId)`.
@@ -134,6 +135,12 @@ GET        /api/courses/[code]/[year]/[semester]/students/export
 GET        /api/courses/[code]/[year]/[semester]/review
 GET        /api/courses/[code]/[year]/[semester]/gradebook
 GET        /api/courses/[code]/[year]/[semester]/assignments
+```
+
+Non-course-scoped (auth via `getUserFromRequest`, not admin-gated):
+```
+GET/PUT    /api/profile                → current user's profile (nickname, picture)
+PUT        /api/profile/password       → change password (email/password accounts only)
 ```
 
 #### `courseRoute` wrapper (`src/lib/courses/route.ts`)
@@ -202,8 +209,17 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
 
 ### User Management (Admin only — every `/api/users*` route is Admin-gated via `requireAdmin`)
 - `GET /api/users` — search + pagination. `POST /api/users` — create. `GET/PUT/PATCH/DELETE /api/users/[id]`. `PUT /api/users/[id]/roles` — **409 if removes last Admin**. `POST /api/users/import` — bulk xlsx import.
-- `src/lib/users/validation.ts`, `src/lib/users/import.ts`, `src/lib/users/name.ts` — pure helpers.
+- `src/lib/users/validation.ts` — includes `validateProfileInput({ nickname?, pictureBase64? })` and `validatePasswordChange({ currentPassword, newPassword, confirmPassword })` (pure, testable).
+- `src/lib/users/import.ts`, `src/lib/users/name.ts` — pure helpers.
 - UI: `src/components/users/`.
+
+### User Profile (all roles — `/api/profile*` routes use `getUserFromRequest`, NOT `requireAdmin`)
+- `GET /api/profile` → `{ email, name, nickname, picture, roles, hasPassword: boolean }`.
+- `PUT /api/profile` → update `nickname` and/or `picture` (base64 ≤150KB after decode); validated by `validateProfileInput`.
+- `PUT /api/profile/password` → change password: verify `currentPassword`, validate new, hash + store. 400 for Google accounts (`hasPassword = false`).
+- **`nickname` display:** `layout.tsx` passes `nickname ?? name` to AppShell → Navbar. Official `name` is read-only (Admin-managed only).
+- UI: `src/components/profile/ProfileForm.tsx` (avatar canvas resize 256×256), `src/components/profile/PasswordForm.tsx`.
+- Add `/profile` to `src/proxy.ts` matcher.
 
 ### Admin impersonation (dev-only — never offered in production)
 - **Pure gate** `src/lib/users/impersonation.ts#canImpersonate({ actorRoles, actorId, targetId, isProduction })` → refuses production / not-admin / self.
@@ -254,7 +270,7 @@ docker run -d --name grader-db --restart unless-stopped \
 # then: DATABASE_URL=postgresql://grader:grader@localhost:5433/grader npm run db:setup
 ```
 
-**After schema changes on the dev DB:** apply the relevant migration script via `npx tsx scripts/migrate.ts <file>` (or `psql $DATABASE_URL -f <file>` if psql is available). Migration scripts in order: `migrate-001-natural-keys.sql`, `migrate-002-week-is-released.sql`, `migrate-003-problem-reference-solution.sql`. Fresh installs can use `db:setup` (applies `schema.sql` which includes all columns), but the seed step will error on an existing DB — that's safe to ignore.
+**After schema changes on the dev DB:** apply the relevant migration script via `npx tsx scripts/migrate.ts <file>` (or `psql $DATABASE_URL -f <file>` if psql is available). Migration scripts in order: `migrate-001-natural-keys.sql`, `migrate-002-week-is-released.sql`, `migrate-003-problem-reference-solution.sql`, `migrate-004-user-nickname.sql` *(pending — will be created with #47)*. Fresh installs can use `db:setup` (applies `schema.sql` which includes all columns), but the seed step will error on an existing DB — that's safe to ignore.
 
 ## Conventions
 - Server Components by default; `'use client'` for interactive components.

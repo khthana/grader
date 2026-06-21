@@ -41,6 +41,7 @@ export interface UserRecord {
   id: number
   email: string
   name: string
+  nickname: string | null
   passwordHash: string | null
   picture: string | null
   isActive: boolean
@@ -50,6 +51,7 @@ export interface UserWithRoles {
   id: number
   email: string
   name: string
+  nickname: string | null
   picture: string | null
   isActive: boolean
   roles: string[]
@@ -79,6 +81,7 @@ interface UserRow {
   id: number
   email: string
   name: string
+  nickname: string | null
   password_hash: string | null
   picture: string | null
   is_active: boolean
@@ -96,6 +99,7 @@ function toRecord(row: UserRow): UserRecord {
     passwordHash: row.password_hash,
     picture: row.picture,
     isActive: row.is_active,
+    nickname: row.nickname,
   }
 }
 
@@ -106,7 +110,7 @@ export async function createUser(db: Queryable, input: NewUser): Promise<UserRec
         title_th, first_name_th, last_name_th,
         title_en, first_name_en, last_name_en, phone)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-     RETURNING id, email, name, password_hash, picture, is_active`,
+     RETURNING id, email, name, nickname, password_hash, picture, is_active`,
     [
       normalizeEmail(input.email),
       input.name,
@@ -130,7 +134,7 @@ export async function findUserByEmail(
   email: string
 ): Promise<UserRecord | null> {
   const { rows } = await db.query<UserRow>(
-    `SELECT id, email, name, password_hash, picture, is_active
+    `SELECT id, email, name, nickname, password_hash, picture, is_active
      FROM users WHERE email = $1`,
     [normalizeEmail(email)]
   )
@@ -145,7 +149,7 @@ export async function findUserByIdCode(
 ): Promise<UserRecord | null> {
   if (!idCode || idCode.trim() === "") return null
   const { rows } = await db.query<UserRow>(
-    `SELECT id, email, name, password_hash, picture, is_active
+    `SELECT id, email, name, nickname, password_hash, picture, is_active
      FROM users WHERE id_code = $1`,
     [idCode.trim()]
   )
@@ -157,7 +161,7 @@ export async function getUserWithRoles(
   id: number
 ): Promise<UserWithRoles | null> {
   const { rows } = await db.query<UserRow>(
-    `SELECT id, email, name, password_hash, picture, is_active
+    `SELECT id, email, name, nickname, password_hash, picture, is_active
      FROM users WHERE id = $1`,
     [id]
   )
@@ -176,6 +180,7 @@ export async function getUserWithRoles(
     id: user.id,
     email: user.email,
     name: user.name,
+    nickname: user.nickname,
     picture: user.picture,
     isActive: user.isActive,
     roles: roleRows.map((r) => r.name),
@@ -256,6 +261,29 @@ export async function updateUserName(
     ]
   )
   return rows.length > 0
+}
+
+export async function updateProfile(
+  db: Queryable,
+  userId: number,
+  changes: { nickname?: string | null; picture?: string | null }
+): Promise<void> {
+  const sets: string[] = []
+  const params: unknown[] = [userId]
+  if ("nickname" in changes) {
+    params.push(changes.nickname)
+    sets.push(`nickname = $${params.length}`)
+  }
+  if ("picture" in changes) {
+    params.push(changes.picture)
+    sets.push(`picture = $${params.length}`)
+  }
+  if (sets.length === 0) return
+  sets.push("updated_at = now()")
+  await db.query(
+    `UPDATE users SET ${sets.join(", ")} WHERE id = $1`,
+    params
+  )
 }
 
 export async function deleteUser(db: Queryable, id: number): Promise<boolean> {

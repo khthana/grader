@@ -3,6 +3,7 @@ import {
   createUser,
   findUserByEmail,
   getUserWithRoles,
+  updateProfile,
   assignRole,
 } from "./repository"
 import { freshDb, type Queryable } from "@/lib/test-support/db"
@@ -64,5 +65,26 @@ describe("user repository", () => {
     const u = await createUser(db, { email: "b@kmitl.ac.th", name: "B", passwordHash: "h" })
     const withRoles = await getUserWithRoles(db, u.id)
     expect(withRoles?.roles).toEqual([])
+  })
+
+  it("getUserWithRoles returns nickname as null when not set", async () => {
+    const u = await createUser(db, { email: "c@kmitl.ac.th", name: "C", passwordHash: "h" })
+    const withRoles = await getUserWithRoles(db, u.id)
+    expect(withRoles?.nickname).toBeNull()
+  })
+
+  it("updateProfile stores nickname and getUserWithRoles returns it", async () => {
+    const u = await createUser(db, { email: "d@kmitl.ac.th", name: "D", passwordHash: "h" })
+    await updateProfile(db, u.id, { nickname: "น้องมิ้ว" })
+    const withRoles = await getUserWithRoles(db, u.id)
+    expect(withRoles?.nickname).toBe("น้องมิ้ว")
+  })
+
+  it("updateProfile clears nickname when passed null", async () => {
+    const u = await createUser(db, { email: "e@kmitl.ac.th", name: "E", passwordHash: "h" })
+    await updateProfile(db, u.id, { nickname: "temporary" })
+    await updateProfile(db, u.id, { nickname: null })
+    const withRoles = await getUserWithRoles(db, u.id)
+    expect(withRoles?.nickname).toBeNull()
   })
 })

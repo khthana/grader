@@ -15,6 +15,12 @@ superset. Drives sidebar, landing route, and permissions. (The requirement docs 
 "Teacher" — in this project that maps to **Instructor** (and **TA**); there is no
 distinct Teacher role.)
 
+### Nickname
+An optional display name a **User** sets for themselves on `/profile`. Stored in
+`users.nickname`. When set, the navbar shows nickname instead of the official `name`.
+Clearing it reverts to `name`. Only the user can edit their own nickname; `name` is
+managed by Admin only.
+
 ### Student
 A **User** who carries the Student role. There is no separate roster-only student
 record — a roster entry *is* a User. A Student logs in to submit code.

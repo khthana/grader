@@ -7,9 +7,9 @@ Branch: `main`
 
 ---
 
-## Status: Feature-complete ✅
+## Status: In Development 🔧
 
-All planned features are shipped. No open GitHub issues. 368 tests / 57 files — all pass.
+Profile page feature in progress — issues #46–#49. 368 tests / 57 files — all pass.
 
 ---
 
@@ -29,6 +29,12 @@ All planned features are shipped. No open GitHub issues. 368 tests / 57 files �
 | LLM module + generate endpoint | `6a92bff` |
 | "สร้างด้วย AI" button in ProblemEditor | `b7799de` |
 
+## Features In Progress
+
+| Feature | Issues | PRD |
+|---|---|---|
+| User Profile page (nickname, avatar, password change) | #46 parent; #47 schema; #48 info page; #49 password | `requirement/PRD-profile.md` |
+
 ---
 
 ## Database Migrations Required
@@ -41,6 +47,8 @@ set -a; . ./.env.local; set +a
 npx tsx scripts/migrate.ts scripts/migrate-001-natural-keys.sql
 npx tsx scripts/migrate.ts scripts/migrate-002-week-is-released.sql
 npx tsx scripts/migrate.ts scripts/migrate-003-problem-reference-solution.sql
+# migrate-004 will be added when #47 is implemented:
+# npx tsx scripts/migrate.ts scripts/migrate-004-user-nickname.sql
 ```
 
 Fresh installs (`npm run db:setup`) get all columns via `schema.sql` automatically, but the seed step will error on an existing DB — safe to ignore.
@@ -79,6 +87,11 @@ LLM_MODEL=                # default: claude-haiku-4-5-20251001
 
 ---
 
-## No Known Blockers
+## Open Issues
 
-No open issues. No in-progress features. Next session can start fresh with new requirements.
+- **#47** — Profile: schema + nickname plumbing (start here, no blockers)
+- **#48** — Profile: general info page / avatar (blocked by #47)
+- **#49** — Profile: password change section (blocked by #48)
+- **#46** — Parent issue (do not close until all three above are done)
+
+

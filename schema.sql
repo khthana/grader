@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone         TEXT,
   id_code       TEXT,                -- รหัสนักศึกษา / staff id, optional
   picture       TEXT,
+  nickname      TEXT,
   is_active     BOOLEAN NOT NULL DEFAULT TRUE,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
