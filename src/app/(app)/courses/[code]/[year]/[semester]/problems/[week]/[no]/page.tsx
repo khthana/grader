@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { FaArrowLeft, FaClock, FaExclamationTriangle } from "react-icons/fa"
+import { FaArrowLeft, FaClock, FaExclamationTriangle, FaLock } from "react-icons/fa"
 import { CodeEditor } from "@/components/editor/CodeEditor"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { getDb } from "@/lib/db"
@@ -38,11 +38,33 @@ export default async function CourseProblemPage({ params }: PageProps) {
   const weekRecord = await getWeekByNo(db, slug, weekNo)
   if (!weekRecord) notFound()
 
-  const problem = await getProblemByWeekAndNo(db, weekRecord.id, problemNo)
-  if (!problem) notFound()
-
   const user = await getCurrentUser()
   const isPrivileged = user?.roles.some((r) => ["Admin", "Instructor", "TA"].includes(r))
+
+  if (!isPrivileged && !weekRecord.isReleased) {
+    const coursePath = buildCoursePath(slug)
+    return (
+      <div className="flex flex-col gap-6 font-thai">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold text-primary">สัปดาห์ที่ {weekRecord.weekNo}</h1>
+          <Link
+            href={`${coursePath}/problems`}
+            className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-secondary"
+          >
+            <FaArrowLeft className="h-3 w-3" /> โจทย์ทั้งหมด
+          </Link>
+        </div>
+        <div className="flex flex-col items-center gap-4 rounded-xl border border-gray-200 bg-white px-6 py-12 text-center">
+          <FaLock className="h-8 w-8 text-slate-300" />
+          <p className="text-lg font-semibold text-slate-500">ยังไม่เปิดรับ</p>
+          <p className="text-sm text-slate-400">สัปดาห์นี้ยังไม่ถูกปล่อยโดยอาจารย์ผู้สอน</p>
+        </div>
+      </div>
+    )
+  }
+
+  const problem = await getProblemByWeekAndNo(db, weekRecord.id, problemNo)
+  if (!problem) notFound()
   const lastSubmission =
     user && !isPrivileged ? await getLastSubmission(db, problem.id, user.id) : null
 
