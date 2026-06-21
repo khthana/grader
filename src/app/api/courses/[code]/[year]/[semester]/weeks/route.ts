@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
 import { courseRoute } from "@/lib/courses/route"
+import { isTeachingStaff } from "@/lib/courses/access"
 import { listWeeks, addWeek } from "@/lib/weeks/repository"
 
 export const GET = courseRoute({}, async (_request, auth) => {
-  const weeks = await listWeeks(getDb(), auth.course)
+  const onlyStudent = !isTeachingStaff(auth.user.roles)
+  const weeks = await listWeeks(getDb(), auth.course, onlyStudent ? { releasedOnly: true } : undefined)
   return NextResponse.json({ weeks })
 })
 

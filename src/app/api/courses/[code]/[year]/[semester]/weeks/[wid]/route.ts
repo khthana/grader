@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db"
 import { courseRoute } from "@/lib/courses/route"
 import {
   updateWeekTopic,
+  setWeekReleased,
   listWeeks,
   weekHasProblems,
   deleteWeek,
@@ -16,14 +17,29 @@ export const PUT = courseRoute<{ code: string; year: string; semester: string; w
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
-    const body = (await request.json().catch(() => ({}))) as { topic?: string }
-    const topic = (body.topic ?? "").trim()
-    if (!topic) {
-      return NextResponse.json({ error: "topic is required" }, { status: 400 })
+    const body = (await request.json().catch(() => ({}))) as {
+      topic?: string
+      isReleased?: boolean
+    }
+    const hasTopic = typeof body.topic === "string" && body.topic.trim().length > 0
+    const hasReleased = typeof body.isReleased === "boolean"
+
+    if (!hasTopic && !hasReleased) {
+      return NextResponse.json({ error: "topic or isReleased is required" }, { status: 400 })
     }
 
-    const week = await updateWeekTopic(getDb(), weekId, topic)
-    if (!week) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    const db = getDb()
+    let week = null
+
+    if (hasTopic) {
+      week = await updateWeekTopic(db, weekId, body.topic!.trim())
+      if (!week) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
+    if (hasReleased) {
+      week = await setWeekReleased(db, weekId, body.isReleased!)
+      if (!week) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
 
     return NextResponse.json({ week })
   }
