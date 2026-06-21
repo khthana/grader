@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CE-Grader is a **standalone product**. The `DEEP-QA-FRONTEND/` and `DEEP-QA-BACKEND/` repos (siblings of this folder) are **read-only references only** — used for design-system look/feel and UX patterns, never extended or imported at runtime.
 
-The app was **feature-complete** as of 2026-06-20. All pages are live — no ComingSoon stubs remain. **In progress (2026-06-21):** Week Release Toggle (GitHub #37–40, PRD `requirement/PRD-week-release.md`). Delivered features:
+The app is **feature-complete** as of 2026-06-21. All pages are live — no ComingSoon stubs remain. Delivered features:
 - **Auth + shell:** Postgres-backed login (email/password + Google OAuth), role-based shell, navbar course switcher.
 - **Admin:** User Management (`/users` — CRUD + bulk xlsx import + role assignment), Activity Logs (`/logs`), **dev-only impersonation** (enter another user's session to test their view; persistent banner + one-click exit).
 - **Course management:** รายวิชา (`/courses` — CRUD + staff assignment, Admin/Instructor).
@@ -18,8 +18,9 @@ The app was **feature-complete** as of 2026-06-20. All pages are live — no Com
 - **Gradebook:** `/courses/[code]/[year]/[semester]/gradebook` — student × problem score matrix with `COALESCE(manual_score, points_earned)` effective score.
 - **Assignments:** `/courses/[code]/[year]/[semester]/assignments` — student's own problem list with status badges and effective scores.
 - **Scorebook:** `/courses/[code]/[year]/[semester]/scorebook` — student's own score summary per week; WeekBar + SVG donut banner + score table; Student-only sidebar menu item; reuses `/assignments` + `/weeks` endpoints, no new API route.
+- **Week Release Toggle:** Instructor/Admin toggle `is_released` per Week via lock icon on WeekBar; Students see only released Weeks everywhere (Assignments, Scorebook, Problems); direct URL to unreleased week's problem renders "ยังไม่เปิดรับ" notice (not 404). New Weeks default to hidden. DB migration: `scripts/migrate-002-week-is-released.sql`.
 
-Specs: `requirement/PRD.md` (all PRDs consolidated). Design rationale: `CONTEXT.md` (glossary), `docs/adr/`. Dev migration script: `scripts/migrate-001-natural-keys.sql`.
+Specs: `requirement/PRD.md` + `requirement/PRD-week-release.md`. Design rationale: `CONTEXT.md` (glossary), `docs/adr/`. DB migration scripts: `scripts/migrate-001-natural-keys.sql`, `scripts/migrate-002-week-is-released.sql`.
 
 ## Commands
 - `npm run dev` — start dev server (Turbopack)
