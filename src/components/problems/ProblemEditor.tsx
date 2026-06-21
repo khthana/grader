@@ -10,6 +10,7 @@ import {
   FaEyeSlash,
   FaEye,
   FaSave,
+  FaPlay,
 } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
@@ -76,6 +77,9 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
   )
   const [refSolution, setRefSolution] = useState(initialRefSolution ?? "")
   const [saving, setSaving] = useState(false)
+  type RefResult = { stdout: string; stderr: string; ok: boolean }
+  const [refResults, setRefResults] = useState<RefResult[] | null>(null)
+  const [verifying, setVerifying] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [descTab, setDescTab] = useState<"write" | "preview">("write")
 
@@ -91,6 +95,51 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
 
   function updateCase(idx: number, patch: Partial<TestCaseForm>) {
     setCases((prev) => prev.map((c, i) => (i === idx ? { ...c, ...patch } : c)))
+  }
+
+  async function handleRunReference() {
+    if (!refSolution.trim()) {
+      notify("error", "กรุณากรอกเฉลยอ้างอิงก่อนรัน")
+      return
+    }
+    setVerifying(true)
+    setRefResults(null)
+    try {
+      const res = await fetch(`/api/courses/${courseSlug}/problems/run-reference`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: refSolution, inputs: cases.map((c) => c.input) }),
+      })
+      if (!res.ok) {
+        notify("error", "รันเฉลยไม่สำเร็จ")
+        return
+      }
+      const data = await res.json()
+      const outputs = data.outputs as RefResult[]
+      setCases((prev) =>
+        prev.map((c, i) => {
+          const r = outputs[i]
+          if (!r || !r.ok || c.expectedOutput.trim()) return c
+          return { ...c, expectedOutput: r.stdout }
+        })
+      )
+      setRefResults(outputs)
+    } catch {
+      notify("error", "รันเฉลยไม่สำเร็จ")
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  function handleApplyAllFromRef() {
+    if (!refResults) return
+    setCases((prev) =>
+      prev.map((c, i) => {
+        const r = refResults[i]
+        if (!r || !r.ok) return c
+        return { ...c, expectedOutput: r.stdout }
+      })
+    )
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -247,14 +296,34 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
           <div className="rounded-xl border border-gray-200 bg-white p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-semibold text-slate-700">Test Cases</h2>
-              <button
-                type="button"
-                onClick={addCase}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm text-secondary transition hover:bg-blue-100"
-              >
-                <FaPlus className="h-3 w-3" />
-                เพิ่ม Test Case
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRunReference}
+                  disabled={verifying || !refSolution.trim()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm text-violet-700 transition hover:bg-violet-100 disabled:opacity-40"
+                >
+                  <FaPlay className="h-3 w-3" />
+                  {verifying ? "กำลังรัน..." : "รันเฉลย"}
+                </button>
+                {refResults && (
+                  <button
+                    type="button"
+                    onClick={handleApplyAllFromRef}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-700 transition hover:bg-amber-100"
+                  >
+                    ใช้ค่าจากเฉลยทั้งหมด
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={addCase}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm text-secondary transition hover:bg-blue-100"
+                >
+                  <FaPlus className="h-3 w-3" />
+                  เพิ่ม Test Case
+                </button>
+              </div>
             </div>
 
             {errors.testCases && (
@@ -317,6 +386,43 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
                         className="input-base w-full resize-y font-mono text-xs"
                         placeholder="ผลลัพธ์ที่คาดหวัง"
                       />
+                      {refResults && refResults[idx] && (
+                        <div className="mt-1">
+                          {(() => {
+                            const r = refResults[idx]
+                            if (!r.ok) {
+                              return (
+                                <p className="text-[11px] text-red-500">
+                                  🔴 เฉลยรันไม่ผ่าน
+                                  {r.stderr && (
+                                    <span className="ml-1 font-mono">{r.stderr.slice(0, 80)}</span>
+                                  )}
+                                </p>
+                              )
+                            }
+                            if (r.stdout.trim() === tc.expectedOutput.trim()) {
+                              return (
+                                <p className="text-[11px] text-green-600">✅ ตรงกับเฉลย</p>
+                              )
+                            }
+                            return (
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-[11px] text-amber-600">
+                                  ⚠️ ไม่ตรงกับเฉลย · เฉลยได้:{" "}
+                                  <code className="font-mono">{r.stdout || "(ว่าง)"}</code>
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => updateCase(idx, { expectedOutput: r.stdout })}
+                                  className="shrink-0 rounded bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700 hover:bg-amber-200"
+                                >
+                                  ใช้ค่านี้
+                                </button>
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

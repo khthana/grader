@@ -30,6 +30,26 @@ async function runCode(code: string, input: string): Promise<PistonResponse> {
   return res.json()
 }
 
+export async function runReferenceSolution(
+  code: string,
+  inputs: string[]
+): Promise<Array<{ stdout: string; stderr: string; ok: boolean }>> {
+  return Promise.all(
+    inputs.map(async (input) => {
+      try {
+        const response = await runCode(code, input)
+        const stdout = response.run.stdout.trim()
+        const stderr = response.run.stderr
+        const ok = response.run.code === 0 && stderr === ""
+        return { stdout, stderr, ok }
+      } catch (error) {
+        const stderr = error instanceof Error ? error.message : "Unknown error"
+        return { stdout: "", stderr, ok: false }
+      }
+    })
+  )
+}
+
 export async function runTestCases(
   code: string,
   testCases: TestCase[]
