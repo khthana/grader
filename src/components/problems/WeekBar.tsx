@@ -180,7 +180,7 @@ export function WeekBar({
                   onClick={() => removeWeek(w)}
                   title="ลบสัปดาห์สุดท้าย"
                   className={[
-                    "absolute -left-1.5 -top-1.5 rounded-full border p-1 text-[10px] shadow-sm transition disabled:opacity-50",
+                    "absolute left-1 top-1 rounded-full border p-1 text-[10px] shadow-sm transition disabled:opacity-50",
                     "border-gray-200 bg-white text-slate-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600",
                   ].join(" ")}
                 >
@@ -193,7 +193,7 @@ export function WeekBar({
                   onClick={(e) => { e.stopPropagation(); toggleRelease(w) }}
                   title={w.isReleased ? "ซ่อนสัปดาห์นี้" : "ปล่อยสัปดาห์นี้"}
                   className={[
-                    "absolute -right-1.5 -top-1.5 rounded-full border p-1 text-[10px] shadow-sm transition",
+                    "absolute right-1 top-1 rounded-full border p-1 text-[10px] shadow-sm transition",
                     w.isReleased
                       ? "border-green-200 bg-white text-green-500 hover:text-green-700"
                       : "border-gray-200 bg-white text-slate-300 hover:text-slate-500",
