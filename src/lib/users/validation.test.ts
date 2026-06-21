@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { validateUserInput, validateProfileInput, type UserInput } from "./validation"
+import { validateUserInput, validateProfileInput, validatePasswordChange, type UserInput } from "./validation"
 
 const validInput: UserInput = {
   firstNameTh: "สมชาย",
@@ -88,5 +88,33 @@ describe("validateProfileInput", () => {
     const bytes = Buffer.alloc(100 * 1024, 0)
     const b64 = `data:image/jpeg;base64,${bytes.toString("base64")}`
     expect(validateProfileInput({ pictureBase64: b64 }).valid).toBe(true)
+  })
+})
+
+describe("validatePasswordChange", () => {
+  it("flags all fields when all are missing", () => {
+    const result = validatePasswordChange({ currentPassword: "", newPassword: "", confirmPassword: "" })
+    expect(result.valid).toBe(false)
+    expect(result.errors.currentPassword).toBeDefined()
+    expect(result.errors.newPassword).toBeDefined()
+    expect(result.errors.confirmPassword).toBeDefined()
+  })
+
+  it("rejects weak new password (too short, no digit)", () => {
+    const result = validatePasswordChange({ currentPassword: "old", newPassword: "abcdefgh", confirmPassword: "abcdefgh" })
+    expect(result.valid).toBe(false)
+    expect(result.errors.newPassword).toBeDefined()
+  })
+
+  it("rejects when confirm does not match new", () => {
+    const result = validatePasswordChange({ currentPassword: "old", newPassword: "Password1", confirmPassword: "Password2" })
+    expect(result.valid).toBe(false)
+    expect(result.errors.confirmPassword).toBeDefined()
+  })
+
+  it("passes when all fields are valid and match", () => {
+    const result = validatePasswordChange({ currentPassword: "old", newPassword: "NewPass1", confirmPassword: "NewPass1" })
+    expect(result.valid).toBe(true)
+    expect(result.errors).toEqual({})
   })
 })

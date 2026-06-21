@@ -56,6 +56,36 @@ export function validateProfileInput(input: ProfileInput): ValidationResult {
   return { valid: Object.keys(errors).length === 0, errors }
 }
 
+export interface PasswordChangeInput {
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
+}
+
+export function validatePasswordChange(input: PasswordChangeInput): ValidationResult {
+  const errors: Record<string, string> = {}
+
+  if (!input.currentPassword) errors.currentPassword = "กรุณากรอกรหัสผ่านเดิม"
+
+  if (!input.newPassword) {
+    errors.newPassword = "กรุณากรอกรหัสผ่านใหม่"
+  } else {
+    const hasLetter = /[A-Za-z]/.test(input.newPassword)
+    const hasDigit = /\d/.test(input.newPassword)
+    if (input.newPassword.length < 8 || !hasLetter || !hasDigit) {
+      errors.newPassword = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร และมีทั้งตัวอักษรและตัวเลข"
+    }
+  }
+
+  if (!input.confirmPassword) {
+    errors.confirmPassword = "กรุณายืนยันรหัสผ่านใหม่"
+  } else if (!errors.newPassword && input.newPassword !== input.confirmPassword) {
+    errors.confirmPassword = "รหัสผ่านไม่ตรงกัน"
+  }
+
+  return { valid: Object.keys(errors).length === 0, errors }
+}
+
 export function validateUserInput(input: UserInput): ValidationResult {
   const errors: Record<string, string> = {}
 

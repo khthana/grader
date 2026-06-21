@@ -263,6 +263,17 @@ export async function updateUserName(
   return rows.length > 0
 }
 
+export async function updatePasswordHash(
+  db: Queryable,
+  userId: number,
+  hash: string
+): Promise<void> {
+  await db.query(
+    `UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1`,
+    [userId, hash]
+  )
+}
+
 export async function updateProfile(
   db: Queryable,
   userId: number,
