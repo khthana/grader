@@ -30,12 +30,6 @@ All planned features shipped. 392 tests / 59 files — all pass.
 | "สร้างด้วย AI" button in ProblemEditor | `b7799de` |
 | User Profile page (nickname, avatar, password change) | `2ccd753`–`7fdc520` + `migrate-004` |
 
-## Features In Progress
-
-| Feature | Issues | PRD |
-|---|---|---|
-| User Profile page (nickname, avatar, password change) | #46–49 all closed | `requirement/PRD-profile.md` |
-
 ---
 
 ## Database Migrations Required
