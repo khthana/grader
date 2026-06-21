@@ -1,13 +1,14 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { FaPlus, FaTrash } from "react-icons/fa"
+import { FaPlus, FaTrash, FaLock, FaLockOpen } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
 
 export interface Week {
   id: number
   weekNo: number
   topic: string
+  isReleased: boolean
 }
 
 const MAX_WEEKS = 16
@@ -77,6 +78,19 @@ export function WeekBar({
     } else {
       const body = await res.json().catch(() => ({}))
       notify("error", body.error || "เพิ่มสัปดาห์ไม่สำเร็จ")
+    }
+  }
+
+  async function toggleRelease(week: Week) {
+    const res = await fetch(`/api/courses/${courseSlug}/weeks/${week.id}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ isReleased: !week.isReleased }),
+    })
+    if (res.ok) {
+      onWeeksChanged()
+    } else {
+      notify("error", "เปลี่ยนสถานะสัปดาห์ไม่สำเร็จ")
     }
   }
 
@@ -171,6 +185,24 @@ export function WeekBar({
                   ].join(" ")}
                 >
                   <FaTrash className="h-2.5 w-2.5" />
+                </button>
+              )}
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); toggleRelease(w) }}
+                  title={w.isReleased ? "ซ่อนสัปดาห์นี้" : "ปล่อยสัปดาห์นี้"}
+                  className={[
+                    "absolute left-1 top-1 rounded p-0.5 text-[10px] transition",
+                    w.isReleased
+                      ? "text-green-500 hover:text-green-700"
+                      : "text-slate-300 hover:text-slate-500",
+                  ].join(" ")}
+                >
+                  {w.isReleased
+                    ? <FaLockOpen className="h-2.5 w-2.5" />
+                    : <FaLock className="h-2.5 w-2.5" />
+                  }
                 </button>
               )}
             </div>
