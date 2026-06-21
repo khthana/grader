@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS weeks (
   course_semester INTEGER NOT NULL,
   week_no         INTEGER NOT NULL,
   topic           TEXT NOT NULL DEFAULT '',
+  is_released     BOOLEAN NOT NULL DEFAULT FALSE,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (course_code, course_year, course_semester, week_no),

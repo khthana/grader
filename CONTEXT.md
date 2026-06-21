@@ -101,6 +101,9 @@ The single number shown wherever a student's score appears (Gradebook, Scorebook
 Assignments). A submission that has been auto-graded but not yet reviewed still has an
 effective score (its auto-grade).
 
+### Released Week (สัปดาห์ที่ปล่อยแล้ว)
+A **Week** whose `is_released` flag is `true`. Only Released Weeks are visible to Students — they appear in the WeekBar on Assignments, Scorebook, and Problems pages, and their Problems are accessible via direct URL. Unreleased (hidden) Weeks are visible only to Admin, Instructor, and TA, who see a lock icon on the week card and can toggle the release state. New Weeks default to unreleased. Toggling is manual (no scheduled release in v1).
+
 ### Gradebook (สมุดคะแนน — มุมมองอาจารย์/Staff)
 The staff-facing matrix of **every** enrolled Student × every **Problem** in a Course,
 each cell holding that student's **Effective Score**. Read by Admin/Instructor/TA. The

@@ -6,6 +6,7 @@ import {
   addWeek,
   weekHasProblems,
   deleteWeek,
+  setWeekReleased,
   DEFAULT_WEEKS,
   MAX_WEEKS,
 } from "./repository"
@@ -108,5 +109,60 @@ describe("week repository", () => {
     expect(await deleteWeek(db, last.id)).toBe(true)
     const after = await listWeeks(db, courseKey)
     expect(after).toHaveLength(DEFAULT_WEEKS - 1)
+  })
+
+  // Week Release Toggle (#37)
+
+  it("seeded weeks default to isReleased: false", async () => {
+    await seedWeeks(db, courseKey)
+    const weeks = await listWeeks(db, courseKey)
+    expect(weeks.every((w) => w.isReleased === false)).toBe(true)
+  })
+
+  it("setWeekReleased(true) persists — listWeeks reflects the change", async () => {
+    await seedWeeks(db, courseKey)
+    const [first] = await listWeeks(db, courseKey)
+    const updated = await setWeekReleased(db, first.id, true)
+    expect(updated).not.toBeNull()
+    expect(updated?.isReleased).toBe(true)
+    const refreshed = await listWeeks(db, courseKey)
+    expect(refreshed[0].isReleased).toBe(true)
+  })
+
+  it("setWeekReleased(false) reverts to hidden", async () => {
+    await seedWeeks(db, courseKey)
+    const [first] = await listWeeks(db, courseKey)
+    await setWeekReleased(db, first.id, true)
+    const reverted = await setWeekReleased(db, first.id, false)
+    expect(reverted?.isReleased).toBe(false)
+    const refreshed = await listWeeks(db, courseKey)
+    expect(refreshed[0].isReleased).toBe(false)
+  })
+
+  it("setWeekReleased returns null for unknown id", async () => {
+    expect(await setWeekReleased(db, 99999, true)).toBeNull()
+  })
+
+  it("listWeeks with releasedOnly:true excludes hidden weeks", async () => {
+    await seedWeeks(db, courseKey)
+    const weeks = await listWeeks(db, courseKey)
+    await setWeekReleased(db, weeks[0].id, true)
+    const visible = await listWeeks(db, courseKey, { releasedOnly: true })
+    expect(visible).toHaveLength(1)
+    expect(visible[0].weekNo).toBe(1)
+  })
+
+  it("listWeeks without releasedOnly returns all weeks regardless of state", async () => {
+    await seedWeeks(db, courseKey)
+    const weeks = await listWeeks(db, courseKey)
+    await setWeekReleased(db, weeks[0].id, true)
+    const all = await listWeeks(db, courseKey)
+    expect(all).toHaveLength(DEFAULT_WEEKS)
+  })
+
+  it("addWeek creates a week with isReleased: false", async () => {
+    const added = await addWeek(db, courseKey)
+    expect(added).not.toBeNull()
+    expect(added?.isReleased).toBe(false)
   })
 })

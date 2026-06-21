@@ -9,6 +9,7 @@ export interface WeekRecord {
   courseSemester: number
   weekNo: number
   topic: string
+  isReleased: boolean
 }
 
 interface WeekRow {
@@ -18,6 +19,7 @@ interface WeekRow {
   course_semester: number
   week_no: number
   topic: string
+  is_released: boolean
 }
 
 function toRecord(row: WeekRow): WeekRecord {
@@ -28,10 +30,11 @@ function toRecord(row: WeekRow): WeekRecord {
     courseSemester: row.course_semester,
     weekNo: row.week_no,
     topic: row.topic,
+    isReleased: row.is_released,
   }
 }
 
-const WEEK_COLS = `id, course_code, course_year, course_semester, week_no, topic`
+const WEEK_COLS = `id, course_code, course_year, course_semester, week_no, topic, is_released`
 
 export const DEFAULT_WEEKS = 6
 export const MAX_WEEKS = 16
@@ -97,15 +100,35 @@ export async function getWeekByNo(
   return rows[0] ? toRecord(rows[0]) : null
 }
 
-export async function listWeeks(db: Queryable, key: CourseKey): Promise<WeekRecord[]> {
+export async function listWeeks(
+  db: Queryable,
+  key: CourseKey,
+  opts?: { releasedOnly?: boolean }
+): Promise<WeekRecord[]> {
+  const releasedClause = opts?.releasedOnly ? `AND is_released = TRUE` : ``
   const { rows } = await db.query<WeekRow>(
     `SELECT ${WEEK_COLS}
      FROM weeks
      WHERE course_code = $1 AND course_year = $2::int AND course_semester = $3::int
+       ${releasedClause}
      ORDER BY week_no`,
     [key.code, key.year, key.semester]
   )
   return rows.map(toRecord)
+}
+
+export async function setWeekReleased(
+  db: Queryable,
+  weekId: number,
+  isReleased: boolean
+): Promise<WeekRecord | null> {
+  const { rows } = await db.query<WeekRow>(
+    `UPDATE weeks SET is_released = $1, updated_at = now()
+     WHERE id = $2::int
+     RETURNING ${WEEK_COLS}`,
+    [isReleased, weekId]
+  )
+  return rows[0] ? toRecord(rows[0]) : null
 }
 
 export async function updateWeekTopic(

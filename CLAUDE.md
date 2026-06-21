@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CE-Grader is a **standalone product**. The `DEEP-QA-FRONTEND/` and `DEEP-QA-BACKEND/` repos (siblings of this folder) are **read-only references only** — used for design-system look/feel and UX patterns, never extended or imported at runtime.
 
-The app is **feature-complete** as of 2026-06-20. All pages are live — no ComingSoon stubs remain. Delivered features:
+The app was **feature-complete** as of 2026-06-20. All pages are live — no ComingSoon stubs remain. **In progress (2026-06-21):** Week Release Toggle (GitHub #37–40, PRD `requirement/PRD-week-release.md`). Delivered features:
 - **Auth + shell:** Postgres-backed login (email/password + Google OAuth), role-based shell, navbar course switcher.
 - **Admin:** User Management (`/users` — CRUD + bulk xlsx import + role assignment), Activity Logs (`/logs`), **dev-only impersonation** (enter another user's session to test their view; persistent banner + one-click exit).
 - **Course management:** รายวิชา (`/courses` — CRUD + staff assignment, Admin/Instructor).
@@ -64,7 +64,7 @@ Course domain — **natural composite PKs, no surrogate `id`:**
 - `enrollments` — PK `(course_code, course_year, course_semester, user_id)`. Fields: `study_group`, `program`, `year` (student cohort year). No surrogate `id`.
 
 Problems domain — **surrogate `id` + composite FK to courses:**
-- `weeks` — `id SERIAL` PK, FK `(course_code, course_year, course_semester)` → courses, `UNIQUE (course_code, course_year, course_semester, week_no)`. New courses seed `DEFAULT_WEEKS`=6 (growable to `MAX_WEEKS`=16).
+- `weeks` — `id SERIAL` PK, FK `(course_code, course_year, course_semester)` → courses, `UNIQUE (course_code, course_year, course_semester, week_no)`. New courses seed `DEFAULT_WEEKS`=6 (growable to `MAX_WEEKS`=16). **`is_released BOOLEAN DEFAULT FALSE`** — controls student visibility (Week Release Toggle feature).
 - `problems` — `id SERIAL` PK, FK `(course_code, course_year, course_semester)` → courses, FK `week_id` → weeks, `problem_no INTEGER` (per-week sequential, auto-assigned), `UNIQUE (week_id, problem_no)`. Fields: `title`, `description`, `input_spec`, `output_spec`, `score`, `due_at`, `close_at`, `language`.
 - `test_cases` — `id SERIAL` PK, FK `problem_id`. Fields: `input`, `expected_output`, `is_hidden`, `score`, `sort_order`.
 - `submissions` — `id SERIAL` PK, FK `problem_id`, FK `user_id`, FK `(course_code, course_year, course_semester)` → courses. Fields: `code`, `language`, `points_earned`, `points_max`, `is_late`, `results jsonb`, `reviewed_at`, `reviewed_by`, `manual_score`.
@@ -99,7 +99,7 @@ parseCourseSlug(code, year, semester): CourseKey | null
 - `src/lib/users/repository.ts` — `createUser`, `findUserByEmail`, `getUserById`, `getUserWithRoles`, `listUsers`, `updateUser`, `deleteUser`, `setUserActive`, `assignRole`, `setUserRoles`, `countUsersWithRole`.
 - `src/lib/courses/repository.ts` — `createCourse(db, { code, year, semester, nameTh, nameEn, program? })`, `getCourseByKey(db, key: CourseKey)`, `updateCourse(db, key, data)`, `deleteCourse(db, key)`, `listCoursesForUser(db, userId, roles)` (**entitlement: Admin all; others: `course_instructors` UNION `enrollments`**), `assignInstructor(db, key: CourseKey, userId)`, `setCourseInstructors(db, key, userIds)`, `listCourseInstructors(db, key)`, `searchStaffCandidates(db, key, query)`.
 - `src/lib/enrollments/repository.ts` — `createEnrollment(db, { courseCode, courseYear, courseSemester, userId, ... })`, `findEnrollment(db, key, userId)`, `getEnrollmentByUser(db, key, userId)`, `listEnrollments(db, key, opts)`, `listAllEnrollments(db, key)`, `listGroups(db, key)`, `updateEnrollment(db, key, userId, data)`, `deleteEnrollment(db, key, userId)`.
-- `src/lib/weeks/repository.ts` — `seedWeeks(db, key: CourseKey)`, `listWeeks(db, key)`, `getWeekByNo(db, key, weekNo)`, `updateWeekTopic(db, weekId, topic)`, `addWeek(db, key)`, `weekHasProblems(db, weekId)`, `deleteWeek(db, weekId)`.
+- `src/lib/weeks/repository.ts` — `seedWeeks(db, key: CourseKey)`, `listWeeks(db, key, opts?)` (`releasedOnly?: boolean`), `getWeekByNo(db, key, weekNo)`, `updateWeekTopic(db, weekId, topic)`, `setWeekReleased(db, weekId, isReleased)`, `addWeek(db, key)`, `weekHasProblems(db, weekId)`, `deleteWeek(db, weekId)`.
 - `src/lib/problems/repository.ts` — `createProblem(db, { courseCode, courseYear, courseSemester, weekId, title, ... })` (auto-assigns `problem_no`), `getProblemById(db, id)` (includes `testCases[]`), `getProblemByWeekAndNo(db, key, weekNo, problemNo)`, `listProblems(db, key, opts)` (includes `pointsMax`, `weekNo`, `problemNo`), `updateProblem`, `deleteProblem`, `setTestCases`.
 - `src/lib/submissions/repository.ts` — `createSubmission(db, { problemId, userId, courseCode, courseYear, courseSemester, ... })`, `listSubmissions`, `countSubmitted(db, problemId, key: CourseKey)`, `countPending`, `getSubmission`, `reviewSubmission`, `listSubmissionsForProblem(db, problemId)`, `getLastSubmission`, `listPendingSubmissions(db, key: CourseKey)`, `getProblemIdsWithSubmissions(db, key: CourseKey)` → `number[]`.
 - `src/lib/gradebook/repository.ts` — `getGradebook(db, key: CourseKey)` → `{ problems: GradebookProblem[], students: GradebookStudent[] }` where `student.scores[problemId]` = `COALESCE(manual_score, points_earned)`.
@@ -172,7 +172,8 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
 - **UI:** `src/components/courses/` and `src/components/students/`.
 
 ### Problems & grading
-- **Weeks:** `GET /api/courses/[code]/[year]/[semester]/weeks` (list); `POST` (Instructor appends); `PUT …/weeks/[wid]` (edit topic); `DELETE …/weeks/[wid]` (last only, no problems, keep ≥1). `WeekBar` component renders a wrapping `grid-cols-6` of week cards.
+- **Weeks:** `GET /api/courses/[code]/[year]/[semester]/weeks` (list — role-aware: Student receives only `is_released=true` weeks); `POST` (Instructor appends); `PUT …/weeks/[wid]` (edit topic and/or toggle `isReleased`); `DELETE …/weeks/[wid]` (last only, no problems, keep ≥1). `WeekBar` component renders a `grid-cols-6` of week cards; when `canManage`, each card shows a lock/unlock icon to toggle release state.
+- **Week release gate:** problem page checks `week.isReleased`; if Student + hidden → renders "ยังไม่เปิดรับ" notice (not 404). Staff always see the problem.
 - **Problems (Instructor):** `GET/POST /api/courses/.../problems`; `GET/PUT/DELETE …/problems/[pid]`. `ProblemEditor` handles create/edit with live test-case management. `validateProblemInput`: title required, weekId required, ≥1 test case, score ≥ 0, `close_at` ≥ `due_at`.
 - **Student view** (`/courses/.../problems/[week]/[no]`): loaded via `getWeekByNo` + `getProblemByWeekAndNo`.
 - **Code editor** (`src/components/editor/CodeEditor.tsx`): uses `@uiw/react-codemirror` + `@codemirror/lang-python`, dynamically imported with `ssr: false`. Dark theme, line numbers, `editable={!isClosed}`.
