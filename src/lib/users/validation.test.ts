@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { validateUserInput, type UserInput } from "./validation"
+import { validateUserInput, validateProfileInput, type UserInput } from "./validation"
 
 const validInput: UserInput = {
   firstNameTh: "สมชาย",
@@ -50,5 +50,43 @@ describe("validateUserInput", () => {
   it("rejects unknown roles when roles are provided", () => {
     expect(validateUserInput({ ...validInput, roles: ["Admin", "Student"] }).errors.roles).toBeUndefined()
     expect(validateUserInput({ ...validInput, roles: ["Wizard"] }).errors.roles).toBeDefined()
+  })
+})
+
+describe("validateProfileInput", () => {
+  it("accepts an empty object (all fields optional)", () => {
+    const result = validateProfileInput({})
+    expect(result.valid).toBe(true)
+    expect(result.errors).toEqual({})
+  })
+
+  it("rejects nickname longer than 50 chars", () => {
+    const result = validateProfileInput({ nickname: "น".repeat(51) })
+    expect(result.valid).toBe(false)
+    expect(result.errors.nickname).toBeDefined()
+  })
+
+  it("accepts nickname of exactly 50 chars", () => {
+    expect(validateProfileInput({ nickname: "น".repeat(50) }).valid).toBe(true)
+  })
+
+  it("rejects pictureBase64 with invalid data URL format", () => {
+    const result = validateProfileInput({ pictureBase64: "not-a-data-url" })
+    expect(result.valid).toBe(false)
+    expect(result.errors.pictureBase64).toBeDefined()
+  })
+
+  it("rejects pictureBase64 over 150KB", () => {
+    const bigBytes = Buffer.alloc(151 * 1024, 0)
+    const b64 = `data:image/jpeg;base64,${bigBytes.toString("base64")}`
+    const result = validateProfileInput({ pictureBase64: b64 })
+    expect(result.valid).toBe(false)
+    expect(result.errors.pictureBase64).toBeDefined()
+  })
+
+  it("accepts a valid base64 image within 150KB", () => {
+    const bytes = Buffer.alloc(100 * 1024, 0)
+    const b64 = `data:image/jpeg;base64,${bytes.toString("base64")}`
+    expect(validateProfileInput({ pictureBase64: b64 }).valid).toBe(true)
   })
 })

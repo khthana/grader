@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation"
 import { useState } from "react"
-import { FaChevronDown, FaSignOutAlt, FaUser, FaBook, FaPlus } from "react-icons/fa"
+import { FaChevronDown, FaSignOutAlt, FaUser, FaBook, FaPlus, FaCog } from "react-icons/fa"
 import { HiArrowsRightLeft } from "react-icons/hi2"
 import { getLandingRoute, type Role } from "@/lib/roles"
 import { canManageCourses } from "@/lib/courses/access"
@@ -229,6 +229,12 @@ export function Navbar({
               <p className="truncate font-thai text-sm font-medium text-slate-800">{name}</p>
               <p className="font-thai text-xs text-slate-400">{activeRole}</p>
             </div>
+            <button
+              onClick={() => { setProfileOpen(false); router.push("/profile") }}
+              className="flex w-full items-center gap-3 px-4 py-2 font-thai text-sm text-slate-600 hover:bg-slate-50"
+            >
+              <FaCog /> โปรไฟล์
+            </button>
             <button
               onClick={logout}
               className="flex w-full items-center gap-3 px-4 py-2 font-thai text-sm text-slate-600 hover:bg-slate-50 hover:text-red-600"

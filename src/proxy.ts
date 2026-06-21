@@ -39,5 +39,6 @@ export const config = {
     "/gradebook/:path*",
     "/assignments/:path*",
     "/scorebook/:path*",
+    "/profile",
   ],
 }

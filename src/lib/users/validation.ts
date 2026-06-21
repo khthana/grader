@@ -1,3 +1,8 @@
+export interface ProfileInput {
+  nickname?: string | null
+  pictureBase64?: string | null
+}
+
 export interface UserInput {
   titleTh?: string
   firstNameTh: string
@@ -23,6 +28,32 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function isBlank(value: string | undefined): boolean {
   return !value || value.trim() === ""
+}
+
+export function validateProfileInput(input: ProfileInput): ValidationResult {
+  const errors: Record<string, string> = {}
+
+  if (input.nickname != null) {
+    if (input.nickname.trim().length > 50) {
+      errors.nickname = "ชื่อเล่นต้องไม่เกิน 50 ตัวอักษร"
+    }
+  }
+
+  if (input.pictureBase64 != null && input.pictureBase64 !== "") {
+    const commaIdx = input.pictureBase64.indexOf(",")
+    const header = commaIdx >= 0 ? input.pictureBase64.slice(0, commaIdx) : ""
+    const b64data = commaIdx >= 0 ? input.pictureBase64.slice(commaIdx + 1) : ""
+    if (!header.match(/^data:image\/.+;base64$/) || !b64data) {
+      errors.pictureBase64 = "รูปแบบรูปภาพไม่ถูกต้อง"
+    } else {
+      const byteLength = Buffer.from(b64data, "base64").length
+      if (byteLength > 150 * 1024) {
+        errors.pictureBase64 = "รูปภาพต้องมีขนาดไม่เกิน 150KB"
+      }
+    }
+  }
+
+  return { valid: Object.keys(errors).length === 0, errors }
 }
 
 export function validateUserInput(input: UserInput): ValidationResult {
