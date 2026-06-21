@@ -7,9 +7,9 @@ Branch: `main`
 
 ---
 
-## Status: In Development 🔧
+## Status: Feature-complete ✅
 
-Profile page feature in progress — issues #46–#49. 368 tests / 57 files — all pass.
+All planned features shipped. 392 tests / 59 files — all pass.
 
 ---
 
@@ -28,12 +28,13 @@ Profile page feature in progress — issues #46–#49. 368 tests / 57 files — 
 | Reference Solution + Verify (Piston runner) | `ab7bf5b`, `c8257f4` + `migrate-003` |
 | LLM module + generate endpoint | `6a92bff` |
 | "สร้างด้วย AI" button in ProblemEditor | `b7799de` |
+| User Profile page (nickname, avatar, password change) | `2ccd753`–`7fdc520` + `migrate-004` |
 
 ## Features In Progress
 
 | Feature | Issues | PRD |
 |---|---|---|
-| User Profile page (nickname, avatar, password change) | #46 parent; #47 schema; #48 info page; #49 password | `requirement/PRD-profile.md` |
+| User Profile page (nickname, avatar, password change) | #46–49 all closed | `requirement/PRD-profile.md` |
 
 ---
 
@@ -47,8 +48,7 @@ set -a; . ./.env.local; set +a
 npx tsx scripts/migrate.ts scripts/migrate-001-natural-keys.sql
 npx tsx scripts/migrate.ts scripts/migrate-002-week-is-released.sql
 npx tsx scripts/migrate.ts scripts/migrate-003-problem-reference-solution.sql
-# migrate-004 will be added when #47 is implemented:
-# npx tsx scripts/migrate.ts scripts/migrate-004-user-nickname.sql
+npx tsx scripts/migrate.ts scripts/migrate-004-user-nickname.sql
 ```
 
 Fresh installs (`npm run db:setup`) get all columns via `schema.sql` automatically, but the seed step will error on an existing DB — safe to ignore.
@@ -87,11 +87,8 @@ LLM_MODEL=                # default: claude-haiku-4-5-20251001
 
 ---
 
-## Open Issues
+## No Known Blockers
 
-- **#47** — Profile: schema + nickname plumbing (start here, no blockers)
-- **#48** — Profile: general info page / avatar (blocked by #47)
-- **#49** — Profile: password change section (blocked by #48)
-- **#46** — Parent issue (do not close until all three above are done)
+No open issues. No in-progress features. Next session can start fresh with new requirements.
 
 

@@ -21,9 +21,9 @@ All pages are live — no ComingSoon stubs remain. Delivered features:
 - **Week Release Toggle:** Instructor/Admin toggle `is_released` per Week via lock icon on WeekBar; Students see only released Weeks everywhere (Assignments, Scorebook, Problems); direct URL to unreleased week's problem renders "ยังไม่เปิดรับ" notice (not 404). New Weeks default to hidden. DB migration: `scripts/migrate-002-week-is-released.sql`.
 - **Reference Solution + Verify:** Instructor stores a Python reference solution per problem in `ProblemEditor` (`SolutionEditor` CodeMirror widget). "รันเฉลย" runs it against all test-case inputs via Piston and shows ✅/⚠️/🔴 per case with per-case "ใช้ค่านี้" + bulk "ใช้ค่าจากเฉลยทั้งหมด". Reference solution is **never** exposed to Students — `getReferenceSolution(db, problemId)` is the only reader, callable only from staff-gated paths. DB migration: `scripts/migrate-003-problem-reference-solution.sql`.
 - **AI Test-Case Generation:** "สร้างด้วย AI" button in ProblemEditor calls `POST /api/courses/.../problems/generate`; AI writes a solution + diverse test inputs; result fills `refSolution` and replaces test cases; Instructor clicks "รันเฉลย" to compute outputs before saving. Button is hidden after a 503 (no LLM key). Works in both create mode (sends raw title/description) and edit mode (sends `problemId`).
-- **User Profile** *(in development — issues #46–#49):* `/profile` page for all roles — set nickname (shown in navbar instead of official name) + upload avatar (Canvas API client-side resize → 256×256px → base64 → DB), change password (disabled for Google accounts). API: `GET/PUT /api/profile`, `PUT /api/profile/password` (non-admin-gated). Schema: `users.nickname TEXT` + `migrate-004-user-nickname.sql`.
+- **User Profile** *(issues #46–#49):* `/profile` page for all roles — set nickname (shown in navbar instead of official name) + upload avatar (Canvas API client-side resize → 256×256px → base64 → DB), change password (disabled for Google accounts). API: `GET/PUT /api/profile`, `PUT /api/profile/password` (non-admin-gated). Schema: `users.nickname TEXT` + `migrate-004-user-nickname.sql`.
 
-Specs: `requirement/PRD.md` + `requirement/PRD-week-release.md` + `requirement/PRD-reference-solution-ai.md` + `requirement/PRD-profile.md`. Design rationale: `CONTEXT.md` (glossary), `docs/adr/`. DB migration scripts: `scripts/migrate-001-natural-keys.sql`, `scripts/migrate-002-week-is-released.sql`, `scripts/migrate-003-problem-reference-solution.sql`, `scripts/migrate-004-user-nickname.sql` *(pending).*
+Specs: `requirement/PRD.md` + `requirement/PRD-week-release.md` + `requirement/PRD-reference-solution-ai.md` + `requirement/PRD-profile.md`. Design rationale: `CONTEXT.md` (glossary), `docs/adr/`. DB migration scripts: `scripts/migrate-001-natural-keys.sql`, `scripts/migrate-002-week-is-released.sql`, `scripts/migrate-003-problem-reference-solution.sql`, `scripts/migrate-004-user-nickname.sql`.
 
 ## Commands
 - `npm run dev` — start dev server (Turbopack)
@@ -238,7 +238,7 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
 5. `GradeResult = { pointsEarned, pointsMax, totalTests, passedTests, results[], feedback }` returned to client.
 
 ## Testing
-- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **368 tests / 57 files** as of 2026-06-21.
+- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **392 tests / 59 files** as of 2026-06-21.
 - Pure modules are unit-tested directly (session, password, roles, breadcrumbs, validation, import, name).
 - Repository + route handlers are integration-tested against **pg-mem** (in-memory Postgres, no Docker): build a pool with `newDb()` + `mem.public.none(schema.sql)` + `mem.adapters.createPg()`, inject via `setTestDb`, seed through the repository. Route handlers are imported and called with a `NextRequest`; auth is exercised with real `createSessionToken` cookies.
 - **pg-mem gotchas:** explicit casts (`$1::int`); no `STRING_AGG` (use second query + JS); no `DISTINCT ON` (use subquery with `MAX(submitted_at)` + inner join); schema path `../` count must match test file depth exactly.
@@ -270,7 +270,7 @@ docker run -d --name grader-db --restart unless-stopped \
 # then: DATABASE_URL=postgresql://grader:grader@localhost:5433/grader npm run db:setup
 ```
 
-**After schema changes on the dev DB:** apply the relevant migration script via `npx tsx scripts/migrate.ts <file>` (or `psql $DATABASE_URL -f <file>` if psql is available). Migration scripts in order: `migrate-001-natural-keys.sql`, `migrate-002-week-is-released.sql`, `migrate-003-problem-reference-solution.sql`, `migrate-004-user-nickname.sql` *(pending — will be created with #47)*. Fresh installs can use `db:setup` (applies `schema.sql` which includes all columns), but the seed step will error on an existing DB — that's safe to ignore.
+**After schema changes on the dev DB:** apply the relevant migration script via `npx tsx scripts/migrate.ts <file>` (or `psql $DATABASE_URL -f <file>` if psql is available). Migration scripts in order: `migrate-001-natural-keys.sql`, `migrate-002-week-is-released.sql`, `migrate-003-problem-reference-solution.sql`, `migrate-004-user-nickname.sql`. Fresh installs can use `db:setup` (applies `schema.sql` which includes all columns), but the seed step will error on an existing DB — that's safe to ignore.
 
 ## Conventions
 - Server Components by default; `'use client'` for interactive components.
