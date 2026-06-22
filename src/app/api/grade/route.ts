@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { runTestCases } from "@/lib/piston"
+import { runTestCases, runUnitTestCases } from "@/lib/piston"
 import type { SubmissionRequest, GradeResult, TestCase } from "@/types"
 import { getUserFromRequest } from "@/lib/auth-guard"
 import { getDb } from "@/lib/db"
@@ -80,7 +80,10 @@ export async function POST(request: NextRequest) {
     isHidden: tc.isHidden,
   }))
 
-  const results = await runTestCases(code, testCases)
+  const results =
+    problem.problemType === "unit"
+      ? await runUnitTestCases(problem.functionName, testCases, code)
+      : await runTestCases(code, testCases)
 
   const scoreMap = new Map(problem.testCases.map((tc) => [tc.id, tc.score ?? 10]))
   const pointsEarned = results

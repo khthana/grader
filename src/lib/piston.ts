@@ -50,6 +50,71 @@ export async function runReferenceSolution(
   )
 }
 
+export async function runUnitTestCases(
+  functionName: string,
+  testCases: TestCase[],
+  studentCode: string
+): Promise<TestResult[]> {
+  return Promise.all(
+    testCases.map(async (tc) => {
+      const harness = `${studentCode}
+
+try:
+    _result = ${functionName}(${tc.input})
+    _expected = ${tc.expectedOutput}
+    if _result == _expected:
+        print("PASS")
+    else:
+        print(f"FAIL:{repr(_result)}")
+except Exception as e:
+    print(f"ERROR:{str(e)}")
+`
+      try {
+        const response = await runCode(harness, "")
+        const stdout = response.run.stdout.trim()
+        if (stdout === "PASS") {
+          return {
+            testCaseId: tc.id,
+            passed: true,
+            actualOutput: tc.expectedOutput,
+            expectedOutput: tc.expectedOutput,
+            executionTime: 0,
+          } satisfies TestResult
+        }
+        if (stdout.startsWith("FAIL:")) {
+          const actualOutput = stdout.slice(5)
+          return {
+            testCaseId: tc.id,
+            passed: false,
+            actualOutput,
+            expectedOutput: tc.expectedOutput,
+            executionTime: 0,
+          } satisfies TestResult
+        }
+        // ERROR: or unexpected output
+        const errorMsg = stdout.startsWith("ERROR:") ? stdout.slice(6) : stdout
+        return {
+          testCaseId: tc.id,
+          passed: false,
+          actualOutput: "",
+          expectedOutput: tc.expectedOutput,
+          executionTime: 0,
+          error: errorMsg,
+        } satisfies TestResult
+      } catch (error) {
+        return {
+          testCaseId: tc.id,
+          passed: false,
+          actualOutput: "",
+          expectedOutput: tc.expectedOutput,
+          executionTime: 0,
+          error: error instanceof Error ? error.message : "Unknown error",
+        } satisfies TestResult
+      }
+    })
+  )
+}
+
 export async function runTestCases(
   code: string,
   testCases: TestCase[]
