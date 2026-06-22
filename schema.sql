@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS problems (
   problem_type        TEXT NOT NULL DEFAULT 'io',
   function_name       TEXT NOT NULL DEFAULT '',
   starter_code        TEXT NOT NULL DEFAULT '',
+  unit_test_code      TEXT NOT NULL DEFAULT '',
   blacklist           TEXT[] NOT NULL DEFAULT '{}',
   whitelist           TEXT[] NOT NULL DEFAULT '{}',
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),

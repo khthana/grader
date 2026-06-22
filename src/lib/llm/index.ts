@@ -13,7 +13,7 @@ function extractJson(text: string): string {
 }
 
 export type IoTestPlan   = { solution: string; inputs: string[] }
-export type UnitTestPlan = { solution: string; tests: { args: string; expectedReturn: string }[] }
+export type UnitTestPlan = { solution: string; unitTestCode: string }
 
 export async function generateTestPlan(problem: {
   title: string
@@ -40,10 +40,10 @@ export async function generateTestPlan(problem: {
   const prompt = isUnit
     ? `You are a programming test designer. Given the following Python unit-test problem, write:
 1. A correct Python function implementation
-2. A diverse set of 8-10 test cases covering normal values, edge cases, and boundary values
+2. A single block of Python unit-test code using assert statements that covers normal values, edge cases, and boundary values (8-10 assertions). The student's function will be prepended before this block, so call the function(s) directly. Do not redefine the function.
 
 Return ONLY valid JSON with no markdown, no explanation:
-{"solution":"<Python function code>","tests":[{"args":"<python literal args>","expected_return":"<python literal>"},...]}
+{"solution":"<Python function code>","unit_test_code":"<Python assert statements, newline-separated>"}
 
 Problem:
 ${parts}`
@@ -86,14 +86,11 @@ ${parts}`
   if (isUnit) {
     const parsed = JSON.parse(extractJson(text)) as {
       solution: string
-      tests: Array<{ args: unknown; expected_return: unknown }>
+      unit_test_code: unknown
     }
     return {
       solution: parsed.solution,
-      tests: parsed.tests.map((t) => ({
-        args: String(t.args),
-        expectedReturn: String(t.expected_return),
-      })),
+      unitTestCode: String(parsed.unit_test_code ?? ""),
     }
   }
 

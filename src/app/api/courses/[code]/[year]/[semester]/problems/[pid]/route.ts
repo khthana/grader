@@ -56,10 +56,17 @@ export const PUT = courseRoute<{ code: string; year: string; semester: string; p
       closeAt?: string | null
       language?: string
       referenceSolution?: string
+      problemType?: string
+      functionName?: string
+      starterCode?: string
+      unitTestCode?: string
+      blacklist?: string[]
+      whitelist?: string[]
       testCases?: Array<{
         input: string
         expectedOutput: string
         isHidden: boolean
+        score?: number
         sortOrder: number
       }>
     }
@@ -71,6 +78,11 @@ export const PUT = courseRoute<{ code: string; year: string; semester: string; p
       dueAt: body.dueAt,
       closeAt: body.closeAt,
       testCases: body.testCases,
+      problemType: body.problemType,
+      functionName: body.functionName,
+      unitTestCode: body.unitTestCode,
+      blacklist: body.blacklist,
+      whitelist: body.whitelist,
     })
     if (!valid) return NextResponse.json({ errors }, { status: 400 })
 
@@ -90,6 +102,12 @@ export const PUT = courseRoute<{ code: string; year: string; semester: string; p
       closeAt: body.closeAt,
       language: body.language,
       referenceSolution: body.referenceSolution,
+      problemType: body.problemType,
+      functionName: body.functionName,
+      starterCode: body.starterCode,
+      unitTestCode: body.unitTestCode,
+      blacklist: body.blacklist,
+      whitelist: body.whitelist,
     })
 
     const testCases = await setTestCases(db, problemId, body.testCases ?? [])

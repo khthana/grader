@@ -80,16 +80,13 @@ describe("generateTestPlan", () => {
     expect(result.inputs).toEqual(["1", "2", "3"])
   })
 
-  it("problemType='unit' → result has tests[].args and tests[].expectedReturn", async () => {
+  it("problemType='unit' → result has solution and unitTestCode", async () => {
     mockFetch({
       content: [
         {
           text: JSON.stringify({
             solution: "def add(a, b): return a + b",
-            tests: [
-              { args: "1, 2", expected_return: "3" },
-              { args: "0, 0", expected_return: "0" },
-            ],
+            unit_test_code: "assert add(1, 2) == 3\nassert add(0, 0) == 0",
           }),
         },
       ],
@@ -97,38 +94,38 @@ describe("generateTestPlan", () => {
     const result = await generateTestPlan({
       title: "Add", description: "Write add(a,b)", problemType: "unit",
     })
-    expect("tests" in result).toBe(true)
-    if ("tests" in result) {
-      expect(result.tests[0].args).toBe("1, 2")
-      expect(result.tests[0].expectedReturn).toBe("3")
+    expect("unitTestCode" in result).toBe(true)
+    if ("unitTestCode" in result) {
+      expect(result.solution).toBe("def add(a, b): return a + b")
+      expect(result.unitTestCode).toContain("assert add(1, 2) == 3")
     }
   })
 
   it("problemType='unit' → prompt sent to API contains unit-test signal", async () => {
     mockFetch({
       content: [{
-        text: JSON.stringify({ solution: "def add(a,b): return a+b", tests: [{ args: "1,2", expected_return: "3" }] }),
+        text: JSON.stringify({ solution: "def add(a,b): return a+b", unit_test_code: "assert add(1,2)==3" }),
       }],
     })
     await generateTestPlan({ title: "Add", description: "Write add(a,b)", problemType: "unit" })
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]?.body as string) as { messages: Array<{ content: string }> }
     const prompt = body.messages[0].content
     expect(prompt).toContain("unit-test")
-    expect(prompt).toContain("expected_return")
+    expect(prompt).toContain("unit_test_code")
   })
 
-  it("problemType='io' → returns inputs[], not tests[]", async () => {
+  it("problemType='io' → returns inputs[], not unitTestCode", async () => {
     mockFetch(CLEAN_RESPONSE)
     const result = await generateTestPlan({ title: "Square", description: "Print n squared", problemType: "io" })
     expect("inputs" in result).toBe(true)
-    expect("tests" in result).toBe(false)
+    expect("unitTestCode" in result).toBe(false)
   })
 
   it("problemType omitted → returns inputs[] (backward compat)", async () => {
     mockFetch(CLEAN_RESPONSE)
     const result = await generateTestPlan({ title: "Square", description: "Print n squared" })
     expect("inputs" in result).toBe(true)
-    expect("tests" in result).toBe(false)
+    expect("unitTestCode" in result).toBe(false)
   })
 
   it("passes inputSpec and outputSpec to the API when provided", async () => {

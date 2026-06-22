@@ -230,6 +230,31 @@ describe("problem repository", () => {
     expect(detail?.whitelist).toEqual(["def"])
   })
 
+  it("createProblem with unitTestCode → getProblemById returns it; default is empty", async () => {
+    const withBlock = await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId, title: "Block Q",
+      problemType: "unit",
+      unitTestCode: "assert add(1, 2) == 3",
+    })
+    expect((await getProblemById(db, withBlock.id))?.unitTestCode).toBe("assert add(1, 2) == 3")
+
+    const without = await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId, title: "No Block Q",
+    })
+    expect((await getProblemById(db, without.id))?.unitTestCode).toBe("")
+  })
+
+  it("updateProblem can patch unitTestCode", async () => {
+    const p = await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId, title: "Q",
+    })
+    await updateProblem(db, p.id, { unitTestCode: "assert solve() == 42" })
+    expect((await getProblemById(db, p.id))?.unitTestCode).toBe("assert solve() == 42")
+  })
+
   it("createProblem without new fields → defaults (io, empty strings, empty arrays)", async () => {
     const p = await createProblem(db, {
       courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,

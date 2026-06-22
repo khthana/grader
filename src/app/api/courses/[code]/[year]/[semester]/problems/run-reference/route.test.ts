@@ -8,10 +8,12 @@ import { createEnrollment } from "@/lib/enrollments/repository"
 // Mock Piston — external HTTP; tested separately in src/lib/piston.test.ts
 vi.mock("@/lib/piston", () => ({
   runReferenceSolution: vi.fn(),
+  runUnitTestBlock: vi.fn(),
 }))
 
-import { runReferenceSolution } from "@/lib/piston"
+import { runReferenceSolution, runUnitTestBlock } from "@/lib/piston"
 const mockRun = vi.mocked(runReferenceSolution)
+const mockBlock = vi.mocked(runUnitTestBlock)
 
 import { POST } from "./route"
 
@@ -41,6 +43,7 @@ describe("POST /api/courses/[code]/[year]/[semester]/problems/run-reference", ()
     f = await courseFixture()
     setTestDb(f.db)
     mockRun.mockReset()
+    mockBlock.mockReset()
   })
 
   afterEach(() => setTestDb(null))
@@ -57,6 +60,36 @@ describe("POST /api/courses/[code]/[year]/[semester]/problems/run-reference", ()
     expect(body.outputs[0]).toEqual({ stdout: "42", stderr: "", ok: true })
     expect(body.outputs[1]).toEqual({ stdout: "", stderr: "err", ok: false })
     expect(mockRun).toHaveBeenCalledWith("print(42)", ["", ""])
+  })
+
+  it("unit mode: runs reference solution + unit test block, returns single ok result", async () => {
+    mockBlock.mockResolvedValue({
+      testCaseId: 0, passed: true, actualOutput: "", expectedOutput: "", executionTime: 0,
+    })
+    const res = await POST(
+      req({ code: "def add(a,b): return a+b", problemType: "unit", unitTestCode: "assert add(1,2)==3" }),
+      ctx()
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.outputs).toHaveLength(1)
+    expect(body.outputs[0].ok).toBe(true)
+    expect(mockBlock).toHaveBeenCalledWith("def add(a,b): return a+b", "assert add(1,2)==3")
+    expect(mockRun).not.toHaveBeenCalled()
+  })
+
+  it("unit mode: failing block returns ok:false with traceback in stderr", async () => {
+    mockBlock.mockResolvedValue({
+      testCaseId: 0, passed: false, actualOutput: "", expectedOutput: "", executionTime: 0, error: "AssertionError",
+    })
+    const res = await POST(
+      req({ code: "def add(a,b): return 0", problemType: "unit", unitTestCode: "assert add(1,2)==3" }),
+      ctx()
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.outputs[0].ok).toBe(false)
+    expect(body.outputs[0].stderr).toContain("AssertionError")
   })
 
   it("empty inputs array returns 200 with empty outputs", async () => {

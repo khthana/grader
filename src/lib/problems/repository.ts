@@ -20,6 +20,7 @@ export interface ProblemRecord {
   problemType: string
   functionName: string
   starterCode: string
+  unitTestCode: string
   blacklist: string[]
   whitelist: string[]
   createdAt: string
@@ -75,6 +76,7 @@ interface ProblemRow {
   problem_type: string
   function_name: string
   starter_code: string
+  unit_test_code: string
   blacklist: string[]
   whitelist: string[]
   created_at: string
@@ -109,6 +111,7 @@ function toRecord(row: ProblemRow): ProblemRecord {
     problemType: row.problem_type,
     functionName: row.function_name,
     starterCode: row.starter_code,
+    unitTestCode: row.unit_test_code,
     blacklist: row.blacklist ?? [],
     whitelist: row.whitelist ?? [],
     createdAt: row.created_at,
@@ -130,7 +133,7 @@ function toTestCaseRecord(row: TestCaseRow): TestCaseRecord {
 const PROBLEM_COLS =
   `id, course_code, course_year, course_semester, week_id, problem_no,
    title, description, input_spec, output_spec, score, due_at, close_at, language,
-   problem_type, function_name, starter_code, blacklist, whitelist, created_at`
+   problem_type, function_name, starter_code, unit_test_code, blacklist, whitelist, created_at`
 
 export async function createProblem(
   db: Queryable,
@@ -151,6 +154,7 @@ export async function createProblem(
     problemType?: string
     functionName?: string
     starterCode?: string
+    unitTestCode?: string
     blacklist?: string[]
     whitelist?: string[]
   }
@@ -159,10 +163,10 @@ export async function createProblem(
     `INSERT INTO problems
        (course_code, course_year, course_semester, week_id, problem_no,
         title, description, input_spec, output_spec, score, due_at, close_at, language,
-        reference_solution, problem_type, function_name, starter_code, blacklist, whitelist)
+        reference_solution, problem_type, function_name, starter_code, unit_test_code, blacklist, whitelist)
      VALUES ($1, $2::int, $3::int, $4::int,
              COALESCE((SELECT MAX(problem_no) FROM problems WHERE week_id = $4::int), 0) + 1,
-             $5, $6, $7, $8, $9::int, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+             $5, $6, $7, $8, $9::int, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
      RETURNING ${PROBLEM_COLS}`,
     [
       data.courseCode,
@@ -181,6 +185,7 @@ export async function createProblem(
       data.problemType ?? "io",
       data.functionName ?? "",
       data.starterCode ?? "",
+      data.unitTestCode ?? "",
       data.blacklist ?? [],
       data.whitelist ?? [],
     ]
@@ -298,6 +303,7 @@ export async function updateProblem(
     problemType: string
     functionName: string
     starterCode: string
+    unitTestCode: string
     blacklist: string[]
     whitelist: string[]
   }>
@@ -317,6 +323,7 @@ export async function updateProblem(
   if (data.problemType !== undefined) { params.push(data.problemType); sets.push(`problem_type = $${params.length}`) }
   if (data.functionName !== undefined) { params.push(data.functionName); sets.push(`function_name = $${params.length}`) }
   if (data.starterCode !== undefined) { params.push(data.starterCode); sets.push(`starter_code = $${params.length}`) }
+  if (data.unitTestCode !== undefined) { params.push(data.unitTestCode); sets.push(`unit_test_code = $${params.length}`) }
   if (data.blacklist !== undefined) { params.push(data.blacklist); sets.push(`blacklist = $${params.length}`) }
   if (data.whitelist !== undefined) { params.push(data.whitelist); sets.push(`whitelist = $${params.length}`) }
 

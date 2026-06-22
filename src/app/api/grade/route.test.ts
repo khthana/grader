@@ -13,12 +13,12 @@ import { freshDb, setTestDb, sessionFor, type Queryable } from "@/lib/test-suppo
 // Mock Piston — external HTTP; tested separately
 vi.mock("@/lib/piston", () => ({
   runTestCases: vi.fn(),
-  runUnitTestCases: vi.fn(),
+  runUnitTestBlock: vi.fn(),
 }))
 
-import { runTestCases, runUnitTestCases } from "@/lib/piston"
+import { runTestCases, runUnitTestBlock } from "@/lib/piston"
 const mockRun = vi.mocked(runTestCases)
-const mockUnitRun = vi.mocked(runUnitTestCases)
+const mockUnitRun = vi.mocked(runUnitTestBlock)
 
 function gradeReq(body: unknown, token?: string): NextRequest {
   const r = new NextRequest("http://localhost/api/grade", {
@@ -287,76 +287,44 @@ describe("POST /api/grade", () => {
 
   // ── Unit Test Mode ───────────────────────────────────────────────────────
 
-  it("unit problem: function correct → passed=true, pointsEarned = tc.score", async () => {
+  it("unit problem: block passes → passed=true, pointsEarned = problem.score (all-or-nothing)", async () => {
     const weeks = await listWeeks(db, { code: "C01", year: 2567, semester: 1 })
     const p = await createProblem(db, {
       courseCode: "C01", courseYear: 2567, courseSemester: 1,
-      weekId: weeks[0].id, title: "Add fn",
-      problemType: "unit", functionName: "add",
+      weekId: weeks[0].id, title: "Add fn", score: 25,
+      problemType: "unit", unitTestCode: "assert add(1, 2) == 3",
     })
-    await setTestCases(db, p.id, [
-      { input: "1, 2", expectedOutput: "3", isHidden: false, score: 10, sortOrder: 0 },
-    ])
-    const detail = await getProblemById(db, p.id)
-    const [tc] = detail!.testCases
-    mockUnitRun.mockResolvedValue([
-      { testCaseId: tc.id, passed: true, actualOutput: "3", expectedOutput: "3", executionTime: 0 },
-    ])
+    mockUnitRun.mockResolvedValue(
+      { testCaseId: 0, passed: true, actualOutput: "", expectedOutput: "", executionTime: 0 },
+    )
     const token = sessionFor("student@kmitl.ac.th")
     const res = await POST(gradeReq({ problemId: p.id, code: "def add(a, b): return a + b", mode: "run" }, token))
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.pointsEarned).toBe(10)
-    expect(body.pointsMax).toBe(10)
+    expect(body.pointsEarned).toBe(25)
+    expect(body.pointsMax).toBe(25)
     expect(mockUnitRun).toHaveBeenCalledOnce()
+    expect(mockUnitRun).toHaveBeenCalledWith("def add(a, b): return a + b", "assert add(1, 2) == 3")
     expect(mockRun).not.toHaveBeenCalled()
   })
 
-  it("unit problem: wrong return value → passed=false, actualOutput has repr", async () => {
+  it("unit problem: block fails → passed=false, pointsEarned=0, traceback in error", async () => {
     const weeks = await listWeeks(db, { code: "C01", year: 2567, semester: 1 })
     const p = await createProblem(db, {
       courseCode: "C01", courseYear: 2567, courseSemester: 1,
-      weekId: weeks[0].id, title: "Add fn wrong",
-      problemType: "unit", functionName: "add",
+      weekId: weeks[0].id, title: "Add fn wrong", score: 25,
+      problemType: "unit", unitTestCode: "assert add(1, 2) == 3",
     })
-    await setTestCases(db, p.id, [
-      { input: "1, 2", expectedOutput: "3", isHidden: false, score: 10, sortOrder: 0 },
-    ])
-    const detail = await getProblemById(db, p.id)
-    const [tc] = detail!.testCases
-    mockUnitRun.mockResolvedValue([
-      { testCaseId: tc.id, passed: false, actualOutput: "99", expectedOutput: "3", executionTime: 0 },
-    ])
+    mockUnitRun.mockResolvedValue(
+      { testCaseId: 0, passed: false, actualOutput: "", expectedOutput: "", executionTime: 0, error: "AssertionError" },
+    )
     const token = sessionFor("student@kmitl.ac.th")
     const res = await POST(gradeReq({ problemId: p.id, code: "def add(a, b): return 99", mode: "run" }, token))
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.pointsEarned).toBe(0)
     expect(body.results[0].passed).toBe(false)
-    expect(body.results[0].actualOutput).toBe("99")
-  })
-
-  it("unit problem: function throws → passed=false", async () => {
-    const weeks = await listWeeks(db, { code: "C01", year: 2567, semester: 1 })
-    const p = await createProblem(db, {
-      courseCode: "C01", courseYear: 2567, courseSemester: 1,
-      weekId: weeks[0].id, title: "Add fn throws",
-      problemType: "unit", functionName: "add",
-    })
-    await setTestCases(db, p.id, [
-      { input: "1, 2", expectedOutput: "3", isHidden: false, score: 10, sortOrder: 0 },
-    ])
-    const detail = await getProblemById(db, p.id)
-    const [tc] = detail!.testCases
-    mockUnitRun.mockResolvedValue([
-      { testCaseId: tc.id, passed: false, actualOutput: "", expectedOutput: "3", executionTime: 0, error: "unsupported operand type" },
-    ])
-    const token = sessionFor("student@kmitl.ac.th")
-    const res = await POST(gradeReq({ problemId: p.id, code: "def add(a, b): return a - b", mode: "run" }, token))
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body.pointsEarned).toBe(0)
-    expect(body.results[0].passed).toBe(false)
+    expect(body.results[0].error).toContain("AssertionError")
   })
 
   it("io problem still uses runTestCases — no regression", async () => {

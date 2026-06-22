@@ -73,14 +73,24 @@ describe("validateProblemInput", () => {
     expect(result.valid).toBe(true)
   })
 
-  it("unit problem with empty functionName → error", () => {
-    const result = validateProblemInput({ ...validInput, problemType: "unit", functionName: "" })
+  it("unit problem with empty unitTestCode → error", () => {
+    const result = validateProblemInput({ ...validInput, problemType: "unit", unitTestCode: "" })
     expect(result.valid).toBe(false)
-    expect(result.errors.functionName).toBeTruthy()
+    expect(result.errors.unitTestCode).toBeTruthy()
   })
 
-  it("io problem with empty functionName → valid (ignored)", () => {
-    const result = validateProblemInput({ ...validInput, problemType: "io", functionName: "" })
+  it("unit problem with unitTestCode → valid (no test cases required)", () => {
+    const result = validateProblemInput({
+      title: "Add", weekId: 1, dueAt: null, closeAt: null,
+      problemType: "unit", unitTestCode: "assert add(1, 2) == 3", testCases: [],
+    })
+    expect(result.valid).toBe(true)
+  })
+
+  it("unit problem with empty functionName → valid (function name now optional)", () => {
+    const result = validateProblemInput({
+      ...validInput, problemType: "unit", functionName: "", unitTestCode: "assert add(1,2)==3",
+    })
     expect(result.valid).toBe(true)
   })
 

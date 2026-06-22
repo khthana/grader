@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { runTestCases, runUnitTestCases } from "@/lib/piston"
+import { runTestCases, runUnitTestBlock } from "@/lib/piston"
 import type { SubmissionRequest, GradeResult, TestCase } from "@/types"
 import { getUserFromRequest } from "@/lib/auth-guard"
 import { getDb } from "@/lib/db"
@@ -56,9 +56,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const isUnit = problem.problemType === "unit"
+
   const policy = checkCodePolicy(code, problem.blacklist ?? [], problem.whitelist ?? [])
   if (!policy.ok) {
-    const pointsMax = problem.testCases.reduce((s, tc) => s + (tc.score ?? 10), 0)
+    const pointsMax = isUnit
+      ? problem.score
+      : problem.testCases.reduce((s, tc) => s + (tc.score ?? 10), 0)
     return NextResponse.json({
       pointsEarned: 0,
       pointsMax,
@@ -69,27 +73,36 @@ export async function POST(request: NextRequest) {
     } satisfies GradeResult)
   }
 
-  const testCases: TestCase[] = (
-    runMode === "run"
-      ? problem.testCases.filter((tc) => !tc.isHidden)
-      : problem.testCases
-  ).map((tc) => ({
-    id: tc.id,
-    input: tc.input,
-    expectedOutput: tc.expectedOutput,
-    isHidden: tc.isHidden,
-  }))
+  let results
+  let pointsEarned: number
+  let pointsMax: number
 
-  const results =
-    problem.problemType === "unit"
-      ? await runUnitTestCases(problem.functionName, testCases, code)
-      : await runTestCases(code, testCases)
+  if (isUnit) {
+    // Unit mode (#55): single test-code block, all-or-nothing scoring.
+    const result = await runUnitTestBlock(code, problem.unitTestCode)
+    results = [result]
+    pointsMax = problem.score
+    pointsEarned = result.passed ? problem.score : 0
+  } else {
+    const testCases: TestCase[] = (
+      runMode === "run"
+        ? problem.testCases.filter((tc) => !tc.isHidden)
+        : problem.testCases
+    ).map((tc) => ({
+      id: tc.id,
+      input: tc.input,
+      expectedOutput: tc.expectedOutput,
+      isHidden: tc.isHidden,
+    }))
 
-  const scoreMap = new Map(problem.testCases.map((tc) => [tc.id, tc.score ?? 10]))
-  const pointsEarned = results
-    .filter((r) => r.passed)
-    .reduce((sum, r) => sum + (scoreMap.get(r.testCaseId) ?? 0), 0)
-  const pointsMax = testCases.reduce((sum, tc) => sum + (scoreMap.get(tc.id) ?? 0), 0)
+    results = await runTestCases(code, testCases)
+    const scoreMap = new Map(problem.testCases.map((tc) => [tc.id, tc.score ?? 10]))
+    pointsEarned = results
+      .filter((r) => r.passed)
+      .reduce((sum, r) => sum + (scoreMap.get(r.testCaseId) ?? 0), 0)
+    pointsMax = testCases.reduce((sum, tc) => sum + (scoreMap.get(tc.id) ?? 0), 0)
+  }
+
   const passedTests = results.filter((r) => r.passed).length
   const totalTests = results.length
 

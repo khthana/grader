@@ -45,10 +45,17 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
     closeAt?: string | null
     language?: string
     referenceSolution?: string
+    problemType?: string
+    functionName?: string
+    starterCode?: string
+    unitTestCode?: string
+    blacklist?: string[]
+    whitelist?: string[]
     testCases?: Array<{
       input: string
       expectedOutput: string
       isHidden: boolean
+      score?: number
       sortOrder: number
     }>
   }
@@ -60,6 +67,11 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
     dueAt: body.dueAt,
     closeAt: body.closeAt,
     testCases: body.testCases,
+    problemType: body.problemType,
+    functionName: body.functionName,
+    unitTestCode: body.unitTestCode,
+    blacklist: body.blacklist,
+    whitelist: body.whitelist,
   })
   if (!valid) return NextResponse.json({ errors }, { status: 400 })
 
@@ -78,6 +90,12 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
     closeAt: body.closeAt ?? null,
     language: body.language ?? "python",
     referenceSolution: body.referenceSolution,
+    problemType: body.problemType,
+    functionName: body.functionName,
+    starterCode: body.starterCode,
+    unitTestCode: body.unitTestCode,
+    blacklist: body.blacklist,
+    whitelist: body.whitelist,
   })
 
   const testCases = await setTestCases(db, problem.id, body.testCases ?? [])

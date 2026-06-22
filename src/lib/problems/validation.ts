@@ -7,6 +7,7 @@ export interface ProblemInput {
   testCases?: unknown[]
   problemType?: string
   functionName?: string
+  unitTestCode?: string
   blacklist?: unknown[]
   whitelist?: unknown[]
 }
@@ -29,13 +30,16 @@ export function validateProblemInput(input: ProblemInput): {
     errors.score = "คะแนนโจทย์ต้องไม่ต่ำกว่า 0"
   }
 
-  const cases = input.testCases ?? []
-  if (cases.length === 0) {
-    errors.testCases = "ต้องมีอย่างน้อย 1 test case"
-  }
-
-  if (input.problemType === "unit" && !input.functionName?.trim()) {
-    errors.functionName = "ต้องระบุชื่อฟังก์ชันสำหรับโจทย์ประเภท Unit Test"
+  // Unit mode (#55) uses a single test-code block instead of per-case test cases.
+  if (input.problemType === "unit") {
+    if (!input.unitTestCode?.trim()) {
+      errors.unitTestCode = "ต้องระบุ Unit Test Code สำหรับโจทย์ประเภท Unit Test"
+    }
+  } else {
+    const cases = input.testCases ?? []
+    if (cases.length === 0) {
+      errors.testCases = "ต้องมีอย่างน้อย 1 test case"
+    }
   }
 
   for (const list of ["blacklist", "whitelist"] as const) {

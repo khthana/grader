@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { runReferenceSolution } from "./piston"
+import { runReferenceSolution, runUnitTestBlock } from "./piston"
 
 function mockPiston(response: { stdout: string; stderr: string; code: number }) {
   vi.stubGlobal(
@@ -62,5 +62,31 @@ describe("runReferenceSolution", () => {
     const [r] = await runReferenceSolution("print(1)", [""])
     expect(r.ok).toBe(false)
     expect(r.stderr).toContain("network error")
+  })
+})
+
+describe("runUnitTestBlock", () => {
+  it("passed:true when the combined code exits cleanly (all asserts pass)", async () => {
+    mockPiston({ stdout: "", stderr: "", code: 0 })
+    const result = await runUnitTestBlock("def add(a,b): return a+b", "assert add(1,2) == 3")
+    expect(result.passed).toBe(true)
+  })
+
+  it("passed:false with traceback in error when an assert fails (non-zero exit)", async () => {
+    mockPiston({
+      stdout: "",
+      stderr: "Traceback (most recent call last):\n  ...\nAssertionError",
+      code: 1,
+    })
+    const result = await runUnitTestBlock("def add(a,b): return 0", "assert add(1,2) == 3")
+    expect(result.passed).toBe(false)
+    expect(result.error).toContain("AssertionError")
+  })
+
+  it("passed:false with error when piston fetch throws", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")))
+    const result = await runUnitTestBlock("x = 1", "assert x == 1")
+    expect(result.passed).toBe(false)
+    expect(result.error).toContain("network error")
   })
 })
