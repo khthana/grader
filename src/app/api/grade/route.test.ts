@@ -7,6 +7,7 @@ import { seedWeeks, listWeeks } from "@/lib/weeks/repository"
 import { createProblem, setTestCases } from "@/lib/problems/repository"
 import { createEnrollment } from "@/lib/enrollments/repository"
 import { listSubmissions } from "@/lib/submissions/repository"
+import { getProblemById } from "@/lib/problems/repository"
 import { freshDb, setTestDb, sessionFor, type Queryable } from "@/lib/test-support/db"
 
 // Mock Piston — external HTTP; tested separately
@@ -68,8 +69,8 @@ describe("POST /api/grade", () => {
     })
     problemId = problem.id
     await setTestCases(db, problemId, [
-      { input: "", expectedOutput: "Hello", isHidden: false, sortOrder: 0 },
-      { input: "", expectedOutput: "World", isHidden: true, sortOrder: 1 },
+      { input: "", expectedOutput: "Hello", isHidden: false, score: 20, sortOrder: 0 },
+      { input: "", expectedOutput: "World", isHidden: true,  score: 10, sortOrder: 1 },
     ])
   })
 
@@ -92,7 +93,7 @@ describe("POST /api/grade", () => {
     expect(res.status).toBe(404)
   })
 
-  it("mode:run — pass all visible → pointsEarned = problem.score", async () => {
+  it("mode:run — pass all visible → pointsEarned = sum of visible tc scores", async () => {
     mockRun.mockResolvedValue([
       { testCaseId: 1, passed: true, actualOutput: "Hello", expectedOutput: "Hello", executionTime: 0 },
     ])
@@ -100,15 +101,15 @@ describe("POST /api/grade", () => {
     const res = await POST(gradeReq({ problemId, code: "print('Hello')", mode: "run" }, token))
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.pointsEarned).toBe(30)
-    expect(body.pointsMax).toBe(30)
+    expect(body.pointsEarned).toBe(20)
+    expect(body.pointsMax).toBe(20)
     expect(body.results).toHaveLength(1)
     const calledCases = mockRun.mock.calls[0][1]
     expect(calledCases).toHaveLength(1)
     expect(calledCases[0].isHidden).toBe(false)
   })
 
-  it("mode:run — fail any visible → pointsEarned = 0", async () => {
+  it("mode:run — fail visible → pointsEarned = 0", async () => {
     mockRun.mockResolvedValue([
       { testCaseId: 1, passed: false, actualOutput: "x", expectedOutput: "Hello", executionTime: 0 },
     ])
@@ -117,10 +118,10 @@ describe("POST /api/grade", () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.pointsEarned).toBe(0)
-    expect(body.pointsMax).toBe(30)
+    expect(body.pointsMax).toBe(20)
   })
 
-  it("mode:submit — pass all → pointsEarned = problem.score, stored", async () => {
+  it("mode:submit — pass all → pointsEarned = sum of all tc scores, stored", async () => {
     mockRun.mockResolvedValue([
       { testCaseId: 1, passed: true, actualOutput: "Hello", expectedOutput: "Hello", executionTime: 0 },
       { testCaseId: 2, passed: true, actualOutput: "World", expectedOutput: "World", executionTime: 0 },
@@ -135,19 +136,19 @@ describe("POST /api/grade", () => {
     expect(subs[0].pointsEarned).toBe(30)
   })
 
-  it("mode:submit — fail any → pointsEarned = 0, stored", async () => {
+  it("mode:submit — partial pass → partial pointsEarned, stored", async () => {
     mockRun.mockResolvedValue([
-      { testCaseId: 1, passed: true, actualOutput: "Hello", expectedOutput: "Hello", executionTime: 0 },
-      { testCaseId: 2, passed: false, actualOutput: "x", expectedOutput: "World", executionTime: 0 },
+      { testCaseId: 1, passed: true,  actualOutput: "Hello", expectedOutput: "Hello", executionTime: 0 },
+      { testCaseId: 2, passed: false, actualOutput: "x",     expectedOutput: "World", executionTime: 0 },
     ])
     const token = sessionFor("student@kmitl.ac.th")
     const res = await POST(gradeReq({ problemId, code: "print('Hello')", mode: "submit" }, token))
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.pointsEarned).toBe(0)
+    expect(body.pointsEarned).toBe(20)
     expect(body.pointsMax).toBe(30)
     const subs = await listSubmissions(db, problemId)
-    expect(subs[0].pointsEarned).toBe(0)
+    expect(subs[0].pointsEarned).toBe(20)
   })
 
   // ── Deadline enforcement ─────────────────────────────────────────────────
@@ -237,5 +238,36 @@ describe("POST /api/grade", () => {
     expect(res.status).toBe(200)
     const subs = await listSubmissions(db, problemId)
     expect(subs).toHaveLength(0)
+  })
+
+  // ── Per-test-case scoring ────────────────────────────────────────────────
+
+  it("per-test-case scoring: pass 1 of 2 → pointsEarned = score of passing case", async () => {
+    const course = await createCourse(db, { code: "C10", year: 2567, semester: 1, nameTh: "ก", nameEn: "A" })
+    await seedWeeks(db, course)
+    const weeks = await listWeeks(db, course)
+    const student = await createUser(db, { email: "s10@kmitl.ac.th", name: "S10", idCode: "10" })
+    await assignRole(db, student.id, "Student")
+    await createEnrollment(db, { courseCode: course.code, courseYear: course.year, courseSemester: course.semester, userId: student.id })
+    const p = await createProblem(db, {
+      courseCode: course.code, courseYear: course.year, courseSemester: course.semester,
+      weekId: weeks[0].id, title: "Scoring Q", score: 30,
+    })
+    await setTestCases(db, p.id, [
+      { input: "", expectedOutput: "A", isHidden: false, score: 20, sortOrder: 0 },
+      { input: "", expectedOutput: "B", isHidden: false, score: 10, sortOrder: 1 },
+    ])
+    const detail = await getProblemById(db, p.id)
+    const [tc1, tc2] = detail!.testCases
+    mockRun.mockResolvedValue([
+      { testCaseId: tc1.id, passed: true,  actualOutput: "A", expectedOutput: "A", executionTime: 0 },
+      { testCaseId: tc2.id, passed: false, actualOutput: "x", expectedOutput: "B", executionTime: 0 },
+    ])
+    const token = sessionFor("s10@kmitl.ac.th")
+    const res = await POST(gradeReq({ problemId: p.id, code: "print('A')", mode: "submit" }, token))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.pointsEarned).toBe(20)
+    expect(body.pointsMax).toBe(30)
   })
 })

@@ -68,9 +68,11 @@ export async function POST(request: NextRequest) {
 
   const results = await runTestCases(code, testCases)
 
-  const allPassed = results.length > 0 && results.every((r) => r.passed)
-  const pointsEarned = allPassed ? problem.score : 0
-  const pointsMax = problem.score
+  const scoreMap = new Map(problem.testCases.map((tc) => [tc.id, tc.score ?? 10]))
+  const pointsEarned = results
+    .filter((r) => r.passed)
+    .reduce((sum, r) => sum + (scoreMap.get(r.testCaseId) ?? 0), 0)
+  const pointsMax = testCases.reduce((sum, tc) => sum + (scoreMap.get(tc.id) ?? 0), 0)
   const passedTests = results.filter((r) => r.passed).length
   const totalTests = results.length
 
@@ -100,7 +102,7 @@ export async function POST(request: NextRequest) {
     passedTests,
     results,
     feedback:
-      allPassed
+      passedTests === totalTests && totalTests > 0
         ? "ผ่านทุก test case!"
         : `ได้ ${pointsEarned}/${pointsMax} คะแนน`,
   }
