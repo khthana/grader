@@ -514,7 +514,7 @@ Introduce a real **Problem** domain: course-scoped Problems organised by **Week*
 
 ## PRD 10 · Unit Test Mode & Code Policy (Blacklist / Whitelist)
 
-> Status: In Progress (issues #50–#54)
+> Status: Complete (issues #50–#54)
 > Full spec: `requirement/PRD-unit-test-blacklist.md`
 
 ### Problem Statement
