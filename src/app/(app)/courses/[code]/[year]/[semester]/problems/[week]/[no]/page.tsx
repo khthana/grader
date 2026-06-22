@@ -73,7 +73,10 @@ export default async function CourseProblemPage({ params }: PageProps) {
   const now = new Date()
   const isClosed = problem.closeAt ? new Date(problem.closeAt) < now : false
   const isLateWindow = !isClosed && problem.dueAt ? new Date(problem.dueAt) < now : false
-  const pointsMax = problem.testCases.reduce((s, tc) => s + (tc.score ?? 0), 0)
+  const pointsMax =
+    problem.problemType === "unit"
+      ? problem.score
+      : problem.testCases.reduce((s, tc) => s + (tc.score ?? 0), 0)
   const effectiveScore = lastSubmission?.manualScore ?? lastSubmission?.pointsEarned ?? null
   const coursePath = buildCoursePath(slug)
 
@@ -170,6 +173,7 @@ export default async function CourseProblemPage({ params }: PageProps) {
           draftKey={`editor-code-${code}/${year}/${semester}/${weekNo}/${problemNo}`}
           isClosed={isClosed}
           starterCode={problem.starterCode || ""}
+          problemType={problem.problemType}
         />
       </div>
     </div>

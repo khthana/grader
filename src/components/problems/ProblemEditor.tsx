@@ -52,6 +52,7 @@ interface Props {
     problemType: string
     functionName: string
     starterCode: string
+    unitTestCode: string
     blacklist: string[]
     whitelist: string[]
     testCases: TestCaseForm[]
@@ -86,6 +87,7 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
   )
   const [functionName, setFunctionName] = useState(problem?.functionName ?? "")
   const [starterCode, setStarterCode] = useState(problem?.starterCode ?? "")
+  const [unitTestCode, setUnitTestCode] = useState(problem?.unitTestCode ?? "")
   const [blacklist, setBlacklist] = useState<string[]>(problem?.blacklist ?? [])
   const [whitelist, setWhitelist] = useState<string[]>(problem?.whitelist ?? [])
   const [blacklistDraft, setBlacklistDraft] = useState("")
@@ -123,15 +125,14 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
     setVerifying(true)
     setRefResults(null)
     try {
+      const body =
+        problemType === "unit"
+          ? { code: refSolution, problemType, unitTestCode }
+          : { code: refSolution, inputs: cases.map((c) => c.input) }
       const res = await fetch(`/api/courses/${courseSlug}/problems/run-reference`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          code: refSolution,
-          inputs: cases.map((c) => c.input),
-          problemType,
-          functionName: functionName.trim(),
-        }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) {
         notify("error", "รันเฉลยไม่สำเร็จ")
@@ -139,13 +140,18 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
       }
       const data = await res.json()
       const outputs = data.outputs as RefResult[]
-      setCases((prev) =>
-        prev.map((c, i) => {
-          const r = outputs[i]
-          if (!r || !r.ok || c.expectedOutput.trim()) return c
-          return { ...c, expectedOutput: r.stdout }
-        })
-      )
+      if (problemType === "unit") {
+        const ok = outputs[0]?.ok
+        notify(ok ? "success" : "error", ok ? "เฉลยผ่าน Unit Test Code ✅" : "เฉลยไม่ผ่าน — ตรวจสอบ test code")
+      } else {
+        setCases((prev) =>
+          prev.map((c, i) => {
+            const r = outputs[i]
+            if (!r || !r.ok || c.expectedOutput.trim()) return c
+            return { ...c, expectedOutput: r.stdout }
+          })
+        )
+      }
       setRefResults(outputs)
     } catch {
       notify("error", "รันเฉลยไม่สำเร็จ")
@@ -180,12 +186,12 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
       }
       const data = await res.json() as
         | { solution: string; inputs: string[] }
-        | { solution: string; tests: { args: string; expectedReturn: string }[] }
+        | { solution: string; unitTestCode: string }
       setRefSolution(data.solution)
-      if ("tests" in data) {
-        setCases(data.tests.map((t, i) => ({ input: t.args, expectedOutput: t.expectedReturn, isHidden: false, sortOrder: i })))
+      if ("unitTestCode" in data) {
+        setUnitTestCode(data.unitTestCode)
         setRefResults(null)
-        notify("success", "AI สร้าง test cases เรียบร้อยแล้ว")
+        notify("success", "AI สร้าง Unit Test Code เรียบร้อย — กด 'รันเฉลย' เพื่อตรวจสอบ")
       } else {
         setCases(data.inputs.map((input, i) => ({ input, expectedOutput: "", isHidden: false, sortOrder: i })))
         setRefResults(null)
@@ -228,14 +234,18 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
       problemType,
       functionName: functionName.trim(),
       starterCode,
+      unitTestCode,
       blacklist,
       whitelist,
-      testCases: cases.map((c, i) => ({
-        input: c.input,
-        expectedOutput: c.expectedOutput,
-        isHidden: c.isHidden,
-        sortOrder: i,
-      })),
+      testCases:
+        problemType === "unit"
+          ? []
+          : cases.map((c, i) => ({
+              input: c.input,
+              expectedOutput: c.expectedOutput,
+              isHidden: c.isHidden,
+              sortOrder: i,
+            })),
     }
 
     const url =
@@ -437,13 +447,13 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
               <button
                 type="button"
                 onClick={handleRunReference}
-                disabled={verifying || !refSolution.trim() || (problemType === "unit" && !functionName.trim())}
+                disabled={verifying || !refSolution.trim() || (problemType === "unit" && !unitTestCode.trim())}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm text-violet-700 transition hover:bg-violet-100 disabled:opacity-40"
               >
                 <FaPlay className="h-3 w-3" />
                 {verifying ? "กำลังรัน..." : "รันเฉลย"}
               </button>
-              {refResults && (
+              {problemType === "io" && refResults && (
                 <button
                   type="button"
                   onClick={handleApplyAllFromRef}
@@ -452,31 +462,67 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
                   ใช้ค่าจากเฉลยทั้งหมด
                 </button>
               )}
-              <button
-                type="button"
-                onClick={addCase}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm text-secondary transition hover:bg-blue-100"
-              >
-                <FaPlus className="h-3 w-3" />
-                เพิ่ม Test Case
-              </button>
+              {problemType === "io" && (
+                <button
+                  type="button"
+                  onClick={addCase}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm text-secondary transition hover:bg-blue-100"
+                >
+                  <FaPlus className="h-3 w-3" />
+                  เพิ่ม Test Case
+                </button>
+              )}
             </div>
 
-            {/* Function name — unit mode only */}
+            {/* Function name — unit mode only (optional) */}
             {problemType === "unit" && (
               <div className="mb-3">
-                <Field label="ชื่อฟังก์ชัน *" error={errors.functionName}>
+                <Field label="ชื่อฟังก์ชัน (ไม่บังคับ)">
                   <input
                     type="text"
                     value={functionName}
                     onChange={(e) => setFunctionName(e.target.value)}
-                    placeholder="เช่น add, fibonacci, is_palindrome"
+                    placeholder="เช่น add, fibonacci, is_palindrome — ใช้เป็น hint ให้ AI"
                     className="input-base w-full font-mono"
                   />
                 </Field>
               </div>
             )}
 
+            {/* Unit Test Code block — unit mode */}
+            {problemType === "unit" ? (
+              <>
+                {errors.unitTestCode && (
+                  <p className="mb-2 text-xs text-red-500">{errors.unitTestCode}</p>
+                )}
+                <p className="mb-2 text-xs text-slate-400">
+                  เขียน assert ทดสอบฟังก์ชันของนักศึกษา — code นักศึกษาจะถูกวางไว้ด้านบนก่อนรัน · ผ่านทั้งบล็อก = ได้คะแนนเต็ม
+                </p>
+                <SolutionEditor
+                  value={unitTestCode}
+                  onChange={setUnitTestCode}
+                  label="Unit Test Code"
+                  placeholder={"# เช่น\nassert add(1, 2) == 3\nassert add(0, 0) == 0"}
+                />
+                {refResults && refResults[0] && (
+                  <div className="mt-2">
+                    {refResults[0].ok ? (
+                      <p className="text-xs text-green-600">✅ เฉลยผ่าน Unit Test Code ทั้งหมด</p>
+                    ) : (
+                      <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                        <p className="mb-1 text-xs font-semibold text-red-600">🔴 เฉลยไม่ผ่าน</p>
+                        {refResults[0].stderr && (
+                          <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] text-red-700">
+                            {refResults[0].stderr}
+                          </pre>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+            <>
             {errors.testCases && (
               <p className="mb-3 text-xs text-red-500">{errors.testCases}</p>
             )}
@@ -519,21 +565,17 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1 block text-xs text-slate-400">
-                        {problemType === "unit" ? "Arguments" : "Input"}
-                      </label>
+                      <label className="mb-1 block text-xs text-slate-400">Input</label>
                       <textarea
                         value={tc.input}
                         onChange={(e) => updateCase(idx, { input: e.target.value })}
                         rows={3}
                         className="input-base w-full resize-y font-mono text-xs"
-                        placeholder={problemType === "unit" ? "เช่น 1, 2" : "ว่างได้ถ้าไม่มี input"}
+                        placeholder="ว่างได้ถ้าไม่มี input"
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs text-slate-400">
-                        {problemType === "unit" ? "Expected Return Value" : "Expected Output"}
-                      </label>
+                      <label className="mb-1 block text-xs text-slate-400">Expected Output</label>
                       <textarea
                         value={tc.expectedOutput}
                         onChange={(e) => updateCase(idx, { expectedOutput: e.target.value })}
@@ -583,6 +625,8 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
                 </div>
               ))}
             </div>
+            </>
+            )}
           </div>
         </div>
 

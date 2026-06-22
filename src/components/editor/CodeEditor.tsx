@@ -17,6 +17,7 @@ interface CodeEditorProps {
   draftKey?: string
   isClosed?: boolean
   starterCode?: string
+  problemType?: string
 }
 
 function useEditorPrefs() {
@@ -107,7 +108,7 @@ function SettingsPopover({
   )
 }
 
-export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode = "" }: CodeEditorProps) {
+export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode = "", problemType = "io" }: CodeEditorProps) {
   const key = draftKey ?? `editor-code-${problemId}`
   const [code, setCode] = useState("")
   const [result, setResult] = useState<GradeResult | null>(null)
@@ -119,8 +120,8 @@ export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode 
   const { theme, fontSize, tabSize, setTheme, setFontSize, setTabSize } = useEditorPrefs()
 
   useEffect(() => {
-    const saved = localStorage.getItem(key)
-    setCode(saved ?? starterCode)
+    const initial = localStorage.getItem(key) ?? starterCode
+    if (initial) setCode(initial)
   }, [key, starterCode])
 
   const handleChange = useCallback((value: string) => {
@@ -273,9 +274,18 @@ export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode 
                 }`}
               >
                 <p className="font-semibold">
-                  Test {i + 1}: {r.passed ? "ผ่าน ✓" : "ไม่ผ่าน ✗"}
+                  {problemType === "unit"
+                    ? `ผลการทดสอบ: ${r.passed ? "ผ่าน ✓" : "ไม่ผ่าน ✗"}`
+                    : `Test ${i + 1}: ${r.passed ? "ผ่าน ✓" : "ไม่ผ่าน ✗"}`}
                 </p>
-                {!r.passed && (
+                {!r.passed && problemType === "unit" && (
+                  <div className="mt-2 flex flex-col gap-1 font-mono text-xs">
+                    {r.error
+                      ? <pre className="whitespace-pre-wrap rounded bg-white/60 px-2 py-1">{r.error}</pre>
+                      : <p className="font-sans">มี test case ที่ไม่ผ่าน</p>}
+                  </div>
+                )}
+                {!r.passed && problemType !== "unit" && (
                   <div className="mt-2 flex flex-col gap-1 font-mono text-xs">
                     <p><span className="font-sans font-semibold text-slate-500">Expected:</span></p>
                     <pre className="whitespace-pre-wrap rounded bg-white/60 px-2 py-1">{r.expectedOutput}</pre>
