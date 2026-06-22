@@ -91,6 +91,7 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
   const [blacklistDraft, setBlacklistDraft] = useState("")
   const [whitelistDraft, setWhitelistDraft] = useState("")
   const [refSolution, setRefSolution] = useState(initialRefSolution ?? "")
+  const [codeTab, setCodeTab] = useState<"starter" | "ref">("ref")
   const [generating, setGenerating] = useState(false)
   const [llmUnavailable, setLlmUnavailable] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -353,34 +354,29 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
                   </Field>
                 </div>
               )}
-              {problemType === "unit" && (
-                <Field label="ชื่อฟังก์ชัน *" error={errors.functionName}>
-                  <input
-                    type="text"
-                    value={functionName}
-                    onChange={(e) => setFunctionName(e.target.value)}
-                    placeholder="เช่น add, fibonacci, is_palindrome"
-                    className="input-base w-full font-mono"
-                  />
-                </Field>
-              )}
             </div>
           </div>
 
-          {/* Starter code card */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <h2 className="mb-2 text-base font-semibold text-slate-700">Starter Code</h2>
-            <p className="mb-3 text-xs text-slate-400">
-              Code เริ่มต้นที่นักศึกษาจะเห็นเมื่อเปิดโจทย์ครั้งแรก (ใส่หรือไม่ใส่ก็ได้)
-            </p>
-            <SolutionEditor value={starterCode} onChange={setStarterCode} />
-          </div>
-
-          {/* Reference solution card */}
+          {/* Code card — tabbed: Starter Code / เฉลยอ้างอิง */}
           <div className="rounded-xl border border-gray-200 bg-white p-5">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-slate-700">เฉลยอ้างอิง</h2>
-              {!llmUnavailable && (
+              <div className="flex gap-1">
+                {(["starter", "ref"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setCodeTab(tab)}
+                    className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+                      codeTab === tab
+                        ? "bg-primary text-white"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    {tab === "starter" ? "Starter Code" : "เฉลยอ้างอิง"}
+                  </button>
+                ))}
+              </div>
+              {codeTab === "ref" && !llmUnavailable && (
                 <button
                   type="button"
                   onClick={handleGenerate}
@@ -393,45 +389,86 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
                 </button>
               )}
             </div>
-            <p className="mb-3 text-xs text-slate-400">
-              เฉลยนี้จัดเก็บในระบบเพื่อใช้ตรวจสอบ test cases — นักศึกษาไม่สามารถเห็นได้
-            </p>
-            <SolutionEditor value={refSolution} onChange={setRefSolution} />
+            {codeTab === "starter" ? (
+              <>
+                <p className="mb-3 text-xs text-slate-400">
+                  Code เริ่มต้นที่นักศึกษาจะเห็นเมื่อเปิดโจทย์ครั้งแรก (ใส่หรือไม่ใส่ก็ได้)
+                </p>
+                <SolutionEditor value={starterCode} onChange={setStarterCode} />
+              </>
+            ) : (
+              <>
+                <p className="mb-3 text-xs text-slate-400">
+                  เฉลยนี้จัดเก็บในระบบเพื่อใช้ตรวจสอบ test cases — นักศึกษาไม่สามารถเห็นได้
+                </p>
+                <SolutionEditor value={refSolution} onChange={setRefSolution} />
+              </>
+            )}
           </div>
 
           {/* Test cases card */}
           <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-slate-700">Test Cases</h2>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleRunReference}
-                  disabled={verifying || !refSolution.trim() || (problemType === "unit" && !functionName.trim())}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm text-violet-700 transition hover:bg-violet-100 disabled:opacity-40"
-                >
-                  <FaPlay className="h-3 w-3" />
-                  {verifying ? "กำลังรัน..." : "รันเฉลย"}
-                </button>
-                {refResults && (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              {/* Problem type toggle */}
+              <div className="flex gap-1.5 mr-auto">
+                {(["io", "unit"] as const).map((t) => (
                   <button
+                    key={t}
                     type="button"
-                    onClick={handleApplyAllFromRef}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-700 transition hover:bg-amber-100"
+                    onClick={() => setProblemType(t)}
+                    className={`rounded-lg border px-3 py-1 text-sm font-medium transition ${
+                      problemType === t
+                        ? "border-primary bg-primary text-white"
+                        : "border-gray-200 text-slate-500 hover:border-primary hover:text-primary"
+                    }`}
                   >
-                    ใช้ค่าจากเฉลยทั้งหมด
+                    {t === "io" ? "I/O" : "Unit Test"}
                   </button>
-                )}
+                ))}
+              </div>
+              {/* Action buttons */}
+              <button
+                type="button"
+                onClick={handleRunReference}
+                disabled={verifying || !refSolution.trim() || (problemType === "unit" && !functionName.trim())}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm text-violet-700 transition hover:bg-violet-100 disabled:opacity-40"
+              >
+                <FaPlay className="h-3 w-3" />
+                {verifying ? "กำลังรัน..." : "รันเฉลย"}
+              </button>
+              {refResults && (
                 <button
                   type="button"
-                  onClick={addCase}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm text-secondary transition hover:bg-blue-100"
+                  onClick={handleApplyAllFromRef}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-700 transition hover:bg-amber-100"
                 >
-                  <FaPlus className="h-3 w-3" />
-                  เพิ่ม Test Case
+                  ใช้ค่าจากเฉลยทั้งหมด
                 </button>
-              </div>
+              )}
+              <button
+                type="button"
+                onClick={addCase}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm text-secondary transition hover:bg-blue-100"
+              >
+                <FaPlus className="h-3 w-3" />
+                เพิ่ม Test Case
+              </button>
             </div>
+
+            {/* Function name — unit mode only */}
+            {problemType === "unit" && (
+              <div className="mb-3">
+                <Field label="ชื่อฟังก์ชัน *" error={errors.functionName}>
+                  <input
+                    type="text"
+                    value={functionName}
+                    onChange={(e) => setFunctionName(e.target.value)}
+                    placeholder="เช่น add, fibonacci, is_palindrome"
+                    className="input-base w-full font-mono"
+                  />
+                </Field>
+              </div>
+            )}
 
             {errors.testCases && (
               <p className="mb-3 text-xs text-red-500">{errors.testCases}</p>
@@ -540,43 +577,6 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
               ))}
             </div>
           </div>
-          {/* Code Policy card */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <h2 className="mb-1 text-base font-semibold text-slate-700">นโยบาย Code</h2>
-            <p className="mb-4 text-xs text-slate-400">
-              ระบุ keyword ที่ห้ามใช้ (Blacklist) หรือต้องมี (Whitelist) — ใช้ whole-word match
-            </p>
-            <div className="flex flex-col gap-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-600">
-                  Blacklist <span className="text-xs text-slate-400">(ห้ามใช้)</span>
-                </label>
-                <TagInput
-                  tags={blacklist}
-                  draft={blacklistDraft}
-                  onDraftChange={setBlacklistDraft}
-                  onAdd={(tag) => setBlacklist((prev) => prev.includes(tag) ? prev : [...prev, tag])}
-                  onRemove={(tag) => setBlacklist((prev) => prev.filter((t) => t !== tag))}
-                  placeholder="พิมพ์ keyword แล้วกด Enter"
-                  tagClassName="bg-red-50 text-red-700 border-red-200"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-600">
-                  Whitelist <span className="text-xs text-slate-400">(ต้องมี)</span>
-                </label>
-                <TagInput
-                  tags={whitelist}
-                  draft={whitelistDraft}
-                  onDraftChange={setWhitelistDraft}
-                  onAdd={(tag) => setWhitelist((prev) => prev.includes(tag) ? prev : [...prev, tag])}
-                  onRemove={(tag) => setWhitelist((prev) => prev.filter((t) => t !== tag))}
-                  placeholder="พิมพ์ keyword แล้วกด Enter"
-                  tagClassName="bg-green-50 text-green-700 border-green-200"
-                />
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Right sidebar */}
@@ -584,24 +584,6 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
           <div className="rounded-xl border border-gray-200 bg-white p-5">
             <h2 className="mb-4 text-base font-semibold text-slate-700">ตั้งค่าโจทย์</h2>
             <div className="flex flex-col gap-4">
-              <Field label="ประเภทโจทย์">
-                <div className="flex gap-2">
-                  {(["io", "unit"] as const).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setProblemType(t)}
-                      className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
-                        problemType === t
-                          ? "border-primary bg-primary text-white"
-                          : "border-gray-200 text-slate-500 hover:border-primary hover:text-primary"
-                      }`}
-                    >
-                      {t === "io" ? "I/O" : "Unit Test"}
-                    </button>
-                  ))}
-                </div>
-              </Field>
               <Field label="สัปดาห์">
                 <div className="rounded-lg border border-gray-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
                   {activeWeek
@@ -660,6 +642,44 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
             <FaSave className="h-4 w-4" />
             {saving ? "กำลังบันทึก..." : mode === "create" ? "สร้างโจทย์" : "บันทึกการแก้ไข"}
           </button>
+
+          {/* Code Policy card */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <h2 className="mb-1 text-base font-semibold text-slate-700">นโยบาย Code</h2>
+            <p className="mb-4 text-xs text-slate-400">
+              keyword ที่ห้ามใช้ (Blacklist) หรือต้องมี (Whitelist)
+            </p>
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-600">
+                  Blacklist <span className="text-xs text-slate-400">(ห้ามใช้)</span>
+                </label>
+                <TagInput
+                  tags={blacklist}
+                  draft={blacklistDraft}
+                  onDraftChange={setBlacklistDraft}
+                  onAdd={(tag) => setBlacklist((prev) => prev.includes(tag) ? prev : [...prev, tag])}
+                  onRemove={(tag) => setBlacklist((prev) => prev.filter((t) => t !== tag))}
+                  placeholder="พิมพ์แล้วกด Enter"
+                  tagClassName="bg-red-50 text-red-700 border-red-200"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-600">
+                  Whitelist <span className="text-xs text-slate-400">(ต้องมี)</span>
+                </label>
+                <TagInput
+                  tags={whitelist}
+                  draft={whitelistDraft}
+                  onDraftChange={setWhitelistDraft}
+                  onAdd={(tag) => setWhitelist((prev) => prev.includes(tag) ? prev : [...prev, tag])}
+                  onRemove={(tag) => setWhitelist((prev) => prev.filter((t) => t !== tag))}
+                  placeholder="พิมพ์แล้วกด Enter"
+                  tagClassName="bg-green-50 text-green-700 border-green-200"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </form>
