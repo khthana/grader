@@ -32,7 +32,10 @@ export default async function ProblemSubmissionsPage({ params }: PageProps) {
   const problem = await getProblemByWeekAndNo(db, weekRecord.id, problemNo)
   if (!problem) notFound()
 
-  const pointsMax = problem.testCases.reduce((sum, tc) => sum + (tc.score ?? 0), 0)
+  const pointsMax =
+    problem.problemType === "unit"
+      ? problem.score
+      : problem.testCases.reduce((sum, tc) => sum + (tc.score ?? 0), 0)
   const coursePath = buildCoursePath(slug)
   const courseSlug = courseSlugString(slug)
 
