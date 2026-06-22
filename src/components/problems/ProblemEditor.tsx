@@ -49,6 +49,11 @@ interface Props {
     closeAt: string | null
     language: string
     weekId: number
+    problemType: string
+    functionName: string
+    starterCode: string
+    blacklist: string[]
+    whitelist: string[]
     testCases: TestCaseForm[]
   }
 }
@@ -76,6 +81,15 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
       ? problem.testCases
       : [emptyCase(0)]
   )
+  const [problemType, setProblemType] = useState<"io" | "unit">(
+    problem?.problemType === "unit" ? "unit" : "io"
+  )
+  const [functionName, setFunctionName] = useState(problem?.functionName ?? "")
+  const [starterCode, setStarterCode] = useState(problem?.starterCode ?? "")
+  const [blacklist, setBlacklist] = useState<string[]>(problem?.blacklist ?? [])
+  const [whitelist, setWhitelist] = useState<string[]>(problem?.whitelist ?? [])
+  const [blacklistDraft, setBlacklistDraft] = useState("")
+  const [whitelistDraft, setWhitelistDraft] = useState("")
   const [refSolution, setRefSolution] = useState(initialRefSolution ?? "")
   const [generating, setGenerating] = useState(false)
   const [llmUnavailable, setLlmUnavailable] = useState(false)
@@ -143,7 +157,7 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
     try {
       const body = problem?.id
         ? { problemId: problem.id }
-        : { title, description, inputSpec, outputSpec }
+        : { title, description, inputSpec, outputSpec, problemType }
       const res = await fetch(`/api/courses/${courseSlug}/problems/generate`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -158,11 +172,19 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
         notify("error", "สร้างด้วย AI ไม่สำเร็จ")
         return
       }
-      const data = (await res.json()) as { solution: string; inputs: string[] }
+      const data = await res.json() as
+        | { solution: string; inputs: string[] }
+        | { solution: string; tests: { args: string; expectedReturn: string }[] }
       setRefSolution(data.solution)
-      setCases(data.inputs.map((input, i) => ({ input, expectedOutput: "", isHidden: false, sortOrder: i })))
-      setRefResults(null)
-      notify("success", "AI สร้าง test cases เรียบร้อย — กด 'รันเฉลย' เพื่อเติม output")
+      if ("tests" in data) {
+        setCases(data.tests.map((t, i) => ({ input: t.args, expectedOutput: t.expectedReturn, isHidden: false, sortOrder: i })))
+        setRefResults(null)
+        notify("success", "AI สร้าง test cases เรียบร้อยแล้ว")
+      } else {
+        setCases(data.inputs.map((input, i) => ({ input, expectedOutput: "", isHidden: false, sortOrder: i })))
+        setRefResults(null)
+        notify("success", "AI สร้าง test cases เรียบร้อย — กด 'รันเฉลย' เพื่อเติม output")
+      }
     } catch {
       notify("error", "สร้างด้วย AI ไม่สำเร็จ")
     } finally {
@@ -197,6 +219,11 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
       closeAt: closeAt ? toISO(closeAt) : null,
       language,
       referenceSolution: refSolution,
+      problemType,
+      functionName: functionName.trim(),
+      starterCode,
+      blacklist,
+      whitelist,
       testCases: cases.map((c, i) => ({
         input: c.input,
         expectedOutput: c.expectedOutput,
@@ -299,27 +326,49 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
                   </div>
                 )}
               </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="รูปแบบ Input">
-                  <textarea
-                    value={inputSpec}
-                    onChange={(e) => setInputSpec(e.target.value)}
-                    rows={3}
-                    placeholder="เช่น บรรทัดแรกเป็นจำนวนเต็ม n..."
-                    className="input-base w-full resize-y"
+              {problemType === "io" && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="รูปแบบ Input">
+                    <textarea
+                      value={inputSpec}
+                      onChange={(e) => setInputSpec(e.target.value)}
+                      rows={3}
+                      placeholder="เช่น บรรทัดแรกเป็นจำนวนเต็ม n..."
+                      className="input-base w-full resize-y"
+                    />
+                  </Field>
+                  <Field label="รูปแบบ Output">
+                    <textarea
+                      value={outputSpec}
+                      onChange={(e) => setOutputSpec(e.target.value)}
+                      rows={3}
+                      placeholder="เช่น พิมพ์ตัวเลขผลรวม..."
+                      className="input-base w-full resize-y"
+                    />
+                  </Field>
+                </div>
+              )}
+              {problemType === "unit" && (
+                <Field label="ชื่อฟังก์ชัน *" error={errors.functionName}>
+                  <input
+                    type="text"
+                    value={functionName}
+                    onChange={(e) => setFunctionName(e.target.value)}
+                    placeholder="เช่น add, fibonacci, is_palindrome"
+                    className="input-base w-full font-mono"
                   />
                 </Field>
-                <Field label="รูปแบบ Output">
-                  <textarea
-                    value={outputSpec}
-                    onChange={(e) => setOutputSpec(e.target.value)}
-                    rows={3}
-                    placeholder="เช่น พิมพ์ตัวเลขผลรวม..."
-                    className="input-base w-full resize-y"
-                  />
-                </Field>
-              </div>
+              )}
             </div>
+          </div>
+
+          {/* Starter code card */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <h2 className="mb-2 text-base font-semibold text-slate-700">Starter Code</h2>
+            <p className="mb-3 text-xs text-slate-400">
+              Code เริ่มต้นที่นักศึกษาจะเห็นเมื่อเปิดโจทย์ครั้งแรก (ใส่หรือไม่ใส่ก็ได้)
+            </p>
+            <SolutionEditor value={starterCode} onChange={setStarterCode} />
           </div>
 
           {/* Reference solution card */}
@@ -350,23 +399,27 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-semibold text-slate-700">Test Cases</h2>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleRunReference}
-                  disabled={verifying || !refSolution.trim()}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm text-violet-700 transition hover:bg-violet-100 disabled:opacity-40"
-                >
-                  <FaPlay className="h-3 w-3" />
-                  {verifying ? "กำลังรัน..." : "รันเฉลย"}
-                </button>
-                {refResults && (
-                  <button
-                    type="button"
-                    onClick={handleApplyAllFromRef}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-700 transition hover:bg-amber-100"
-                  >
-                    ใช้ค่าจากเฉลยทั้งหมด
-                  </button>
+                {problemType === "io" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleRunReference}
+                      disabled={verifying || !refSolution.trim()}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm text-violet-700 transition hover:bg-violet-100 disabled:opacity-40"
+                    >
+                      <FaPlay className="h-3 w-3" />
+                      {verifying ? "กำลังรัน..." : "รันเฉลย"}
+                    </button>
+                    {refResults && (
+                      <button
+                        type="button"
+                        onClick={handleApplyAllFromRef}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-700 transition hover:bg-amber-100"
+                      >
+                        ใช้ค่าจากเฉลยทั้งหมด
+                      </button>
+                    )}
+                  </>
                 )}
                 <button
                   type="button"
@@ -421,17 +474,21 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1 block text-xs text-slate-400">Input</label>
+                      <label className="mb-1 block text-xs text-slate-400">
+                        {problemType === "unit" ? "Arguments" : "Input"}
+                      </label>
                       <textarea
                         value={tc.input}
                         onChange={(e) => updateCase(idx, { input: e.target.value })}
                         rows={3}
                         className="input-base w-full resize-y font-mono text-xs"
-                        placeholder="ว่างได้ถ้าไม่มี input"
+                        placeholder={problemType === "unit" ? "เช่น 1, 2" : "ว่างได้ถ้าไม่มี input"}
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs text-slate-400">Expected Output</label>
+                      <label className="mb-1 block text-xs text-slate-400">
+                        {problemType === "unit" ? "Expected Return Value" : "Expected Output"}
+                      </label>
                       <textarea
                         value={tc.expectedOutput}
                         onChange={(e) => updateCase(idx, { expectedOutput: e.target.value })}
@@ -482,6 +539,43 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
               ))}
             </div>
           </div>
+          {/* Code Policy card */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <h2 className="mb-1 text-base font-semibold text-slate-700">นโยบาย Code</h2>
+            <p className="mb-4 text-xs text-slate-400">
+              ระบุ keyword ที่ห้ามใช้ (Blacklist) หรือต้องมี (Whitelist) — ใช้ whole-word match
+            </p>
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-600">
+                  Blacklist <span className="text-xs text-slate-400">(ห้ามใช้)</span>
+                </label>
+                <TagInput
+                  tags={blacklist}
+                  draft={blacklistDraft}
+                  onDraftChange={setBlacklistDraft}
+                  onAdd={(tag) => setBlacklist((prev) => prev.includes(tag) ? prev : [...prev, tag])}
+                  onRemove={(tag) => setBlacklist((prev) => prev.filter((t) => t !== tag))}
+                  placeholder="พิมพ์ keyword แล้วกด Enter"
+                  tagClassName="bg-red-50 text-red-700 border-red-200"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-600">
+                  Whitelist <span className="text-xs text-slate-400">(ต้องมี)</span>
+                </label>
+                <TagInput
+                  tags={whitelist}
+                  draft={whitelistDraft}
+                  onDraftChange={setWhitelistDraft}
+                  onAdd={(tag) => setWhitelist((prev) => prev.includes(tag) ? prev : [...prev, tag])}
+                  onRemove={(tag) => setWhitelist((prev) => prev.filter((t) => t !== tag))}
+                  placeholder="พิมพ์ keyword แล้วกด Enter"
+                  tagClassName="bg-green-50 text-green-700 border-green-200"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Right sidebar */}
@@ -489,6 +583,24 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
           <div className="rounded-xl border border-gray-200 bg-white p-5">
             <h2 className="mb-4 text-base font-semibold text-slate-700">ตั้งค่าโจทย์</h2>
             <div className="flex flex-col gap-4">
+              <Field label="ประเภทโจทย์">
+                <div className="flex gap-2">
+                  {(["io", "unit"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setProblemType(t)}
+                      className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
+                        problemType === t
+                          ? "border-primary bg-primary text-white"
+                          : "border-gray-200 text-slate-500 hover:border-primary hover:text-primary"
+                      }`}
+                    >
+                      {t === "io" ? "I/O" : "Unit Test"}
+                    </button>
+                  ))}
+                </div>
+              </Field>
               <Field label="สัปดาห์">
                 <div className="rounded-lg border border-gray-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
                   {activeWeek
@@ -567,6 +679,61 @@ function Field({
       <label className="mb-1 block text-sm font-medium text-slate-600">{label}</label>
       {children}
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+    </div>
+  )
+}
+
+function TagInput({
+  tags,
+  draft,
+  onDraftChange,
+  onAdd,
+  onRemove,
+  placeholder,
+  tagClassName,
+}: {
+  tags: string[]
+  draft: string
+  onDraftChange: (v: string) => void
+  onAdd: (tag: string) => void
+  onRemove: (tag: string) => void
+  placeholder?: string
+  tagClassName?: string
+}) {
+  function commit() {
+    const tag = draft.trim()
+    if (tag) { onAdd(tag); onDraftChange("") }
+  }
+  return (
+    <div className="rounded-lg border border-gray-200 bg-slate-50 p-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/30 transition">
+      <div className="flex flex-wrap gap-1.5 mb-1.5">
+        {tags.map((tag) => (
+          <span
+            key={tag}
+            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${tagClassName}`}
+          >
+            {tag}
+            <button
+              type="button"
+              onClick={() => onRemove(tag)}
+              className="ml-0.5 text-current opacity-60 hover:opacity-100"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => onDraftChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === ",") { e.preventDefault(); commit() }
+          if (e.key === "Backspace" && !draft && tags.length > 0) onRemove(tags[tags.length - 1])
+        }}
+        placeholder={placeholder}
+        className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+      />
     </div>
   )
 }

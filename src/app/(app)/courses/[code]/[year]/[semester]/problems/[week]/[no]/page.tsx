@@ -169,6 +169,7 @@ export default async function CourseProblemPage({ params }: PageProps) {
           problemId={problem.id}
           draftKey={`editor-code-${code}/${year}/${semester}/${weekNo}/${problemNo}`}
           isClosed={isClosed}
+          starterCode={problem.starterCode || ""}
         />
       </div>
     </div>

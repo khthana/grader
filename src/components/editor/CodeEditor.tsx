@@ -16,6 +16,7 @@ interface CodeEditorProps {
   problemId: number
   draftKey?: string
   isClosed?: boolean
+  starterCode?: string
 }
 
 function useEditorPrefs() {
@@ -106,7 +107,7 @@ function SettingsPopover({
   )
 }
 
-export function CodeEditor({ problemId, draftKey, isClosed = false }: CodeEditorProps) {
+export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode = "" }: CodeEditorProps) {
   const key = draftKey ?? `editor-code-${problemId}`
   const [code, setCode] = useState("")
   const [result, setResult] = useState<GradeResult | null>(null)
@@ -119,8 +120,8 @@ export function CodeEditor({ problemId, draftKey, isClosed = false }: CodeEditor
 
   useEffect(() => {
     const saved = localStorage.getItem(key)
-    if (saved) setCode(saved)
-  }, [key])
+    setCode(saved ?? starterCode)
+  }, [key, starterCode])
 
   const handleChange = useCallback((value: string) => {
     setCode(value)
