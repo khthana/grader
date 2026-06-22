@@ -509,3 +509,37 @@ Introduce a real **Problem** domain: course-scoped Problems organised by **Week*
 - Export (xlsx/PDF) of scorebook.
 - Instructor/TA/Admin view of this page.
 - Real-time updates when an instructor reviews a submission.
+
+---
+
+## PRD 10 · Unit Test Mode & Code Policy (Blacklist / Whitelist)
+
+> Status: In Progress (issues #50–#54)
+> Full spec: `requirement/PRD-unit-test-blacklist.md`
+
+### Problem Statement
+
+ระบบตรวจงานรองรับเฉพาะ stdin/stdout comparison ทำให้โจทย์ที่ให้นักศึกษาเขียนเฉพาะฟังก์ชันต้องใส่ boilerplate `input()`/`print()` และ Instructor ไม่สามารถบังคับหรือห้ามการใช้คำสั่งบางอย่างได้ (เช่น "ต้องใช้ recursion" หรือ "ห้ามใช้ sort")
+
+### Solution
+
+- **Unit Test Mode** — Instructor เลือก `problem_type = 'unit'` กำหนดชื่อฟังก์ชันและ starter code; grader เรียกฟังก์ชันโดยตรงผ่าน Python harness ใน Piston; test case เก็บ args literal + expected return literal
+- **Code Policy** — blacklist/whitelist per problem ตรวจด้วย whole-word regex ก่อนรัน Piston ทั้งใน mode:run และ mode:submit
+- **Per-Test-Case Scoring** — scoring เปลี่ยนเป็น sum of `test_cases.score` ทั้ง I/O และ unit mode (bug fix — column มีอยู่แล้วแต่ยังไม่ถูกใช้)
+
+### Implementation Decisions (summary)
+
+- Schema: `problems` ได้รับ 5 columns ใหม่ (`problem_type`, `function_name`, `starter_code`, `blacklist TEXT[]`, `whitelist TEXT[]`) ผ่าน `migrate-005-unit-test-blacklist.sql`; `test_cases` ไม่เปลี่ยน
+- Pure module `checkCodePolicy(code, blacklist, whitelist)` → `{ ok, violations }` — whole-word regex, no server-side eval
+- Piston harness: stdout protocol `PASS` / `FAIL:<repr>` / `ERROR:<msg>`, 1 call per test case
+- AI generation: `generateTestPlan` รับ `problemType`; unit mode returns `{ solution, tests: [{args, expected_return}] }`
+
+### Issues
+
+| # | Title | Blocked by |
+|---|---|---|
+| [#50](https://github.com/khthana/grader/issues/50) | Schema & Repository: new problem fields | — |
+| [#51](https://github.com/khthana/grader/issues/51) | Per-test-case scoring fix | — |
+| [#52](https://github.com/khthana/grader/issues/52) | Code Policy (Blacklist/Whitelist) | #50 |
+| [#53](https://github.com/khthana/grader/issues/53) | Unit Test Mode | #50 |
+| [#54](https://github.com/khthana/grader/issues/54) | AI Generation for Unit Test Mode | #53 |

@@ -1,7 +1,18 @@
 // Run a migration SQL file against DATABASE_URL.
-// Usage: DATABASE_URL=... npx tsx scripts/migrate.ts scripts/migrate-003-problem-reference-solution.sql
+// Usage: npx tsx scripts/migrate.ts scripts/migrate-00N-*.sql
 import { readFileSync } from "node:fs"
 import { Pool } from "pg"
+
+// Load .env.local if DATABASE_URL not already in environment
+if (!process.env.DATABASE_URL) {
+  try {
+    const env = readFileSync(".env.local", "utf8")
+    for (const line of env.split("\n")) {
+      const match = line.match(/^([^#=]+)=(.*)$/)
+      if (match) process.env[match[1].trim()] = match[2].trim()
+    }
+  } catch { /* .env.local not found — rely on DATABASE_URL being set externally */ }
+}
 
 const file = process.argv[2]
 if (!file) {

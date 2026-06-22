@@ -127,6 +127,11 @@ CREATE TABLE IF NOT EXISTS problems (
   close_at        TIMESTAMPTZ,
   language            TEXT NOT NULL DEFAULT 'python',
   reference_solution  TEXT NOT NULL DEFAULT '',
+  problem_type        TEXT NOT NULL DEFAULT 'io',
+  function_name       TEXT NOT NULL DEFAULT '',
+  starter_code        TEXT NOT NULL DEFAULT '',
+  blacklist           TEXT[] NOT NULL DEFAULT '{}',
+  whitelist           TEXT[] NOT NULL DEFAULT '{}',
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (week_id, problem_no),
@@ -140,6 +145,7 @@ CREATE TABLE IF NOT EXISTS test_cases (
   input           TEXT NOT NULL DEFAULT '',
   expected_output TEXT NOT NULL DEFAULT '',
   is_hidden       BOOLEAN NOT NULL DEFAULT FALSE,
+  score           INTEGER NOT NULL DEFAULT 10,
   sort_order      INTEGER NOT NULL DEFAULT 0
 );
 

@@ -122,6 +122,29 @@ effective score (its auto-grade).
 ### Released Week (สัปดาห์ที่ปล่อยแล้ว)
 A **Week** whose `is_released` flag is `true`. Only Released Weeks are visible to Students — they appear in the WeekBar on Assignments, Scorebook, and Problems pages, and their Problems are accessible via direct URL. Unreleased (hidden) Weeks are visible only to Admin, Instructor, and TA, who see a lock icon on the week card and can toggle the release state. New Weeks default to unreleased. Toggling is manual (no scheduled release in v1).
 
+### Problem Type (ประเภทโจทย์)
+One of `"io"` or `"unit"`, set per **Problem** by the Instructor. Controls how the grader runs student code.
+- `"io"` (default) — stdin/stdout comparison: student code reads from stdin, grader compares stdout to expected output.
+- `"unit"` — function-level testing: student writes a named function; grader calls it directly with argument literals and compares the return value to an expected return literal.
+
+### Unit Test Mode (โหมด Unit Test)
+A **Problem** grading mode (`problem_type = 'unit'`) where the Instructor specifies a **Function Name** and test cases carry argument literals + expected return value literals instead of stdin/stdout pairs. The grader builds a Python harness that calls the student's function directly inside Piston — no `input()`/`print()` boilerplate required. Students write only the function body; the editor is pre-populated with **Starter Code**.
+
+### Starter Code (โค้ดตั้งต้น)
+Optional template code set by the Instructor per **Problem** that pre-populates the student's code editor when they first open the problem. In unit test problems, this is typically the function signature (`def add(a, b):`). Applies to both I/O and unit test problems. A student's saved submission takes precedence over starter code when they return to a problem.
+
+### Function Name (ชื่อฟังก์ชัน)
+The name of the Python function students must implement in a **Unit Test Mode** problem. Set at the problem level (one function per problem); every test case calls this function. Stored in `problems.function_name`.
+
+### Code Policy (นโยบาย Code)
+An optional set of rules on a **Problem** that restricts what code students may submit. Consists of two independent lists — **Blacklist** and **Whitelist** — checked via whole-word regex before any test runs. A violation rejects the submission immediately with a message identifying which term was flagged. Applies to both `mode:run` and `mode:submit`, and to both I/O and unit test problems.
+
+### Blacklist (รายการห้ามใช้)
+A list of terms configured per **Problem** that must **not** appear in the student's submitted code. Example use: forbidding `sorted` or `sort` to require students to implement sorting themselves. Stored in `problems.blacklist TEXT[]`. Matched with whole-word regex so `sort` does not match `quicksort` or `sort_key`.
+
+### Whitelist (รายการต้องมี)
+A list of terms configured per **Problem** that **must** appear in the student's submitted code. Example use: requiring `def` or `recursion` to enforce a particular coding pattern. Stored in `problems.whitelist TEXT[]`. Matched with whole-word regex.
+
 ### Gradebook (สมุดคะแนน — มุมมองอาจารย์/Staff)
 The staff-facing matrix of **every** enrolled Student × every **Problem** in a Course,
 each cell holding that student's **Effective Score**. Read by Admin/Instructor/TA. The

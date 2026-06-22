@@ -17,6 +17,11 @@ export interface ProblemRecord {
   dueAt: string | null
   closeAt: string | null
   language: string
+  problemType: string
+  functionName: string
+  starterCode: string
+  blacklist: string[]
+  whitelist: string[]
   createdAt: string
 }
 
@@ -24,6 +29,7 @@ export interface TestCaseInput {
   input: string
   expectedOutput: string
   isHidden: boolean
+  score?: number
   sortOrder: number
 }
 
@@ -66,6 +72,11 @@ interface ProblemRow {
   due_at: string | null
   close_at: string | null
   language: string
+  problem_type: string
+  function_name: string
+  starter_code: string
+  blacklist: string[]
+  whitelist: string[]
   created_at: string
 }
 
@@ -75,6 +86,7 @@ interface TestCaseRow {
   input: string
   expected_output: string
   is_hidden: boolean
+  score: number
   sort_order: number
 }
 
@@ -94,6 +106,11 @@ function toRecord(row: ProblemRow): ProblemRecord {
     dueAt: row.due_at,
     closeAt: row.close_at,
     language: row.language,
+    problemType: row.problem_type,
+    functionName: row.function_name,
+    starterCode: row.starter_code,
+    blacklist: row.blacklist ?? [],
+    whitelist: row.whitelist ?? [],
     createdAt: row.created_at,
   }
 }
@@ -105,13 +122,15 @@ function toTestCaseRecord(row: TestCaseRow): TestCaseRecord {
     input: row.input,
     expectedOutput: row.expected_output,
     isHidden: row.is_hidden,
+    score: row.score,
     sortOrder: row.sort_order,
   }
 }
 
 const PROBLEM_COLS =
   `id, course_code, course_year, course_semester, week_id, problem_no,
-   title, description, input_spec, output_spec, score, due_at, close_at, language, created_at`
+   title, description, input_spec, output_spec, score, due_at, close_at, language,
+   problem_type, function_name, starter_code, blacklist, whitelist, created_at`
 
 export async function createProblem(
   db: Queryable,
@@ -129,16 +148,21 @@ export async function createProblem(
     closeAt?: string | null
     language?: string
     referenceSolution?: string
+    problemType?: string
+    functionName?: string
+    starterCode?: string
+    blacklist?: string[]
+    whitelist?: string[]
   }
 ): Promise<ProblemRecord> {
   const { rows } = await db.query<ProblemRow>(
     `INSERT INTO problems
        (course_code, course_year, course_semester, week_id, problem_no,
         title, description, input_spec, output_spec, score, due_at, close_at, language,
-        reference_solution)
+        reference_solution, problem_type, function_name, starter_code, blacklist, whitelist)
      VALUES ($1, $2::int, $3::int, $4::int,
              COALESCE((SELECT MAX(problem_no) FROM problems WHERE week_id = $4::int), 0) + 1,
-             $5, $6, $7, $8, $9::int, $10, $11, $12, $13)
+             $5, $6, $7, $8, $9::int, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      RETURNING ${PROBLEM_COLS}`,
     [
       data.courseCode,
@@ -154,6 +178,11 @@ export async function createProblem(
       data.closeAt ?? null,
       data.language ?? "python",
       data.referenceSolution ?? "",
+      data.problemType ?? "io",
+      data.functionName ?? "",
+      data.starterCode ?? "",
+      data.blacklist ?? [],
+      data.whitelist ?? [],
     ]
   )
   return toRecord(rows[0])
@@ -181,7 +210,7 @@ export async function getProblemById(
   if (!rows[0]) return null
   const problem = toRecord(rows[0])
   const { rows: tcRows } = await db.query<TestCaseRow>(
-    `SELECT id, problem_id, input, expected_output, is_hidden, sort_order
+    `SELECT id, problem_id, input, expected_output, is_hidden, score, sort_order
      FROM test_cases WHERE problem_id = $1::int ORDER BY sort_order, id`,
     [id]
   )
@@ -266,6 +295,11 @@ export async function updateProblem(
     closeAt: string | null
     language: string
     referenceSolution: string
+    problemType: string
+    functionName: string
+    starterCode: string
+    blacklist: string[]
+    whitelist: string[]
   }>
 ): Promise<ProblemRecord | null> {
   const sets: string[] = []
@@ -280,6 +314,11 @@ export async function updateProblem(
   if ("closeAt" in data) { params.push(data.closeAt ?? null); sets.push(`close_at = $${params.length}`) }
   if (data.language !== undefined) { params.push(data.language); sets.push(`language = $${params.length}`) }
   if (data.referenceSolution !== undefined) { params.push(data.referenceSolution); sets.push(`reference_solution = $${params.length}`) }
+  if (data.problemType !== undefined) { params.push(data.problemType); sets.push(`problem_type = $${params.length}`) }
+  if (data.functionName !== undefined) { params.push(data.functionName); sets.push(`function_name = $${params.length}`) }
+  if (data.starterCode !== undefined) { params.push(data.starterCode); sets.push(`starter_code = $${params.length}`) }
+  if (data.blacklist !== undefined) { params.push(data.blacklist); sets.push(`blacklist = $${params.length}`) }
+  if (data.whitelist !== undefined) { params.push(data.whitelist); sets.push(`whitelist = $${params.length}`) }
 
   if (sets.length === 0) return getProblemById(db, id).then((d) => (d ? { ...d } : null))
 
@@ -311,10 +350,10 @@ export async function setTestCases(
   const result: TestCaseRecord[] = []
   for (const tc of cases) {
     const { rows } = await db.query<TestCaseRow>(
-      `INSERT INTO test_cases (problem_id, input, expected_output, is_hidden, sort_order)
-       VALUES ($1::int, $2, $3, $4, $5::int)
-       RETURNING id, problem_id, input, expected_output, is_hidden, sort_order`,
-      [problemId, tc.input, tc.expectedOutput, tc.isHidden, tc.sortOrder]
+      `INSERT INTO test_cases (problem_id, input, expected_output, is_hidden, score, sort_order)
+       VALUES ($1::int, $2, $3, $4, $5::int, $6::int)
+       RETURNING id, problem_id, input, expected_output, is_hidden, score, sort_order`,
+      [problemId, tc.input, tc.expectedOutput, tc.isHidden, tc.score ?? 10, tc.sortOrder]
     )
     result.push(toTestCaseRecord(rows[0]))
   }

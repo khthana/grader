@@ -212,6 +212,57 @@ describe("problem repository", () => {
     })
   })
 
+  it("createProblem with new fields → getProblemById returns them (TEXT[] round-trip)", async () => {
+    const p = await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId, title: "Unit Q",
+      problemType: "unit",
+      functionName: "add",
+      starterCode: "def add(a, b):",
+      blacklist: ["sort", "sorted"],
+      whitelist: ["def"],
+    })
+    const detail = await getProblemById(db, p.id)
+    expect(detail?.problemType).toBe("unit")
+    expect(detail?.functionName).toBe("add")
+    expect(detail?.starterCode).toBe("def add(a, b):")
+    expect(detail?.blacklist).toEqual(["sort", "sorted"])
+    expect(detail?.whitelist).toEqual(["def"])
+  })
+
+  it("createProblem without new fields → defaults (io, empty strings, empty arrays)", async () => {
+    const p = await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId, title: "Default Q",
+    })
+    const detail = await getProblemById(db, p.id)
+    expect(detail?.problemType).toBe("io")
+    expect(detail?.functionName).toBe("")
+    expect(detail?.starterCode).toBe("")
+    expect(detail?.blacklist).toEqual([])
+    expect(detail?.whitelist).toEqual([])
+  })
+
+  it("updateProblem can patch new fields independently", async () => {
+    const p = await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId, title: "Q",
+    })
+    await updateProblem(db, p.id, {
+      problemType: "unit",
+      functionName: "solve",
+      starterCode: "def solve():",
+      blacklist: ["import"],
+      whitelist: ["def"],
+    })
+    const detail = await getProblemById(db, p.id)
+    expect(detail?.problemType).toBe("unit")
+    expect(detail?.functionName).toBe("solve")
+    expect(detail?.starterCode).toBe("def solve():")
+    expect(detail?.blacklist).toEqual(["import"])
+    expect(detail?.whitelist).toEqual(["def"])
+  })
+
   it("deleteProblem cascades to test_cases", async () => {
     const p = await createProblem(db, {
       courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,

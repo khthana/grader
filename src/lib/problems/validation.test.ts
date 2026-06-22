@@ -72,4 +72,31 @@ describe("validateProblemInput", () => {
     })
     expect(result.valid).toBe(true)
   })
+
+  it("unit problem with empty functionName → error", () => {
+    const result = validateProblemInput({ ...validInput, problemType: "unit", functionName: "" })
+    expect(result.valid).toBe(false)
+    expect(result.errors.functionName).toBeTruthy()
+  })
+
+  it("io problem with empty functionName → valid (ignored)", () => {
+    const result = validateProblemInput({ ...validInput, problemType: "io", functionName: "" })
+    expect(result.valid).toBe(true)
+  })
+
+  it("problemType omitted → valid (backward compat)", () => {
+    const result = validateProblemInput(validInput)
+    expect(result.valid).toBe(true)
+  })
+
+  it("blacklist with empty-string term → error", () => {
+    const result = validateProblemInput({ ...validInput, blacklist: ["sort", ""] })
+    expect(result.valid).toBe(false)
+    expect(result.errors.blacklist).toBeTruthy()
+  })
+
+  it("whitelist undefined → valid", () => {
+    const result = validateProblemInput({ ...validInput, whitelist: undefined })
+    expect(result.valid).toBe(true)
+  })
 })
