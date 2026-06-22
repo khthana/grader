@@ -162,7 +162,7 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
     setGenerating(true)
     try {
       const body = problem?.id
-        ? { problemId: problem.id }
+        ? { problemId: problem.id, problemType }
         : { title, description, inputSpec, outputSpec, problemType }
       const res = await fetch(`/api/courses/${courseSlug}/problems/generate`, {
         method: "POST",
@@ -359,49 +359,44 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
 
           {/* Code card — tabbed: Starter Code / เฉลยอ้างอิง */}
           <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex gap-1">
-                {(["starter", "ref"] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setCodeTab(tab)}
-                    className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-                      codeTab === tab
-                        ? "bg-primary text-white"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    {tab === "starter" ? "Starter Code" : "เฉลยอ้างอิง"}
-                  </button>
-                ))}
-              </div>
-              {codeTab === "ref" && !llmUnavailable && (
+            <div className="mb-3 flex items-center gap-1">
+              {(["starter", "ref"] as const).map((tab) => (
                 <button
+                  key={tab}
                   type="button"
-                  onClick={handleGenerate}
-                  disabled={generating || !title.trim()}
-                  title={!title.trim() ? "กรอกชื่อโจทย์ก่อน" : undefined}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-40"
+                  onClick={() => setCodeTab(tab)}
+                  className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+                    codeTab === tab
+                      ? "bg-primary text-white"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
                 >
-                  <FaMagic className="h-3 w-3" />
-                  {generating ? "กำลังสร้าง..." : "สร้างด้วย AI"}
+                  {tab === "starter" ? "Starter Code" : "เฉลยอ้างอิง"}
                 </button>
-              )}
+              ))}
             </div>
             {codeTab === "starter" ? (
               <>
                 <p className="mb-3 text-xs text-slate-400">
                   Code เริ่มต้นที่นักศึกษาจะเห็นเมื่อเปิดโจทย์ครั้งแรก (ใส่หรือไม่ใส่ก็ได้)
                 </p>
-                <SolutionEditor value={starterCode} onChange={setStarterCode} />
+                <SolutionEditor
+                  value={starterCode}
+                  onChange={setStarterCode}
+                  label="Starter Code"
+                  placeholder="# โค้ดตั้งต้นสำหรับนักศึกษา เช่น def add(a, b):"
+                />
               </>
             ) : (
               <>
                 <p className="mb-3 text-xs text-slate-400">
                   เฉลยนี้จัดเก็บในระบบเพื่อใช้ตรวจสอบ test cases — นักศึกษาไม่สามารถเห็นได้
                 </p>
-                <SolutionEditor value={refSolution} onChange={setRefSolution} />
+                <SolutionEditor
+                  value={refSolution}
+                  onChange={setRefSolution}
+                  label="เฉลยอ้างอิง"
+                />
               </>
             )}
           </div>
@@ -427,6 +422,18 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
                 ))}
               </div>
               {/* Action buttons */}
+              {!llmUnavailable && (
+                <button
+                  type="button"
+                  onClick={handleGenerate}
+                  disabled={generating || !title.trim()}
+                  title={!title.trim() ? "กรอกชื่อโจทย์ก่อน" : undefined}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-40"
+                >
+                  <FaMagic className="h-3 w-3" />
+                  {generating ? "กำลังสร้าง..." : "สร้างด้วย AI"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleRunReference}

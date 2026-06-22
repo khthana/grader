@@ -28,12 +28,15 @@ export const POST = courseRoute<{ code: string; year: string; semester: string }
       if (!problem || !ownsProblem(problem, auth.course)) {
         return NextResponse.json({ error: "Not found" }, { status: 404 })
       }
+      // Prefer the request's problemType (current UI state, may be unsaved) over the DB value
+      const requestedType =
+        body.problemType === "unit" || body.problemType === "io" ? body.problemType : null
       fields = {
         title: problem.title,
         description: problem.description,
         inputSpec: problem.inputSpec,
         outputSpec: problem.outputSpec,
-        problemType: (problem.problemType === "unit" ? "unit" : "io") as "io" | "unit",
+        problemType: (requestedType ?? (problem.problemType === "unit" ? "unit" : "io")) as "io" | "unit",
       }
     } else if (body && typeof body.title === "string") {
       if (!body.title.trim()) {

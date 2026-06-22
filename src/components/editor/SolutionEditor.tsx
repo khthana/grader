@@ -8,13 +8,15 @@ const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), { ssr: false }
 interface Props {
   value: string
   onChange: (v: string) => void
+  label?: string
+  placeholder?: string
 }
 
-export function SolutionEditor({ value, onChange }: Props) {
+export function SolutionEditor({ value, onChange, label = "เฉลยอ้างอิง", placeholder = "# เขียน Python เฉลยของโจทย์ที่นี่..." }: Props) {
   return (
     <div className="overflow-hidden rounded-lg border border-gray-700">
       <div className="border-b border-gray-700/60 bg-[#1e1e2e] px-3 py-1.5">
-        <span className="font-mono text-xs text-slate-400">Python — เฉลยอ้างอิง</span>
+        <span className="font-mono text-xs text-slate-400">Python — {label}</span>
       </div>
       <CodeMirror
         value={value}
@@ -22,7 +24,7 @@ export function SolutionEditor({ value, onChange }: Props) {
         theme="dark"
         extensions={[python()]}
         onChange={onChange}
-        placeholder="# เขียน Python เฉลยของโจทย์ที่นี่..."
+        placeholder={placeholder}
         basicSetup={{
           lineNumbers: true,
           foldGutter: false,
