@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { courseRoute } from "@/lib/courses/route"
-import { runReferenceSolution } from "@/lib/piston"
+import { runReferenceSolution, runUnitReferenceSolution } from "@/lib/piston"
 
 export const POST = courseRoute<{ code: string; year: string; semester: string }>(
   { manage: true },
@@ -18,7 +18,13 @@ export const POST = courseRoute<{ code: string; year: string; semester: string }
       )
     }
 
-    const outputs = await runReferenceSolution(body.code as string, body.inputs as string[])
+    const isUnit =
+      body.problemType === "unit" && typeof body.functionName === "string" && body.functionName.trim()
+
+    const outputs = isUnit
+      ? await runUnitReferenceSolution(body.code as string, body.functionName as string, body.inputs as string[])
+      : await runReferenceSolution(body.code as string, body.inputs as string[])
+
     return NextResponse.json({ outputs })
   }
 )

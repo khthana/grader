@@ -125,7 +125,12 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
       const res = await fetch(`/api/courses/${courseSlug}/problems/run-reference`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code: refSolution, inputs: cases.map((c) => c.input) }),
+        body: JSON.stringify({
+          code: refSolution,
+          inputs: cases.map((c) => c.input),
+          problemType,
+          functionName: functionName.trim(),
+        }),
       })
       if (!res.ok) {
         notify("error", "รันเฉลยไม่สำเร็จ")
@@ -399,27 +404,23 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-semibold text-slate-700">Test Cases</h2>
               <div className="flex items-center gap-2">
-                {problemType === "io" && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleRunReference}
-                      disabled={verifying || !refSolution.trim()}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm text-violet-700 transition hover:bg-violet-100 disabled:opacity-40"
-                    >
-                      <FaPlay className="h-3 w-3" />
-                      {verifying ? "กำลังรัน..." : "รันเฉลย"}
-                    </button>
-                    {refResults && (
-                      <button
-                        type="button"
-                        onClick={handleApplyAllFromRef}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-700 transition hover:bg-amber-100"
-                      >
-                        ใช้ค่าจากเฉลยทั้งหมด
-                      </button>
-                    )}
-                  </>
+                <button
+                  type="button"
+                  onClick={handleRunReference}
+                  disabled={verifying || !refSolution.trim() || (problemType === "unit" && !functionName.trim())}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm text-violet-700 transition hover:bg-violet-100 disabled:opacity-40"
+                >
+                  <FaPlay className="h-3 w-3" />
+                  {verifying ? "กำลังรัน..." : "รันเฉลย"}
+                </button>
+                {refResults && (
+                  <button
+                    type="button"
+                    onClick={handleApplyAllFromRef}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-700 transition hover:bg-amber-100"
+                  >
+                    ใช้ค่าจากเฉลยทั้งหมด
+                  </button>
                 )}
                 <button
                   type="button"

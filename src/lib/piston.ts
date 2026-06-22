@@ -50,6 +50,34 @@ export async function runReferenceSolution(
   )
 }
 
+export async function runUnitReferenceSolution(
+  code: string,
+  functionName: string,
+  argsList: string[]
+): Promise<Array<{ stdout: string; stderr: string; ok: boolean }>> {
+  return Promise.all(
+    argsList.map(async (args) => {
+      const harness = `${code}
+
+try:
+    _result = ${functionName}(${args})
+    print(repr(_result))
+except Exception as e:
+    print(f"ERROR:{str(e)}")`
+      try {
+        const response = await runCode(harness, "")
+        const stdout = response.run.stdout.trim()
+        const stderr = response.run.stderr
+        const ok = response.run.code === 0 && !stdout.startsWith("ERROR:")
+        return { stdout, stderr, ok }
+      } catch (error) {
+        const stderr = error instanceof Error ? error.message : "Unknown error"
+        return { stdout: "", stderr, ok: false }
+      }
+    })
+  )
+}
+
 export async function runUnitTestCases(
   functionName: string,
   testCases: TestCase[],
