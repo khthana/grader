@@ -12,16 +12,21 @@ function extractJson(text: string): string {
   return text.slice(start, end + 1)
 }
 
+export type IoTestPlan   = { solution: string; inputs: string[] }
+export type UnitTestPlan = { solution: string; tests: { args: string; expectedReturn: string }[] }
+
 export async function generateTestPlan(problem: {
   title: string
   description: string
   inputSpec?: string | null
   outputSpec?: string | null
-}): Promise<{ solution: string; inputs: string[] }> {
+  problemType?: "io" | "unit"
+}): Promise<IoTestPlan | UnitTestPlan> {
   const apiKey = process.env.ANTHROPIC_API_KEY || process.env.LLM_API_KEY || ""
   if (!apiKey) throw new LlmNotConfiguredError()
 
   const model = process.env.LLM_MODEL || "claude-haiku-4-5-20251001"
+  const isUnit = problem.problemType === "unit"
 
   const parts = [
     `Title: ${problem.title}`,
@@ -32,9 +37,19 @@ export async function generateTestPlan(problem: {
     .filter(Boolean)
     .join("\n")
 
-  const prompt = `You are a programming test designer. Given the following Python programming problem, write:
+  const prompt = isUnit
+    ? `You are a programming test designer. Given the following Python unit-test problem, write:
+1. A correct Python function implementation
+2. A diverse set of 8-10 test cases covering normal values, edge cases, and boundary values
+
+Return ONLY valid JSON with no markdown, no explanation:
+{"solution":"<Python function code>","tests":[{"args":"<python literal args>","expected_return":"<python literal>"},...]}
+
+Problem:
+${parts}`
+    : `You are a programming test designer. Given the following Python programming problem, write:
 1. A correct Python solution
-2. A diverse set of 5-8 test inputs covering normal values, edge cases, and boundary values
+2. A diverse set of 8-10 test inputs covering normal values, edge cases, and boundary values
 
 Return ONLY valid JSON with no markdown, no explanation:
 {"solution":"<Python code>","inputs":["<input1>","<input2>",...]}
@@ -67,11 +82,25 @@ ${parts}`
 
   const data = (await response.json()) as { content: Array<{ text: string }> }
   const text = data.content[0].text
+
+  if (isUnit) {
+    const parsed = JSON.parse(extractJson(text)) as {
+      solution: string
+      tests: Array<{ args: unknown; expected_return: unknown }>
+    }
+    return {
+      solution: parsed.solution,
+      tests: parsed.tests.map((t) => ({
+        args: String(t.args),
+        expectedReturn: String(t.expected_return),
+      })),
+    }
+  }
+
   const parsed = JSON.parse(extractJson(text)) as {
     solution: string
     inputs: unknown[]
   }
-
   return {
     solution: parsed.solution,
     inputs: parsed.inputs.map(String),

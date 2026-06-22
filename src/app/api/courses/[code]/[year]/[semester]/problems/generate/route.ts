@@ -20,7 +20,7 @@ export const POST = courseRoute<{ code: string; year: string; semester: string }
   async (request, auth) => {
     const body = await request.json().catch(() => null)
 
-    let fields: { title: string; description: string; inputSpec?: string | null; outputSpec?: string | null }
+    let fields: { title: string; description: string; inputSpec?: string | null; outputSpec?: string | null; problemType?: "io" | "unit" }
 
     if (body && typeof body.problemId === "number") {
       const db = getDb()
@@ -33,6 +33,7 @@ export const POST = courseRoute<{ code: string; year: string; semester: string }
         description: problem.description,
         inputSpec: problem.inputSpec,
         outputSpec: problem.outputSpec,
+        problemType: (problem.problemType === "unit" ? "unit" : "io") as "io" | "unit",
       }
     } else if (body && typeof body.title === "string") {
       if (!body.title.trim()) {
@@ -43,6 +44,7 @@ export const POST = courseRoute<{ code: string; year: string; semester: string }
         description: typeof body.description === "string" ? (body.description as string) : "",
         inputSpec: typeof body.inputSpec === "string" ? (body.inputSpec as string) : null,
         outputSpec: typeof body.outputSpec === "string" ? (body.outputSpec as string) : null,
+        problemType: (body.problemType === "unit" ? "unit" : "io") as "io" | "unit",
       }
     } else {
       return NextResponse.json(

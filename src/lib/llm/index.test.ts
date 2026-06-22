@@ -80,6 +80,57 @@ describe("generateTestPlan", () => {
     expect(result.inputs).toEqual(["1", "2", "3"])
   })
 
+  it("problemType='unit' → result has tests[].args and tests[].expectedReturn", async () => {
+    mockFetch({
+      content: [
+        {
+          text: JSON.stringify({
+            solution: "def add(a, b): return a + b",
+            tests: [
+              { args: "1, 2", expected_return: "3" },
+              { args: "0, 0", expected_return: "0" },
+            ],
+          }),
+        },
+      ],
+    })
+    const result = await generateTestPlan({
+      title: "Add", description: "Write add(a,b)", problemType: "unit",
+    })
+    expect("tests" in result).toBe(true)
+    if ("tests" in result) {
+      expect(result.tests[0].args).toBe("1, 2")
+      expect(result.tests[0].expectedReturn).toBe("3")
+    }
+  })
+
+  it("problemType='unit' → prompt sent to API contains unit-test signal", async () => {
+    mockFetch({
+      content: [{
+        text: JSON.stringify({ solution: "def add(a,b): return a+b", tests: [{ args: "1,2", expected_return: "3" }] }),
+      }],
+    })
+    await generateTestPlan({ title: "Add", description: "Write add(a,b)", problemType: "unit" })
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]?.body as string) as { messages: Array<{ content: string }> }
+    const prompt = body.messages[0].content
+    expect(prompt).toContain("unit-test")
+    expect(prompt).toContain("expected_return")
+  })
+
+  it("problemType='io' → returns inputs[], not tests[]", async () => {
+    mockFetch(CLEAN_RESPONSE)
+    const result = await generateTestPlan({ title: "Square", description: "Print n squared", problemType: "io" })
+    expect("inputs" in result).toBe(true)
+    expect("tests" in result).toBe(false)
+  })
+
+  it("problemType omitted → returns inputs[] (backward compat)", async () => {
+    mockFetch(CLEAN_RESPONSE)
+    const result = await generateTestPlan({ title: "Square", description: "Print n squared" })
+    expect("inputs" in result).toBe(true)
+    expect("tests" in result).toBe(false)
+  })
+
   it("passes inputSpec and outputSpec to the API when provided", async () => {
     mockFetch(CLEAN_RESPONSE)
     await generateTestPlan({
