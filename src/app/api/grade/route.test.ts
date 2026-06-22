@@ -240,6 +240,48 @@ describe("POST /api/grade", () => {
     expect(subs).toHaveLength(0)
   })
 
+  // ── Code policy ─────────────────────────────────────────────────────────
+
+  it("blacklist violation → 200, pointsEarned=0, Piston not called", async () => {
+    const p = await createProblem(db, {
+      courseCode: "C01", courseYear: 2567, courseSemester: 1,
+      weekId: (await listWeeks(db, { code: "C01", year: 2567, semester: 1 }))[0].id,
+      title: "Policy Q", blacklist: ["sorted"],
+    })
+    await setTestCases(db, p.id, [{ input: "", expectedOutput: "x", isHidden: false, sortOrder: 0 }])
+    const token = sessionFor("student@kmitl.ac.th")
+    const res = await POST(gradeReq({ problemId: p.id, code: "x = sorted(lst)", mode: "run" }, token))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.pointsEarned).toBe(0)
+    expect(mockRun).not.toHaveBeenCalled()
+  })
+
+  it("whitelist violation → 200, pointsEarned=0, Piston not called", async () => {
+    const p = await createProblem(db, {
+      courseCode: "C01", courseYear: 2567, courseSemester: 1,
+      weekId: (await listWeeks(db, { code: "C01", year: 2567, semester: 1 }))[0].id,
+      title: "Whitelist Q", whitelist: ["def"],
+    })
+    await setTestCases(db, p.id, [{ input: "", expectedOutput: "x", isHidden: false, sortOrder: 0 }])
+    const token = sessionFor("student@kmitl.ac.th")
+    const res = await POST(gradeReq({ problemId: p.id, code: "x = 1 + 1", mode: "run" }, token))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.pointsEarned).toBe(0)
+    expect(mockRun).not.toHaveBeenCalled()
+  })
+
+  it("no policy (empty lists) → tests run normally", async () => {
+    mockRun.mockResolvedValue([
+      { testCaseId: 1, passed: true, actualOutput: "Hello", expectedOutput: "Hello", executionTime: 0 },
+    ])
+    const token = sessionFor("student@kmitl.ac.th")
+    const res = await POST(gradeReq({ problemId, code: "print('Hello')", mode: "run" }, token))
+    expect(res.status).toBe(200)
+    expect(mockRun).toHaveBeenCalledOnce()
+  })
+
   // ── Per-test-case scoring ────────────────────────────────────────────────
 
   it("per-test-case scoring: pass 1 of 2 → pointsEarned = score of passing case", async () => {

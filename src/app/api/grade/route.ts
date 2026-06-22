@@ -6,6 +6,7 @@ import { getDb } from "@/lib/db"
 import { getProblemById } from "@/lib/problems/repository"
 import { findEnrollment } from "@/lib/enrollments/repository"
 import { createSubmission } from "@/lib/submissions/repository"
+import { checkCodePolicy } from "@/lib/code-policy"
 
 export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request)
@@ -53,6 +54,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
       }
     }
+  }
+
+  const policy = checkCodePolicy(code, problem.blacklist ?? [], problem.whitelist ?? [])
+  if (!policy.ok) {
+    const pointsMax = problem.testCases.reduce((s, tc) => s + (tc.score ?? 10), 0)
+    return NextResponse.json({
+      pointsEarned: 0,
+      pointsMax,
+      totalTests: 0,
+      passedTests: 0,
+      results: [],
+      feedback: `ละเมิดนโยบาย code: ${policy.violations.map((v) => `\`${v}\``).join(", ")}`,
+    } satisfies GradeResult)
   }
 
   const testCases: TestCase[] = (
