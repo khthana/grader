@@ -3,6 +3,17 @@
 > CE-Grader — ระบบตรวจและให้คะแนน Python code ของนักศึกษาอัตโนมัติ
 > Domain glossary: `CONTEXT.md` · Architecture decisions: `docs/adr/`
 
+> **⚠️ Unit Test Mode redesigned in #55 (2026-06-22).** The args/expected per-test-case
+> model described below (#53/#54) was **superseded** by a single **pytest-style test-code
+> block** with all-or-nothing scoring. Sections describing args/expected pairs, the
+> `runUnitTestCases` harness, per-test-case unit scoring, and the `{ tests: [{args,
+> expected_return}] }` AI shape are **historical**. Current behavior: instructor writes one
+> `unit_test_code` block (assert statements), student code is prepended, runs once via
+> `runUnitTestBlock`; pass all → full `score`, else 0; student sees the stderr traceback on
+> failure; `function_name` is optional. Schema: `problems.unit_test_code`
+> (`migrate-006-unit-test-code.sql`). See `CONTEXT.md` → "Unit Test Mode" / "Unit Test Code".
+> The **Code Policy** and **Per-Test-Case Scoring (I/O)** parts of this PRD are unchanged.
+
 ---
 
 ## Problem Statement

@@ -523,16 +523,16 @@ Introduce a real **Problem** domain: course-scoped Problems organised by **Week*
 
 ### Solution
 
-- **Unit Test Mode** — Instructor เลือก `problem_type = 'unit'` กำหนดชื่อฟังก์ชันและ starter code; grader เรียกฟังก์ชันโดยตรงผ่าน Python harness ใน Piston; test case เก็บ args literal + expected return literal
+- **Unit Test Mode** *(redesigned in #55)* — Instructor เลือก `problem_type = 'unit'` แล้วเขียน **Unit Test Code** (บล็อก assert แบบ pytest) หนึ่งบล็อก; ตอนตรวจระบบวาง code นักศึกษาไว้ด้านบนแล้วรันทั้งบล็อกครั้งเดียวผ่าน `runUnitTestBlock`; ผ่านทุก assert = ได้ `score` เต็ม มิฉะนั้น 0 (all-or-nothing); fail แล้วนักศึกษาเห็น traceback; `function_name` เป็น optional (เดิม #53 ใช้ args/expected per-test-case — ยกเลิกแล้ว)
 - **Code Policy** — blacklist/whitelist per problem ตรวจด้วย whole-word regex ก่อนรัน Piston ทั้งใน mode:run และ mode:submit
 - **Per-Test-Case Scoring** — scoring เปลี่ยนเป็น sum of `test_cases.score` ทั้ง I/O และ unit mode (bug fix — column มีอยู่แล้วแต่ยังไม่ถูกใช้)
 
 ### Implementation Decisions (summary)
 
-- Schema: `problems` ได้รับ 5 columns ใหม่ (`problem_type`, `function_name`, `starter_code`, `blacklist TEXT[]`, `whitelist TEXT[]`) ผ่าน `migrate-005-unit-test-blacklist.sql`; `test_cases` ไม่เปลี่ยน
+- Schema: `problems` ได้รับ columns ใหม่ (`problem_type`, `function_name`, `starter_code`, `blacklist TEXT[]`, `whitelist TEXT[]`) ผ่าน `migrate-005-unit-test-blacklist.sql`; `unit_test_code` ผ่าน `migrate-006-unit-test-code.sql` *(#55)*; `test_cases` ไม่เปลี่ยน
 - Pure module `checkCodePolicy(code, blacklist, whitelist)` → `{ ok, violations }` — whole-word regex, no server-side eval
-- Piston harness: stdout protocol `PASS` / `FAIL:<repr>` / `ERROR:<msg>`, 1 call per test case
-- AI generation: `generateTestPlan` รับ `problemType`; unit mode returns `{ solution, tests: [{args, expected_return}] }`
+- Unit harness *(#55)*: `runUnitTestBlock(studentCode, unitTestCode)` — รัน `studentCode + block` ครั้งเดียว, exit 0 = pass; fail คืน stderr/traceback (เดิม #53 ใช้ `PASS`/`FAIL`/`ERROR` per case — ยกเลิก)
+- AI generation: `generateTestPlan` รับ `problemType`; unit mode returns `{ solution, unitTestCode }` *(#55; เดิม `{ tests: [{args, expected_return}] }`)*
 
 ### Issues
 
@@ -541,5 +541,6 @@ Introduce a real **Problem** domain: course-scoped Problems organised by **Week*
 | [#50](https://github.com/khthana/grader/issues/50) | Schema & Repository: new problem fields | — |
 | [#51](https://github.com/khthana/grader/issues/51) | Per-test-case scoring fix | — |
 | [#52](https://github.com/khthana/grader/issues/52) | Code Policy (Blacklist/Whitelist) | #50 |
-| [#53](https://github.com/khthana/grader/issues/53) | Unit Test Mode | #50 |
-| [#54](https://github.com/khthana/grader/issues/54) | AI Generation for Unit Test Mode | #53 |
+| [#53](https://github.com/khthana/grader/issues/53) | Unit Test Mode *(superseded by #55)* | #50 |
+| [#54](https://github.com/khthana/grader/issues/54) | AI Generation for Unit Test Mode *(updated by #55)* | #53 |
+| [#55](https://github.com/khthana/grader/issues/55) | Unit Test Mode v2 — pytest-style test-code block | #50 |
