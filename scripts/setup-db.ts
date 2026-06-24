@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url"
 import { Pool } from "pg"
 import { hashPassword } from "../src/lib/password"
 import { createUser, findUserByEmail, assignRole } from "../src/lib/users/repository"
-import { createCourse, assignInstructor } from "../src/lib/courses/repository"
+import { createCourse, getCourseByKey, assignInstructor } from "../src/lib/courses/repository"
 import { seedWeeks, DEFAULT_WEEKS } from "../src/lib/weeks/repository"
 
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "admin@kmitl.ac.th"
@@ -14,6 +14,8 @@ const ADMIN_NAME = process.env.SEED_ADMIN_NAME ?? "System Admin"
 
 const SEED_COURSE = {
   code: "01076021",
+  year: 2567,
+  semester: 1,
   nameTh: "โครงสร้างข้อมูลและอัลกอริทึม",
   nameEn: "Data Structures and Algorithms",
   program: "วิศวกรรมคอมพิวเตอร์",
@@ -50,21 +52,21 @@ async function main() {
       console.log(`✔ seeded admin: ${ADMIN_EMAIL}`)
     }
 
-    // Seed one course and assign the admin to it (idempotent by course code).
-    const { rows } = await pool.query<{ id: number }>(
-      `SELECT id FROM courses WHERE code = $1`,
-      [SEED_COURSE.code]
-    )
-    let courseId = rows[0]?.id
-    if (courseId) {
+    // Seed one course and assign the admin to it (idempotent by natural key).
+    const key = {
+      code: SEED_COURSE.code,
+      year: SEED_COURSE.year,
+      semester: SEED_COURSE.semester,
+    }
+    const existing = await getCourseByKey(pool, key)
+    if (existing) {
       console.log(`• course already exists: ${SEED_COURSE.code}`)
     } else {
-      const course = await createCourse(pool, SEED_COURSE)
-      courseId = course.id
+      await createCourse(pool, SEED_COURSE)
       console.log(`✔ seeded course: ${SEED_COURSE.code}`)
     }
-    await assignInstructor(pool, courseId, admin.id)
-    await seedWeeks(pool, courseId)
+    await assignInstructor(pool, key, admin.id)
+    await seedWeeks(pool, key)
     console.log(`✔ seeded ${DEFAULT_WEEKS} weeks for course ${SEED_COURSE.code}`)
   } finally {
     await pool.end()

@@ -1,9 +1,23 @@
-// Seed Lab #1 problems into course 01076105, Week 1
-// Run: node scripts/seed-lab1.js
-const { Pool } = require("pg")
+// Seed Lab #1 (6 Python problems) into course 01076105/2569/2, Week 1.
+// Natural-key schema. Run: DATABASE_URL=... npx tsx scripts/seed-lab1.ts
+import { readFileSync } from "node:fs"
+import { Pool } from "pg"
+import { createProblem, setTestCases } from "../src/lib/problems/repository"
+import { getWeekByNo } from "../src/lib/weeks/repository"
+import type { TestCaseInput } from "../src/lib/problems/repository"
 
-const COURSE_ID = 2
-const WEEK_ID = 9
+// Load .env.local if DATABASE_URL not already set
+if (!process.env.DATABASE_URL) {
+  try {
+    for (const line of readFileSync(".env.local", "utf8").split("\n")) {
+      const m = line.match(/^([^#=]+)=(.*)$/)
+      if (m) process.env[m[1].trim()] = m[2].trim()
+    }
+  } catch { /* rely on external DATABASE_URL */ }
+}
+
+const COURSE = { code: "01076105", year: 2569, semester: 2 }
+const WEEK_NO = 1
 
 const p1Output = [
   2002,2009,2016,2023,2037,2044,2051,2058,2072,2079,2086,2093,2107,2114,2121,
@@ -18,14 +32,21 @@ const p1Output = [
   3178,3192,3199,
 ].join(",")
 
-const problems = [
+interface SeedProblem {
+  title: string
+  description: string
+  inputSpec: string
+  outputSpec: string
+  testCases: TestCaseInput[]
+}
+
+const problems: SeedProblem[] = [
   {
     title: "ตัวเลขหารด้วย 7 แต่ไม่หารด้วย 5",
     description:
       "จงเขียนโปรแกรมที่จะหาตัวเลขระหว่าง 2000-3200 ที่หารด้วย 7 ลงตัว แต่หารด้วย 5 ไม่ลงตัว",
     inputSpec: "ไม่มีข้อมูลนำเข้า",
-    outputSpec:
-      "แสดงตัวเลขทั้งหมดที่ตรงเงื่อนไขคั่นด้วยเครื่องหมาย , ในบรรทัดเดียว",
+    outputSpec: "แสดงตัวเลขทั้งหมดที่ตรงเงื่อนไขคั่นด้วยเครื่องหมาย , ในบรรทัดเดียว",
     testCases: [{ input: "", expectedOutput: p1Output, isHidden: false, score: 100, sortOrder: 1 }],
   },
   {
@@ -52,11 +73,11 @@ const problems = [
       "มี 1 บรรทัด แต่ละบรรทัดมีจำนวนเต็ม 4 จำนวนคั่นด้วย Space โดยตัวที่ 1-2 เป็นชั่วโมงและนาทีของเวลาเข้า และตัวที่ 3-4 เป็นชั่วโมงและนาทีของเวลาออก",
     outputSpec: "มีบรรทัดเดียว เป็นค่าที่จอดรถที่ต้องจ่าย ให้แสดงผลลัพธ์เป็นจำนวนเต็ม",
     testCases: [
-      { input: "7 0 7 15",   expectedOutput: "0",   isHidden: false, score: 20, sortOrder: 1 },
-      { input: "7 0 7 16",   expectedOutput: "10",  isHidden: false, score: 20, sortOrder: 2 },
-      { input: "7 30 10 30", expectedOutput: "30",  isHidden: true,  score: 20, sortOrder: 3 },
-      { input: "7 30 10 31", expectedOutput: "50",  isHidden: true,  score: 20, sortOrder: 4 },
-      { input: "7 30 13 31", expectedOutput: "200", isHidden: true,  score: 20, sortOrder: 5 },
+      { input: "7 0 7 15", expectedOutput: "0", isHidden: false, score: 20, sortOrder: 1 },
+      { input: "7 0 7 16", expectedOutput: "10", isHidden: false, score: 20, sortOrder: 2 },
+      { input: "7 30 10 30", expectedOutput: "30", isHidden: true, score: 20, sortOrder: 3 },
+      { input: "7 30 10 31", expectedOutput: "50", isHidden: true, score: 20, sortOrder: 4 },
+      { input: "7 30 13 31", expectedOutput: "200", isHidden: true, score: 20, sortOrder: 5 },
     ],
   },
   {
@@ -67,9 +88,9 @@ const problems = [
     outputSpec: "มี 1 บรรทัด เป็นผลบวก a+aa+aaa+aaaa",
     testCases: [
       { input: "9", expectedOutput: "11106", isHidden: false, score: 25, sortOrder: 1 },
-      { input: "1", expectedOutput: "1234",  isHidden: true,  score: 25, sortOrder: 2 },
-      { input: "3", expectedOutput: "3702",  isHidden: true,  score: 25, sortOrder: 3 },
-      { input: "5", expectedOutput: "6170",  isHidden: true,  score: 25, sortOrder: 4 },
+      { input: "1", expectedOutput: "1234", isHidden: true, score: 25, sortOrder: 2 },
+      { input: "3", expectedOutput: "3702", isHidden: true, score: 25, sortOrder: 3 },
+      { input: "5", expectedOutput: "6170", isHidden: true, score: 25, sortOrder: 4 },
     ],
   },
   {
@@ -88,8 +109,8 @@ const problems = [
     outputSpec: "แสดงรูปสามเหลี่ยมโดยใช้เครื่องหมาย * จำนวน n แถว",
     testCases: [
       { input: "5", expectedOutput: "*\n**\n***\n****\n*****", isHidden: false, score: 33, sortOrder: 1 },
-      { input: "3", expectedOutput: "*\n**\n***",             isHidden: true,  score: 33, sortOrder: 2 },
-      { input: "1", expectedOutput: "*",                     isHidden: true,  score: 34, sortOrder: 3 },
+      { input: "3", expectedOutput: "*\n**\n***", isHidden: true, score: 33, sortOrder: 2 },
+      { input: "1", expectedOutput: "*", isHidden: true, score: 34, sortOrder: 3 },
     ],
   },
 ]
@@ -97,26 +118,39 @@ const problems = [
 async function main() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   try {
-    for (const [i, prob] of problems.entries()) {
-      const { rows: [p] } = await pool.query(
-        `INSERT INTO problems (course_id, week_id, title, description, input_spec, output_spec, language)
-         VALUES ($1, $2, $3, $4, $5, $6, 'python')
-         RETURNING id`,
-        [COURSE_ID, WEEK_ID, prob.title, prob.description, prob.inputSpec, prob.outputSpec]
-      )
-      for (const tc of prob.testCases) {
-        await pool.query(
-          `INSERT INTO test_cases (problem_id, input, expected_output, is_hidden, score, sort_order)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [p.id, tc.input, tc.expectedOutput, tc.isHidden, tc.score, tc.sortOrder]
-        )
-      }
-      console.log(`✓ Problem ${i + 1}: "${prob.title}" (id=${p.id}, ${prob.testCases.length} test cases)`)
+    const week = await getWeekByNo(pool, COURSE, WEEK_NO)
+    if (!week) throw new Error(`Week ${WEEK_NO} not found for ${COURSE.code}/${COURSE.year}/${COURSE.semester}`)
+
+    const { rows: existing } = await pool.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM problems WHERE week_id = $1::int`,
+      [week.id]
+    )
+    if (existing[0].n > 0) {
+      console.log(`• Week ${WEEK_NO} already has ${existing[0].n} problem(s) — aborting to avoid duplicates.`)
+      return
     }
-    console.log("\nDone — 6 problems inserted for Week 1.")
+
+    for (const [i, prob] of problems.entries()) {
+      const totalScore = prob.testCases.reduce((s, tc) => s + (tc.score ?? 0), 0)
+      const created = await createProblem(pool, {
+        courseCode: COURSE.code,
+        courseYear: COURSE.year,
+        courseSemester: COURSE.semester,
+        weekId: week.id,
+        title: prob.title,
+        description: prob.description,
+        inputSpec: prob.inputSpec,
+        outputSpec: prob.outputSpec,
+        score: totalScore,
+        language: "python",
+      })
+      await setTestCases(pool, created.id, prob.testCases)
+      console.log(`✓ Problem ${i + 1}: "${prob.title}" (id=${created.id}, no=${created.problemNo}, ${prob.testCases.length} tc, score=${totalScore})`)
+    }
+    console.log(`\nDone — ${problems.length} problems inserted into Week ${WEEK_NO}.`)
   } finally {
     await pool.end()
   }
 }
 
-main().catch(e => { console.error(e.message); process.exit(1) })
+main().catch((e) => { console.error(e.message); process.exit(1) })
