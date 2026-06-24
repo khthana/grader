@@ -24,3 +24,28 @@ export function getDb(): Queryable {
 export function setTestDb(testDb: Queryable | null): void {
   db = testDb
 }
+
+interface PoolLike {
+  connect: () => Promise<Queryable & { release: () => void }>
+}
+
+// Run `fn` inside a single DB transaction. Checks out one connection so BEGIN /
+// COMMIT / ROLLBACK apply to the same client (a pooled `query` could otherwise
+// span connections). Both pg and the pg-mem adapter expose `connect()`.
+export async function withTransaction<T>(
+  fn: (tx: Queryable) => Promise<T>
+): Promise<T> {
+  const pool = getDb() as unknown as PoolLike
+  const client = await pool.connect()
+  try {
+    await client.query("BEGIN")
+    const result = await fn(client)
+    await client.query("COMMIT")
+    return result
+  } catch (err) {
+    await client.query("ROLLBACK")
+    throw err
+  } finally {
+    client.release()
+  }
+}

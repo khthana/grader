@@ -70,6 +70,20 @@ export async function addWeek(db: Queryable, key: CourseKey): Promise<WeekRecord
   return toRecord(rows[0])
 }
 
+export async function createWeek(
+  db: Queryable,
+  key: CourseKey,
+  data: { weekNo: number; topic: string; isReleased: boolean }
+): Promise<WeekRecord> {
+  const { rows } = await db.query<WeekRow>(
+    `INSERT INTO weeks (course_code, course_year, course_semester, week_no, topic, is_released)
+     VALUES ($1, $2::int, $3::int, $4::int, $5, $6)
+     RETURNING ${WEEK_COLS}`,
+    [key.code, key.year, key.semester, data.weekNo, data.topic, data.isReleased]
+  )
+  return toRecord(rows[0])
+}
+
 export async function weekHasProblems(db: Queryable, weekId: number): Promise<boolean> {
   const { rows } = await db.query<{ count: string }>(
     `SELECT COUNT(*)::int AS count FROM problems WHERE week_id = $1::int`,

@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { FaPlus, FaPen, FaTrash, FaUsers } from "react-icons/fa"
+import { FaPlus, FaPen, FaTrash, FaUsers, FaCopy } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
 import { CourseFormDialog, type CourseValue } from "./CourseFormDialog"
 import { CourseStaffDialog } from "./CourseStaffDialog"
+import { CourseDuplicateDialog } from "./CourseDuplicateDialog"
 
 type DialogState = { mode: "create" } | { mode: "edit"; course: CourseValue } | null
 
@@ -19,6 +20,7 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
   const [dialog, setDialog] = useState<DialogState>(openCreate ? { mode: "create" } : null)
   const [deleteTarget, setDeleteTarget] = useState<CourseValue | null>(null)
   const [staffTarget, setStaffTarget] = useState<CourseValue | null>(null)
+  const [duplicateTarget, setDuplicateTarget] = useState<CourseValue | null>(null)
   const [deleting, setDeleting] = useState(false)
   // Refresh this client table AND the server-rendered shell, so the navbar
   // course switcher (fed by the layout's getCourseContext) updates immediately
@@ -124,6 +126,13 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
                         <FaUsers className="h-3.5 w-3.5" />
                       </button>
                       <button
+                        onClick={() => setDuplicateTarget(c)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-emerald-600"
+                        aria-label="ทำซ้ำไปภาคใหม่"
+                      >
+                        <FaCopy className="h-3.5 w-3.5" />
+                      </button>
+                      <button
                         onClick={() => setDialog({ mode: "edit", course: c })}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-blue-50 hover:text-secondary"
                         aria-label="แก้ไข"
@@ -150,6 +159,14 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
         <CourseFormDialog
           course={dialog.mode === "edit" ? dialog.course : undefined}
           onClose={() => setDialog(null)}
+          onSaved={reload}
+        />
+      )}
+
+      {duplicateTarget && (
+        <CourseDuplicateDialog
+          source={duplicateTarget}
+          onClose={() => setDuplicateTarget(null)}
           onSaved={reload}
         />
       )}
