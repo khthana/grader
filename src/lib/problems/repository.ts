@@ -1,5 +1,6 @@
 import type { Queryable } from "@/lib/db"
 import type { CourseKey } from "@/lib/courses/types"
+import { canManageCourses } from "@/lib/courses/access"
 export type { Queryable, CourseKey }
 
 export interface ProblemRecord {
@@ -193,6 +194,11 @@ export async function createProblem(
   return toRecord(rows[0])
 }
 
+// Raw read of the Reference Solution. Auth-free like every other repository
+// function — the staff gate lives at the caller. For request- or page-driven
+// reads use getReferenceSolutionForStaff so the gate can't be forgotten; this
+// raw read is only for trusted server-side orchestration that is already
+// authorized (e.g. course duplication inside a manage:true route).
 export async function getReferenceSolution(
   db: Queryable,
   problemId: number
@@ -202,6 +208,24 @@ export async function getReferenceSolution(
     [problemId]
   )
   return rows[0]?.reference_solution ?? ""
+}
+
+export type ReferenceSolutionResult =
+  | { ok: true; solution: string }
+  | { ok: false; reason: "forbidden" }
+
+// Staff-only read of the Reference Solution: the gate rides the read. A caller
+// whose roles can't manage courses gets "forbidden", never the value — so the
+// invariant (CONTEXT.md: "never exposed to Students") is enforced by shape, not
+// by each caller remembering to gate. This is the entry every request/page
+// path should use to reach the Reference Solution.
+export async function getReferenceSolutionForStaff(
+  db: Queryable,
+  problemId: number,
+  roles: string[]
+): Promise<ReferenceSolutionResult> {
+  if (!canManageCourses(roles)) return { ok: false, reason: "forbidden" }
+  return { ok: true, solution: await getReferenceSolution(db, problemId) }
 }
 
 export async function getProblemById(
@@ -220,6 +244,25 @@ export async function getProblemById(
     [id]
   )
   return { ...problem, testCases: tcRows.map(toTestCaseRecord) }
+}
+
+// Course-scoped read: returns the problem only when it belongs to `key`,
+// otherwise null. Folds the CourseKey ownership check into the query so staff
+// handlers can't accidentally read across courses (replaces getProblemById +
+// hand-written ownsProblem comparisons).
+export async function getProblemForCourse(
+  db: Queryable,
+  key: CourseKey,
+  id: number
+): Promise<ProblemDetail | null> {
+  const { rows } = await db.query<{ id: number }>(
+    `SELECT id FROM problems
+     WHERE id = $1::int AND course_code = $2
+       AND course_year = $3::int AND course_semester = $4::int`,
+    [id, key.code, key.year, key.semester]
+  )
+  if (!rows[0]) return null
+  return getProblemById(db, id)
 }
 
 // Look up a problem by its human-readable URL coordinates (weekId + problemNo).

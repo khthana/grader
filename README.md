@@ -92,7 +92,7 @@ npm run dev
 | `npm run dev` | Dev server (Turbopack) |
 | `npm run build` | Production build |
 | `npm run lint` | ESLint |
-| `npm test` | Run the Vitest suite (448 tests) |
+| `npm test` | Run the Vitest suite (462 tests) |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run db:setup` | Apply `schema.sql` + seed Admin (needs `DATABASE_URL`) |
 
@@ -136,7 +136,7 @@ Unit tests: pure modules (session, password, roles, breadcrumbs, validation, imp
 Integration tests: repositories + API route handlers ทดสอบกับ **pg-mem** — ไม่ต้องใช้ Docker
 
 ```bash
-npm test   # 448 tests / 62 files
+npm test   # 462 tests / 63 files
 ```
 
 ## Project layout
@@ -161,13 +161,15 @@ src/
       review|assignments|scorebook/ # thin redirectors → active course URL
     api/
       auth/                         # login · logout · me · google OAuth
-      grade/                        # POST /api/grade — Piston execution
+      grade/                        # POST /api/grade — thin orchestrator over lib/grading
       courses/                      # GET/POST /api/courses
         [code]/[year]/[semester]/   # course-scoped API routes
   lib/
     courses/ enrollments/ problems/
     weeks/ submissions/ gradebook/
     assignments/ scorebook/ users/ logs/  # repositories + domain logic
+    grading/                          # gradeSubmission() deep module + CodeRunner seam (ADR 0007)
+    code-policy/ llm/                 # blacklist/whitelist check · AI test-plan generation
   components/
     shell/                          # Navbar · Sidebar · Breadcrumbs · AppShell
     problems/ students/ courses/

@@ -76,6 +76,9 @@ export async function duplicateCourseOffering(
     if (!detail) continue
     const targetWeekId = weekIdMap.get(detail.weekId)
     if (targetWeekId == null) continue // every source week was mirrored above
+    // Trusted server-side copy: this runs inside the manage:true duplicate route
+    // (already authorized), never reaching a Student. The raw read is correct
+    // here; request/page paths use getReferenceSolutionForStaff instead.
     const referenceSolution = await getReferenceSolution(db, p.id)
     const created = await createProblem(db, {
       courseCode: course.code,

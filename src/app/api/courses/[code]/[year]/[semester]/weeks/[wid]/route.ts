@@ -4,6 +4,7 @@ import { courseRoute } from "@/lib/courses/route"
 import {
   updateWeekTopic,
   setWeekReleased,
+  getWeekForCourse,
   listWeeks,
   weekHasProblems,
   deleteWeek,
@@ -11,7 +12,7 @@ import {
 
 export const PUT = courseRoute<{ code: string; year: string; semester: string; wid: string }>(
   { manage: true },
-  async (request, _auth, { wid }) => {
+  async (request, auth, { wid }) => {
     const weekId = Number.parseInt(wid, 10)
     if (!Number.isFinite(weekId)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
@@ -29,6 +30,12 @@ export const PUT = courseRoute<{ code: string; year: string; semester: string; w
     }
 
     const db = getDb()
+    // Scope the mutate-by-id to the authorized course: a week from another
+    // course is a 404, never editable through this URL.
+    if (!(await getWeekForCourse(db, auth.course, weekId))) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
     let week = null
 
     if (hasTopic) {

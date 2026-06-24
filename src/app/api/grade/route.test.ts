@@ -275,6 +275,24 @@ describe("POST /api/grade", () => {
     expect(mockRun).not.toHaveBeenCalled()
   })
 
+  it("mode:submit + blacklist violation → 200, pointsEarned=0, NO submission stored", async () => {
+    const p = await createProblem(db, {
+      courseCode: "C01", courseYear: 2567, courseSemester: 1,
+      weekId: (await listWeeks(db, { code: "C01", year: 2567, semester: 1 }))[0].id,
+      title: "Policy submit Q", blacklist: ["sorted"],
+    })
+    await setTestCases(db, p.id, [{ input: "", expectedOutput: "x", isHidden: false, sortOrder: 0 }])
+    const token = sessionFor("student@kmitl.ac.th")
+    const res = await POST(gradeReq({ problemId: p.id, code: "x = sorted(lst)", mode: "submit" }, token))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.pointsEarned).toBe(0)
+    expect(mockRun).not.toHaveBeenCalled()
+    // A policy violation is not a graded attempt — no Submission row.
+    const subs = await listSubmissions(db, p.id)
+    expect(subs).toHaveLength(0)
+  })
+
   it("no policy (empty lists) → tests run normally", async () => {
     mockRun.mockResolvedValue([
       { testCaseId: 1, passed: true, actualOutput: "Hello", expectedOutput: "Hello", executionTime: 0 },

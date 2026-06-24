@@ -114,6 +114,23 @@ export async function getWeekByNo(
   return rows[0] ? toRecord(rows[0]) : null
 }
 
+// Course-scoped read: returns the week only when it belongs to `key`, otherwise
+// null. Used to scope mutate-by-id handlers (week PUT) so staff of one course
+// can't edit another course's week through the URL.
+export async function getWeekForCourse(
+  db: Queryable,
+  key: CourseKey,
+  weekId: number
+): Promise<WeekRecord | null> {
+  const { rows } = await db.query<WeekRow>(
+    `SELECT ${WEEK_COLS} FROM weeks
+     WHERE id = $1::int AND course_code = $2
+       AND course_year = $3::int AND course_semester = $4::int`,
+    [weekId, key.code, key.year, key.semester]
+  )
+  return rows[0] ? toRecord(rows[0]) : null
+}
+
 export async function listWeeks(
   db: Queryable,
   key: CourseKey,

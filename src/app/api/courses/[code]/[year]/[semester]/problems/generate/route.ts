@@ -1,19 +1,8 @@
 import { NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
 import { courseRoute } from "@/lib/courses/route"
-import { getProblemById } from "@/lib/problems/repository"
+import { getProblemForCourse } from "@/lib/problems/repository"
 import { generateTestPlan, LlmNotConfiguredError } from "@/lib/llm"
-
-function ownsProblem(
-  problem: { courseCode: string; courseYear: number; courseSemester: number },
-  course: { code: string; year: number; semester: number }
-) {
-  return (
-    problem.courseCode === course.code &&
-    problem.courseYear === course.year &&
-    problem.courseSemester === course.semester
-  )
-}
 
 export const POST = courseRoute<{ code: string; year: string; semester: string }>(
   { manage: true },
@@ -24,8 +13,8 @@ export const POST = courseRoute<{ code: string; year: string; semester: string }
 
     if (body && typeof body.problemId === "number") {
       const db = getDb()
-      const problem = await getProblemById(db, body.problemId as number)
-      if (!problem || !ownsProblem(problem, auth.course)) {
+      const problem = await getProblemForCourse(db, auth.course, body.problemId as number)
+      if (!problem) {
         return NextResponse.json({ error: "Not found" }, { status: 404 })
       }
       // Prefer the request's problemType (current UI state, may be unsaved) over the DB value

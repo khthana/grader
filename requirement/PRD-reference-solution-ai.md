@@ -56,7 +56,7 @@
 
 ### Security — leak prevention (critical)
 - The single-problem GET endpoint is entitlement-gated only (enrolled Students can call it) and returns the full problem detail. Therefore the reference solution **must not** enter the default problem projection / record / detail type.
-- The reference solution is read through a **dedicated projection function** (`getReferenceSolution`) callable only from staff-gated paths (the edit page and the run-reference endpoint).
+- The reference solution is read through a **dedicated projection function** callable only from staff-gated paths. Request/page paths use the gated `getReferenceSolutionForStaff(db, id, roles)` (the Problem edit page); the raw `getReferenceSolution` is reserved for already-authorized server-side work (course duplication). The run-reference endpoint runs Instructor-supplied code from the request body and does **not** read the stored solution. *(See ADR 0007 — the staff gate was later folded into the read.)*
 - The write path (create/update problem) accepts an optional reference solution; the default read path is unchanged and never exposes it.
 
 ### Reference-solution runner (deep module)

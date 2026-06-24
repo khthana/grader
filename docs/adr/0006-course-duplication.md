@@ -44,9 +44,11 @@ mapping is unambiguous (no merge).
 | Submission | — | never copied |
 
 Problems are copied in `(week_no, problem_no)` order so `createProblem`'s auto-assign
-reproduces the source `problem_no`. The Reference Solution is read through the staff-only
-`getReferenceSolution` and written server-side via `createProblem` — it never enters a
-student-reachable projection (the CONTEXT.md invariant holds).
+reproduces the source `problem_no`. The Reference Solution is read through the raw
+`getReferenceSolution` — correct here because the copy runs server-side inside an
+already-authorized `manage:true` route — and written server-side via `createProblem`, so
+it never enters a student-reachable projection (the CONTEXT.md invariant holds). Request/
+page paths instead use the gated `getReferenceSolutionForStaff`; see ADR 0007.
 
 ### Atomicity
 

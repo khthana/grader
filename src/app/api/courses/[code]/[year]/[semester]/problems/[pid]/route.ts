@@ -2,24 +2,13 @@ import { NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
 import { courseRoute } from "@/lib/courses/route"
 import {
-  getProblemById,
+  getProblemForCourse,
   updateProblem,
   deleteProblem,
   setTestCases,
 } from "@/lib/problems/repository"
 import { validateProblemInput } from "@/lib/problems/validation"
 import { safeLog } from "@/lib/logs"
-
-function ownsProblem(
-  problem: { courseCode: string; courseYear: number; courseSemester: number },
-  course: { code: string; year: number; semester: number }
-) {
-  return (
-    problem.courseCode === course.code &&
-    problem.courseYear === course.year &&
-    problem.courseSemester === course.semester
-  )
-}
 
 export const GET = courseRoute<{ code: string; year: string; semester: string; pid: string }>(
   {},
@@ -29,8 +18,8 @@ export const GET = courseRoute<{ code: string; year: string; semester: string; p
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
-    const problem = await getProblemById(getDb(), problemId)
-    if (!problem || !ownsProblem(problem, auth.course)) {
+    const problem = await getProblemForCourse(getDb(), auth.course, problemId)
+    if (!problem) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
     return NextResponse.json({ problem })
@@ -87,8 +76,8 @@ export const PUT = courseRoute<{ code: string; year: string; semester: string; p
     if (!valid) return NextResponse.json({ errors }, { status: 400 })
 
     const db = getDb()
-    const existing = await getProblemById(db, problemId)
-    if (!existing || !ownsProblem(existing, auth.course)) {
+    const existing = await getProblemForCourse(db, auth.course, problemId)
+    if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
@@ -132,8 +121,8 @@ export const DELETE = courseRoute<{ code: string; year: string; semester: string
     }
 
     const db = getDb()
-    const existing = await getProblemById(db, problemId)
-    if (!existing || !ownsProblem(existing, auth.course)) {
+    const existing = await getProblemForCourse(db, auth.course, problemId)
+    if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 

@@ -8,7 +8,12 @@ Branch: `main`
 
 ## Status: Feature-complete ✅
 
-All planned features shipped. 448 tests / 62 files — all pass.
+All planned features shipped. 462 tests / 63 files — all pass.
+
+Latest work was an architecture **deepening pass** (ADR 0007) — no new features, no
+schema change: grading collapsed into `src/lib/grading/` behind a `CodeRunner` seam,
+Problem/Week reads scoped by CourseKey (closing a week-PUT cross-course leak), and the
+Reference Solution read gated by `getReferenceSolutionForStaff`.
 
 ---
 
@@ -32,6 +37,7 @@ All planned features shipped. 448 tests / 62 files — all pass.
 | Code Policy — Blacklist / Whitelist | #52 + `migrate-005` |
 | Unit Test Mode v2 (pytest-style `unit_test_code` block) | #53–#55 + `migrate-006` |
 | Course Duplication (copy whole offering to a new term) | #56–#59 (no migration) |
+| Architecture deepening — grading module + course-scoped reads + gated ref-solution read | ADR 0007 (no migration) |
 
 ---
 
@@ -81,7 +87,9 @@ LLM_MODEL=                # default: claude-haiku-4-5-20251001
 ## Key Architecture Notes
 
 - **No psql needed for migrations** — use `npx tsx scripts/migrate.ts <sql-file>`
-- **Reference solution security** — `getReferenceSolution(db, problemId)` is the only reader; never add `reference_solution` to `PROBLEM_COLS` / `ProblemRecord` / `ProblemDetail`
+- **Grading module (ADR 0007)** — `gradeSubmission(problem, code, mode, runner?)` in `src/lib/grading/` owns Code Policy + io/unit dispatch + per-test-case scoring + the single `pointsMax`; `POST /api/grade` only orchestrates (auth · deadline · enrollment · persist) and skips persisting on a policy violation (`result.policyViolations`). The `CodeRunner` seam (`pistonRunner` default) lets grading be tested with a fake runner — no network.
+- **Course-scoped reads (ADR 0007)** — use `getProblemForCourse(db, key, id)` / `getWeekForCourse(db, key, weekId)` in staff handlers; they return `null` for a foreign course. Do **not** reintroduce `getProblemById` + hand-written `ownsProblem`.
+- **Reference solution security** — never add `reference_solution` to `PROBLEM_COLS` / `ProblemRecord` / `ProblemDetail`. Request/page paths read via the gated `getReferenceSolutionForStaff(db, problemId, roles)`; the raw `getReferenceSolution` is for trusted server-side callers only (duplication).
 - **AI generate endpoint** — accepts `{ problemId }` (edit mode) OR `{ title, description, inputSpec?, outputSpec? }` (create mode); returns 503 when no LLM key
 - **Test seam** — `setTestDb(pool)` injects pg-mem; route tests call handlers directly with `NextRequest`
 - **`courseFixture()`** — baseline for any test needing a course: freshDb + Instructor + TA + Course C01/2567/1 + seedWeeks

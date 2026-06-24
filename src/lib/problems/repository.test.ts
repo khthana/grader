@@ -3,7 +3,9 @@ import {
   createProblem,
   getProblemById,
   getProblemByWeekAndNo,
+  getProblemForCourse,
   getReferenceSolution,
+  getReferenceSolutionForStaff,
   listProblems,
   updateProblem,
   deleteProblem,
@@ -82,6 +84,20 @@ describe("problem repository", () => {
     const found = await getProblemByWeekAndNo(db, weeks[0].id, p.problemNo)
     expect(found?.id).toBe(p.id)
     expect(await getProblemByWeekAndNo(db, weeks[0].id, 999)).toBeNull()
+  })
+
+  it("getProblemForCourse returns the problem only for its own course, else null", async () => {
+    const p = await createProblem(db, {
+      courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+      weekId, title: "Scoped Q",
+    })
+    const mine = await getProblemForCourse(db, courseKey, p.id)
+    expect(mine?.id).toBe(p.id)
+
+    // A different course cannot read it — folds the ownership check into the read.
+    const other = await createCourse(db, { code: "C77", year: 2567, semester: 1, nameTh: "อื่น", nameEn: "Other" })
+    expect(await getProblemForCourse(db, other, p.id)).toBeNull()
+    expect(await getProblemForCourse(db, courseKey, 999999)).toBeNull()
   })
 
   it("setTestCases replaces test cases atomically (idempotent on repeat)", async () => {
@@ -199,6 +215,27 @@ describe("problem repository", () => {
       })
       await updateProblem(db, p.id, { referenceSolution: "print(42)" })
       expect(await getReferenceSolution(db, p.id)).toBe("print(42)")
+    })
+
+    it("getReferenceSolutionForStaff returns the value for course managers", async () => {
+      const p = await createProblem(db, {
+        courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+        weekId, title: "Q", referenceSolution: "print('secret')",
+      })
+      const inst = await getReferenceSolutionForStaff(db, p.id, ["Instructor"])
+      expect(inst).toEqual({ ok: true, solution: "print('secret')" })
+      const admin = await getReferenceSolutionForStaff(db, p.id, ["Admin"])
+      expect(admin).toEqual({ ok: true, solution: "print('secret')" })
+    })
+
+    it("getReferenceSolutionForStaff forbids non-managers (gate rides the read)", async () => {
+      const p = await createProblem(db, {
+        courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+        weekId, title: "Q", referenceSolution: "print('secret')",
+      })
+      expect(await getReferenceSolutionForStaff(db, p.id, ["Student"])).toEqual({ ok: false, reason: "forbidden" })
+      expect(await getReferenceSolutionForStaff(db, p.id, ["TA"])).toEqual({ ok: false, reason: "forbidden" })
+      expect(await getReferenceSolutionForStaff(db, p.id, [])).toEqual({ ok: false, reason: "forbidden" })
     })
 
     it("getProblemById does not expose referenceSolution (leak prevention)", async () => {

@@ -21,6 +21,9 @@ export interface GradeResult {
   passedTests: number
   results: TestResult[]
   feedback: string
+  // Present (non-empty) only when code policy blocked grading; the grade route
+  // uses this to skip persisting a Submission for a policy violation.
+  policyViolations?: string[]
 }
 
 export interface SubmissionRequest {

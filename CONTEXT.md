@@ -99,9 +99,12 @@ A Python solution authored by the Instructor and stored per **Problem**. Used
 exclusively for authoring-time test-case verification — the Instructor clicks "รันเฉลย"
 to run it against all **Test Case** inputs via Piston and confirm or repair expected
 outputs. The reference solution is **never** exposed to Students or included in any
-student-reachable API response; it is read only from staff-gated paths (edit page and
-run-reference endpoint). Stored in `problems.reference_solution` (empty string when
-not set).
+student-reachable API response. Request/page paths read it only through the staff-gated
+reader `getReferenceSolutionForStaff` (the Problem edit page); the raw column read is
+reserved for already-authorized server-side work (course duplication). The "รันเฉลย"
+run-reference endpoint runs the Instructor-supplied code from the request body and does
+**not** read the stored reference solution. Stored in `problems.reference_solution`
+(empty string when not set).
 
 ### Submission (การส่งงาน)
 A Student's attempt at a **Problem**. Records the code, `submitted_at`, `points_earned`
