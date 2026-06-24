@@ -6,6 +6,7 @@ import {
   getProblemById,
   listProblems,
   getReferenceSolution,
+  setTestCases,
 } from "@/lib/problems/repository"
 import { createSubmission, listSubmissionsForProblem } from "@/lib/submissions/repository"
 import { createUser, assignRole } from "@/lib/users/repository"
@@ -268,5 +269,83 @@ describe("duplicateCourseOffering", () => {
     const target = { code: course.code, year: course.year, semester: 2 }
     const [copied] = await listProblems(db, target)
     expect(await listSubmissionsForProblem(db, copied.id)).toHaveLength(0)
+  })
+
+  it("copies every test case of a problem 1:1", async () => {
+    const { db, course, ins } = await courseFixture()
+    const week1 = await getWeekByNo(db, course, 1)
+    const src = await createProblem(db, {
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      weekId: week1!.id,
+      title: "Echo",
+    })
+    await setTestCases(db, src.id, [
+      { input: "1", expectedOutput: "1", isHidden: false, score: 10, sortOrder: 1 },
+      { input: "2", expectedOutput: "2", isHidden: false, score: 10, sortOrder: 2 },
+    ])
+
+    await duplicateCourseOffering(db, course, { year: course.year, semester: 2 }, ins.id)
+
+    const target = { code: course.code, year: course.year, semester: 2 }
+    const [copied] = await listProblems(db, target)
+    const detail = await getProblemById(db, copied.id)
+    expect(detail?.testCases).toHaveLength(2)
+    expect(detail?.testCases.map((tc) => [tc.input, tc.expectedOutput])).toEqual([
+      ["1", "1"],
+      ["2", "2"],
+    ])
+  })
+
+  it("preserves the is_hidden flag of each test case", async () => {
+    const { db, course, ins } = await courseFixture()
+    const week1 = await getWeekByNo(db, course, 1)
+    const src = await createProblem(db, {
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      weekId: week1!.id,
+      title: "Hidden mix",
+    })
+    await setTestCases(db, src.id, [
+      { input: "a", expectedOutput: "a", isHidden: false, score: 10, sortOrder: 1 },
+      { input: "b", expectedOutput: "b", isHidden: true, score: 10, sortOrder: 2 },
+    ])
+
+    await duplicateCourseOffering(db, course, { year: course.year, semester: 2 }, ins.id)
+
+    const target = { code: course.code, year: course.year, semester: 2 }
+    const [copied] = await listProblems(db, target)
+    const detail = await getProblemById(db, copied.id)
+    expect(detail?.testCases.map((tc) => tc.isHidden)).toEqual([false, true])
+  })
+
+  it("preserves per-case score and sort order, so total points match the source", async () => {
+    const { db, course, ins } = await courseFixture()
+    const week1 = await getWeekByNo(db, course, 1)
+    const src = await createProblem(db, {
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      weekId: week1!.id,
+      title: "Weighted",
+    })
+    await setTestCases(db, src.id, [
+      { input: "x", expectedOutput: "x", isHidden: false, score: 30, sortOrder: 1 },
+      { input: "y", expectedOutput: "y", isHidden: true, score: 70, sortOrder: 2 },
+    ])
+
+    await duplicateCourseOffering(db, course, { year: course.year, semester: 2 }, ins.id)
+
+    const target = { code: course.code, year: course.year, semester: 2 }
+    const [copied] = await listProblems(db, target)
+    const detail = await getProblemById(db, copied.id)
+    expect(detail?.testCases.map((tc) => [tc.sortOrder, tc.score])).toEqual([
+      [1, 30],
+      [2, 70],
+    ])
+    const total = detail!.testCases.reduce((sum, tc) => sum + tc.score!, 0)
+    expect(total).toBe(100)
   })
 })

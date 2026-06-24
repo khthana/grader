@@ -12,6 +12,7 @@ import {
   getProblemById,
   getReferenceSolution,
   createProblem,
+  setTestCases,
 } from "@/lib/problems/repository"
 
 export type DuplicateResult =
@@ -74,7 +75,7 @@ export async function duplicateCourseOffering(
     const detail = await getProblemById(db, p.id)
     if (!detail) continue
     const referenceSolution = await getReferenceSolution(db, p.id)
-    await createProblem(db, {
+    const created = await createProblem(db, {
       courseCode: course.code,
       courseYear: course.year,
       courseSemester: course.semester,
@@ -95,6 +96,17 @@ export async function duplicateCourseOffering(
       blacklist: detail.blacklist,
       whitelist: detail.whitelist,
     })
+    await setTestCases(
+      db,
+      created.id,
+      detail.testCases.map((tc) => ({
+        input: tc.input,
+        expectedOutput: tc.expectedOutput,
+        isHidden: tc.isHidden,
+        score: tc.score,
+        sortOrder: tc.sortOrder,
+      }))
+    )
   }
 
   return { ok: true, course }
