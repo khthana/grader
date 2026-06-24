@@ -45,6 +45,17 @@ is no per-course capacity column (v1). Being assigned is what grants entitlement
 Course (drives the switcher and every roster/course route). Admin is entitled to all
 Courses without assignment.
 
+### Course Duplication (ทำซ้ำไปภาคใหม่)
+Copying a whole **Course** offering to another academic term — same course `code`, a new
+`(year, semester)`. Triggered by Admin/Instructor from the รายวิชา list. The operation
+**creates** the target offering (it must not already exist) and copies everything that
+defines the course content: **Course staff** (plus the acting user), every **Week**
+(`week_no` + `topic`), every **Problem** (all fields including the **Reference Solution**),
+and every **Test Case**. Term-specific state is deliberately reset: **Due Date** / **Close
+Date** are cleared and every Week starts as an unreleased (hidden) **Released Week**.
+**Enrollments** and **Submissions** are never copied — a new term has a new roster and a
+clean gradebook. The copy is atomic (all-or-nothing).
+
 ### Roster (รายชื่อนักศึกษา)
 The set of Students enrolled in a given Course — i.e. that Course's Enrollments. The
 `/students` page shows the roster of the currently-selected Course.

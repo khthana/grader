@@ -22,6 +22,13 @@ Faculty of Engineering, KMITL — Standalone product (the sibling `DEEP-QA-*` re
 | **Gradebook** | matrix student × problem (effective score = `COALESCE(manual_score, points_earned)`) (Instructor/Admin) |
 | **Assignments** | นักศึกษาดูรายการโจทย์ต่อสัปดาห์พร้อม 4-state badge และคะแนนของตัวเอง |
 | **Scorebook** | นักศึกษาดูคะแนนสรุปของตัวเองต่อสัปดาห์ — donut SVG banner + ตารางคะแนน (Student only) |
+| **Week Release** | Instructor/Admin ปล่อย/ซ่อนโจทย์ราย Week ด้วย lock icon; Student เห็นเฉพาะ Week ที่ปล่อยแล้ว |
+| **Reference Solution** | เก็บเฉลย Python ต่อโจทย์ + ปุ่ม "รันเฉลย" verify expected outputs ผ่าน Piston (ไม่เผยให้ Student) |
+| **AI Test-Case Generation** | ปุ่ม "สร้างด้วย AI" เขียนเฉลย + test inputs (io) หรือ unit test block (unit) ผ่าน LLM |
+| **Code Policy** | Blacklist / Whitelist ต่อโจทย์ — ตรวจ whole-word ก่อนรัน ปฏิเสธโค้ดที่ละเมิด |
+| **Unit Test Mode** | โจทย์แบบ pytest-style block (`assert`) — all-or-nothing scoring; แสดง traceback เมื่อ fail |
+| **User Profile** | ตั้ง nickname + อัปโหลด avatar (resize 256×256) + เปลี่ยนรหัสผ่าน (ทุก role) |
+| **Course Duplication** | ทำซ้ำทั้งวิชา (โจทย์ + เฉลย + test cases + ผู้สอน + weeks) ไปภาคการศึกษาใหม่คลิกเดียว (Instructor/Admin) |
 
 ## Tech stack
 
@@ -85,7 +92,7 @@ npm run dev
 | `npm run dev` | Dev server (Turbopack) |
 | `npm run build` | Production build |
 | `npm run lint` | ESLint |
-| `npm test` | Run the Vitest suite (325 tests) |
+| `npm test` | Run the Vitest suite (448 tests) |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run db:setup` | Apply `schema.sql` + seed Admin (needs `DATABASE_URL`) |
 
@@ -93,11 +100,16 @@ npm run dev
 
 **Fresh install:** `npm run db:setup` ครอบคลุมทุกอย่าง
 
-**Existing dev DB** (อัปเกรดจาก schema เก่า):
+**Existing dev DB** (อัปเกรดจาก schema เก่า): apply migration scripts ตามลำดับ — ใช้ `npx tsx scripts/migrate.ts <file>` เมื่อไม่มี `psql` (โหลด `.env.local` ให้อัตโนมัติ):
 ```bash
-psql $DATABASE_URL -f scripts/migrate-001-natural-keys.sql
+npx tsx scripts/migrate.ts scripts/migrate-001-natural-keys.sql             # surrogate id → natural PK (code, year, semester)
+npx tsx scripts/migrate.ts scripts/migrate-002-week-is-released.sql         # weeks.is_released
+npx tsx scripts/migrate.ts scripts/migrate-003-problem-reference-solution.sql
+npx tsx scripts/migrate.ts scripts/migrate-004-user-nickname.sql
+npx tsx scripts/migrate.ts scripts/migrate-005-unit-test-blacklist.sql      # problem_type/function_name/starter_code/blacklist/whitelist + test_cases.score
+npx tsx scripts/migrate.ts scripts/migrate-006-unit-test-code.sql           # problems.unit_test_code
 ```
-Script นี้ migrate `courses` จาก surrogate `id` ไปเป็น natural composite PK `(code, year, semester)` — รันซ้ำได้ปลอดภัย
+ทุก script รันซ้ำได้ปลอดภัย (idempotent). **Course Duplication ไม่ต้อง migrate** — reuse ตารางเดิม
 
 ## Database backup & restore
 
@@ -124,7 +136,7 @@ Unit tests: pure modules (session, password, roles, breadcrumbs, validation, imp
 Integration tests: repositories + API route handlers ทดสอบกับ **pg-mem** — ไม่ต้องใช้ Docker
 
 ```bash
-npm test   # 325 tests / 51 files
+npm test   # 448 tests / 62 files
 ```
 
 ## Project layout

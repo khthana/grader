@@ -1,7 +1,6 @@
 # Handoff — CE-Grader (Current State)
 
-Date: 2026-06-21  
-Project: `C:\Users\Terry\Desktop\Code\grader`  
+Date: 2026-06-24  
 Repo: https://github.com/khthana/grader.git  
 Branch: `main`
 
@@ -9,7 +8,7 @@ Branch: `main`
 
 ## Status: Feature-complete ✅
 
-All planned features shipped. 392 tests / 59 files — all pass.
+All planned features shipped. 448 tests / 62 files — all pass.
 
 ---
 
@@ -29,6 +28,10 @@ All planned features shipped. 392 tests / 59 files — all pass.
 | LLM module + generate endpoint | `6a92bff` |
 | "สร้างด้วย AI" button in ProblemEditor | `b7799de` |
 | User Profile page (nickname, avatar, password change) | `2ccd753`–`7fdc520` + `migrate-004` |
+| Per-Test-Case Scoring (`test_cases.score`) | #51 + `migrate-005` |
+| Code Policy — Blacklist / Whitelist | #52 + `migrate-005` |
+| Unit Test Mode v2 (pytest-style `unit_test_code` block) | #53–#55 + `migrate-006` |
+| Course Duplication (copy whole offering to a new term) | #56–#59 (no migration) |
 
 ---
 
@@ -43,7 +46,11 @@ npx tsx scripts/migrate.ts scripts/migrate-001-natural-keys.sql
 npx tsx scripts/migrate.ts scripts/migrate-002-week-is-released.sql
 npx tsx scripts/migrate.ts scripts/migrate-003-problem-reference-solution.sql
 npx tsx scripts/migrate.ts scripts/migrate-004-user-nickname.sql
+npx tsx scripts/migrate.ts scripts/migrate-005-unit-test-blacklist.sql
+npx tsx scripts/migrate.ts scripts/migrate-006-unit-test-code.sql
 ```
+
+(Course Duplication, #56–#59, adds **no** migration — it reuses existing tables.)
 
 Fresh installs (`npm run db:setup`) get all columns via `schema.sql` automatically, but the seed step will error on an existing DB — safe to ignore.
 
@@ -78,6 +85,9 @@ LLM_MODEL=                # default: claude-haiku-4-5-20251001
 - **AI generate endpoint** — accepts `{ problemId }` (edit mode) OR `{ title, description, inputSpec?, outputSpec? }` (create mode); returns 503 when no LLM key
 - **Test seam** — `setTestDb(pool)` injects pg-mem; route tests call handlers directly with `NextRequest`
 - **`courseFixture()`** — baseline for any test needing a course: freshDb + Instructor + TA + Course C01/2567/1 + seedWeeks
+- **Transactions** — `withTransaction(fn)` in `src/lib/db.ts` checks out one connection for `BEGIN`/`COMMIT`/`ROLLBACK`; the duplicate route wraps `duplicateCourseOffering` with it for atomicity (pg-mem's adapter supports `connect()`, so it runs in tests)
+- **Course Duplication** — `duplicateCourseOffering(db, source, target, actorId)` in `src/lib/courses/duplicate.ts` copies course + staff + weeks + problems + reference solutions + test cases; resets deadlines + release state; never copies enrollments/submissions; target must not already exist (409). See ADR 0006.
+- **`setup-db.ts` / `seed-lab1.ts`** — both use the natural-key API now (the old surrogate-`courses.id` seed was the only thing that broke `next build`; fixed)
 
 ---
 

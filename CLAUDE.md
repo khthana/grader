@@ -26,8 +26,9 @@ All pages are live — no ComingSoon stubs remain. Delivered features:
 - **Code Policy — Blacklist / Whitelist** *(#52):* Instructor defines terms that must be absent (blacklist) or present (whitelist) per Problem. Pure `checkCodePolicy(code, blacklist, whitelist)` → `{ ok, violations }` in `src/lib/code-policy/index.ts` uses whole-word regex (`\b...\b`); grade route checks before Piston — violation returns 200 with `pointsEarned=0`, no Piston call; applies to both `mode:run` and `mode:submit`. Schema: `problems.blacklist TEXT[]` + `problems.whitelist TEXT[]`.
 - **Unit Test Mode** *(#53 → superseded by #55):* `problem_type = 'unit'` — instructor writes a single **pytest-style test-code block** (`problems.unit_test_code`); student code is prepended; grade route runs it once via `runUnitTestBlock(studentCode, unitTestCode)` in `piston.ts` (exit 0 = pass). **All-or-nothing scoring:** `pointsEarned = problem.score` if the block passes, else `0` (unit mode does **not** use `test_cases`). On failure the student sees the stderr **traceback**. `function_name` is **optional** (AI hint + starter scaffold only). Schema: `problems.problem_type`, `function_name`, `starter_code`, `unit_test_code` (`migrate-006-unit-test-code.sql`). **UI:** ProblemEditor Test Cases card header has the I/O / Unit Test toggle; unit mode replaces the per-case list with one "Unit Test Code" editor, function name optional; "รันเฉลย" runs reference solution + block as a validity check; "สร้างด้วย AI" fills `unitTestCode`; Starter Code / เฉลยอ้างอิง tabbed editor; Code Policy in the sidebar; student page pre-populates `CodeEditor` with `starterCode`.
 - **AI Generation for Unit Test Mode** *(#54 → updated by #55):* `generateTestPlan` gains `problemType?: 'io' | 'unit'` param; unit mode prompt returns `{ solution, unitTestCode }` (a block of assert statements); io mode returns `{ solution, inputs[] }`. `generate` route passes `problemType` from the request body (current UI state) or problem record. Exports `IoTestPlan` | `UnitTestPlan` union type.
+- **Course Duplication** *(#56–#59, ADR 0006):* Instructor/Admin clicks "ทำซ้ำไปภาคใหม่" (FaCopy icon) on a course row in `CoursesTable` → `CourseDuplicateDialog` asks **only** the target year/semester → `POST /api/courses/.../duplicate` (`manage:true`, authorizes the **source** offering) runs `duplicateCourseOffering(db, source, target, actorId)` (`src/lib/courses/duplicate.ts`) inside one `withTransaction`: creates the target offering (copies `nameTh`/`nameEn`/`program`), copies `course_instructors` ∪ actor, mirrors weeks (`week_no` + `topic`, `is_released=false`), then copies every problem in `(week_no, problem_no)` order — all fields incl `reference_solution` (read via the staff-only `getReferenceSolution`, written server-side), `due_at`/`close_at` reset to null, `problem_no` preserved — and each problem's test cases 1:1 (`input`, `expected_output`, `is_hidden`, `score`, `sort_order`). Target must not already exist (409); enrollments & submissions are never copied. **No schema change** (reuses existing tables). PRD: `requirement/PRD-course-duplication.md`.
 
-Specs: `requirement/PRD.md` + `requirement/PRD-week-release.md` + `requirement/PRD-reference-solution-ai.md` + `requirement/PRD-profile.md` + `requirement/PRD-unit-test-blacklist.md`. Design rationale: `CONTEXT.md` (glossary), `docs/adr/`. DB migration scripts: `scripts/migrate-001-natural-keys.sql`, `scripts/migrate-002-week-is-released.sql`, `scripts/migrate-003-problem-reference-solution.sql`, `scripts/migrate-004-user-nickname.sql`, `scripts/migrate-005-unit-test-blacklist.sql`, `scripts/migrate-006-unit-test-code.sql`.
+Specs: `requirement/PRD.md` + `requirement/PRD-week-release.md` + `requirement/PRD-reference-solution-ai.md` + `requirement/PRD-profile.md` + `requirement/PRD-unit-test-blacklist.md` + `requirement/PRD-course-duplication.md`. Design rationale: `CONTEXT.md` (glossary), `docs/adr/`. DB migration scripts: `scripts/migrate-001-natural-keys.sql`, `scripts/migrate-002-week-is-released.sql`, `scripts/migrate-003-problem-reference-solution.sql`, `scripts/migrate-004-user-nickname.sql`, `scripts/migrate-005-unit-test-blacklist.sql`, `scripts/migrate-006-unit-test-code.sql`.
 
 ## Commands
 - `npm run dev` — start dev server (Turbopack)
@@ -102,13 +103,14 @@ parseCourseSlug(code, year, semester): CourseKey | null
 ```
 
 #### DB singleton
-`src/lib/db.ts` — lazy singleton `pg` Pool via `getDb()`. **Test seam:** `setTestDb(pool)` injects a pg-mem pool; `setTestDb(null)` resets.
+`src/lib/db.ts` — lazy singleton `pg` Pool via `getDb()`. **Test seam:** `setTestDb(pool)` injects a pg-mem pool; `setTestDb(null)` resets. **`withTransaction(fn)`** runs `fn(tx)` inside one DB transaction — checks out a single connection so `BEGIN`/`COMMIT`/`ROLLBACK` apply to the same client (a pooled `query` could otherwise span connections); rolls back + rethrows on error. Used by the duplicate route for atomicity; the pg-mem adapter exposes `connect()`, so it is exercised in tests.
 
 #### Repositories
 - `src/lib/users/repository.ts` — `createUser`, `findUserByEmail`, `getUserById`, `getUserWithRoles` *(includes `nickname`)*, `listUsers`, `updateUser`, `deleteUser`, `setUserActive`, `assignRole`, `setUserRoles`, `countUsersWithRole`, **`updateProfile(db, userId, { nickname?, picture? })`** *(profile self-update, no admin gate)*.
 - `src/lib/courses/repository.ts` — `createCourse(db, { code, year, semester, nameTh, nameEn, program? })`, `getCourseByKey(db, key: CourseKey)`, `updateCourse(db, key, data)`, `deleteCourse(db, key)`, `listCoursesForUser(db, userId, roles)` (**entitlement: Admin all; others: `course_instructors` UNION `enrollments`**), `assignInstructor(db, key: CourseKey, userId)`, `setCourseInstructors(db, key, userIds)`, `listCourseInstructors(db, key)`, `searchStaffCandidates(db, key, query)`.
+- `src/lib/courses/duplicate.ts` — `duplicateCourseOffering(db, source: CourseKey, target: { year, semester }, actorId)` → `{ ok: true, course } | { ok: false, reason: "target-exists" | "same-as-source" }`. Orchestrates the whole-offering copy (course + instructors + weeks + problems + reference solutions + test cases); guards `same-as-source` and `target-exists` **before any write**; throws only if the source is missing (an invariant — the route authorizes it first). Wrapped in `withTransaction` by its route.
 - `src/lib/enrollments/repository.ts` — `createEnrollment(db, { courseCode, courseYear, courseSemester, userId, ... })`, `findEnrollment(db, key, userId)`, `getEnrollmentByUser(db, key, userId)`, `listEnrollments(db, key, opts)`, `listAllEnrollments(db, key)`, `listGroups(db, key)`, `updateEnrollment(db, key, userId, data)`, `deleteEnrollment(db, key, userId)`.
-- `src/lib/weeks/repository.ts` — `seedWeeks(db, key: CourseKey)`, `listWeeks(db, key, opts?)` (`releasedOnly?: boolean`), `getWeekByNo(db, key, weekNo)`, `updateWeekTopic(db, weekId, topic)`, `setWeekReleased(db, weekId, isReleased)`, `addWeek(db, key)`, `weekHasProblems(db, weekId)`, `deleteWeek(db, weekId)`.
+- `src/lib/weeks/repository.ts` — `seedWeeks(db, key: CourseKey)`, `listWeeks(db, key, opts?)` (`releasedOnly?: boolean`), `getWeekByNo(db, key, weekNo)`, `updateWeekTopic(db, weekId, topic)`, `setWeekReleased(db, weekId, isReleased)`, `addWeek(db, key)`, `createWeek(db, key, { weekNo, topic, isReleased })` (explicit insert — used by duplication to mirror a source week; `seedWeeks`/`addWeek` only create empty-topic weeks), `weekHasProblems(db, weekId)`, `deleteWeek(db, weekId)`.
 - `src/lib/problems/repository.ts` — `createProblem(db, { courseCode, courseYear, courseSemester, weekId, title, ..., referenceSolution? })` (auto-assigns `problem_no`), `getProblemById(db, id)` (includes `testCases[]`; **no** `reference_solution`), `getProblemByWeekAndNo(db, key, weekNo, problemNo)`, `listProblems(db, key, opts)` (includes `pointsMax`, `weekNo`, `problemNo`), `updateProblem(db, id, { ..., referenceSolution? })`, `deleteProblem`, `setTestCases`, **`getReferenceSolution(db, problemId): Promise<string>`** (staff-only projection — the only safe way to read it).
 - `src/lib/submissions/repository.ts` — `createSubmission(db, { problemId, userId, courseCode, courseYear, courseSemester, ... })`, `listSubmissions`, `countSubmitted(db, problemId, key: CourseKey)`, `countPending`, `getSubmission`, `reviewSubmission`, `listSubmissionsForProblem(db, problemId)`, `getLastSubmission`, `listPendingSubmissions(db, key: CourseKey)`, `getProblemIdsWithSubmissions(db, key: CourseKey)` → `number[]`.
 - `src/lib/gradebook/repository.ts` — `getGradebook(db, key: CourseKey)` → `{ problems: GradebookProblem[], students: GradebookStudent[] }` where `student.scores[problemId]` = `COALESCE(manual_score, points_earned)`.
@@ -123,6 +125,7 @@ All course-scoped API routes live under `/api/courses/[code]/[year]/[semester]/`
 ```
 GET/POST   /api/courses                                       → list / create course
 GET/PUT/DELETE /api/courses/[code]/[year]/[semester]          → single course
+POST       /api/courses/[code]/[year]/[semester]/duplicate     (manage:true — copies whole offering to a new year/semester)
 GET/PUT    /api/courses/[code]/[year]/[semester]/instructors  (+ /candidates)
 GET/POST   /api/courses/[code]/[year]/[semester]/weeks
 PUT/DELETE /api/courses/[code]/[year]/[semester]/weeks/[wid]
@@ -177,6 +180,7 @@ Client components that make API calls receive `courseSlug: string` (e.g. `"01076
 | `StudentFormDialog` | `courseSlug` |
 | `RosterImportDialog` | `courseSlug` |
 | `SubmissionsTable` | `courseSlug`, `problemId`, `pointsMax` |
+| `CourseDuplicateDialog` | `source: CourseValue`, `onClose`, `onSaved` (collects only target year/semester; source key from the clicked row) |
 
 Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/problems/${p.weekNo}/${p.problemNo}`.
 
@@ -185,7 +189,7 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
 - **Access helpers** (`src/lib/courses/access.ts`, pure): `resolveActiveCourse(courses, slug?)` — matches on `"code/year/semester"` slug string; `canMutateRoster(roles)` (Admin/Instructor mutate; TA view-only); `canManageCourses(roles)` (Admin/Instructor).
 - **Route gating:** `authorizeCourse` in `src/lib/courses/authorize.ts` — 401 / 404 / 403-not-entitled / 403-read-only (mutate) / 403-non-manager (manage). Every `/api/courses*` route uses it via `courseRoute`.
 - **Enroll service:** `src/lib/enrollments/enroll.ts#enrollStudent`.
-- **Pure modules:** `enrollments/validation.ts`, `enrollments/import.ts`, `enrollments/export.ts`, `courses/validation.ts` (validates `code`, `year`, `semester`, `nameTh`, `nameEn`).
+- **Pure modules:** `enrollments/validation.ts`, `enrollments/import.ts`, `enrollments/export.ts`, `courses/validation.ts` — `validateCourseInput` (validates `code`, `year`, `semester`, `nameTh`, `nameEn`) built on `validateCourseOffering(year, semester)` (shared year พ.ศ. 2500–2700 + semester 1–3 check, reused by the duplicate route for its target key).
 - **UI:** `src/components/courses/` and `src/components/students/`.
 
 ### Problems & grading
@@ -244,7 +248,7 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
 5. `GradeResult = { pointsEarned, pointsMax, totalTests, passedTests, results[], feedback }` returned to client.
 
 ## Testing
-- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **420 tests / 60 files** as of 2026-06-22.
+- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **448 tests / 62 files** as of 2026-06-24.
 - Pure modules are unit-tested directly (session, password, roles, breadcrumbs, validation, import, name).
 - Repository + route handlers are integration-tested against **pg-mem** (in-memory Postgres, no Docker): build a pool with `newDb()` + `mem.public.none(schema.sql)` + `mem.adapters.createPg()`, inject via `setTestDb`, seed through the repository. Route handlers are imported and called with a `NextRequest`; auth is exercised with real `createSessionToken` cookies.
 - **pg-mem gotchas:** explicit casts (`$1::int`); no `STRING_AGG` (use second query + JS); no `DISTINCT ON` (use subquery with `MAX(submitted_at)` + inner join); schema path `../` count must match test file depth exactly.
