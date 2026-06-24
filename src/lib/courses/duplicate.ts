@@ -7,6 +7,12 @@ import {
   setCourseInstructors,
 } from "@/lib/courses/repository"
 import { listWeeks, createWeek } from "@/lib/weeks/repository"
+import {
+  listProblems,
+  getProblemById,
+  getReferenceSolution,
+  createProblem,
+} from "@/lib/problems/repository"
 
 export type DuplicateResult =
   | { ok: true; course: CourseRecord }
@@ -51,11 +57,43 @@ export async function duplicateCourseOffering(
   await setCourseInstructors(db, course, [...ids])
 
   const weeks = await listWeeks(db, source)
+  const weekIdMap = new Map<number, number>()
   for (const week of weeks) {
-    await createWeek(db, course, {
+    const created = await createWeek(db, course, {
       weekNo: week.weekNo,
       topic: week.topic,
       isReleased: false,
+    })
+    weekIdMap.set(week.id, created.id)
+  }
+
+  // listProblems is ordered by (week_no, problem_no); copying in that order lets
+  // createProblem's auto-assign reproduce the source's problem_no exactly.
+  const problems = await listProblems(db, source)
+  for (const p of problems) {
+    const detail = await getProblemById(db, p.id)
+    if (!detail) continue
+    const referenceSolution = await getReferenceSolution(db, p.id)
+    await createProblem(db, {
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      weekId: weekIdMap.get(detail.weekId)!,
+      title: detail.title,
+      description: detail.description,
+      inputSpec: detail.inputSpec,
+      outputSpec: detail.outputSpec,
+      score: detail.score,
+      dueAt: null,
+      closeAt: null,
+      language: detail.language,
+      referenceSolution,
+      problemType: detail.problemType,
+      functionName: detail.functionName,
+      starterCode: detail.starterCode,
+      unitTestCode: detail.unitTestCode,
+      blacklist: detail.blacklist,
+      whitelist: detail.whitelist,
     })
   }
 

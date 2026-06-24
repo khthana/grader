@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest"
 import { courseFixture } from "@/lib/test-support/db"
 import { createCourse, getCourseByKey, listCourseInstructors } from "@/lib/courses/repository"
+import {
+  createProblem,
+  getProblemById,
+  listProblems,
+  getReferenceSolution,
+} from "@/lib/problems/repository"
+import { createSubmission, listSubmissionsForProblem } from "@/lib/submissions/repository"
 import { createUser, assignRole } from "@/lib/users/repository"
 import { createEnrollment, findEnrollment } from "@/lib/enrollments/repository"
 import {
@@ -104,5 +111,162 @@ describe("duplicateCourseOffering", () => {
 
     const target = { code: course.code, year: course.year, semester: 2 }
     expect(await findEnrollment(db, target, student.id)).toBeNull()
+  })
+
+  it("recreates each problem in the matching target week, preserving problem_no", async () => {
+    const { db, course, ins } = await courseFixture()
+    const week1 = await getWeekByNo(db, course, 1)
+    await createProblem(db, {
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      weekId: week1!.id,
+      title: "Sum two numbers",
+      description: "Add a and b",
+      inputSpec: "two ints",
+      outputSpec: "their sum",
+      score: 25,
+      language: "python",
+    })
+
+    await duplicateCourseOffering(db, course, { year: course.year, semester: 2 }, ins.id)
+
+    const target = { code: course.code, year: course.year, semester: 2 }
+    const problems = await listProblems(db, target)
+    expect(problems).toHaveLength(1)
+    expect(problems[0].weekNo).toBe(1)
+    expect(problems[0].problemNo).toBe(1)
+    expect(problems[0].title).toBe("Sum two numbers")
+    expect(problems[0].score).toBe(25)
+
+    const detail = await getProblemById(db, problems[0].id)
+    expect(detail?.inputSpec).toBe("two ints")
+    expect(detail?.outputSpec).toBe("their sum")
+    expect(detail?.language).toBe("python")
+  })
+
+  it("copies each problem's reference solution to the target", async () => {
+    const { db, course, ins } = await courseFixture()
+    const week1 = await getWeekByNo(db, course, 1)
+    await createProblem(db, {
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      weekId: week1!.id,
+      title: "P",
+      referenceSolution: "print(a + b)",
+    })
+
+    await duplicateCourseOffering(db, course, { year: course.year, semester: 2 }, ins.id)
+
+    const target = { code: course.code, year: course.year, semester: 2 }
+    const [copied] = await listProblems(db, target)
+    expect(await getReferenceSolution(db, copied.id)).toBe("print(a + b)")
+  })
+
+  it("clears deadlines on copied problems even when the source set them", async () => {
+    const { db, course, ins } = await courseFixture()
+    const week1 = await getWeekByNo(db, course, 1)
+    await createProblem(db, {
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      weekId: week1!.id,
+      title: "With deadlines",
+      dueAt: "2025-01-01T00:00:00.000Z",
+      closeAt: "2025-01-08T00:00:00.000Z",
+    })
+
+    await duplicateCourseOffering(db, course, { year: course.year, semester: 2 }, ins.id)
+
+    const target = { code: course.code, year: course.year, semester: 2 }
+    const [copied] = await listProblems(db, target)
+    expect(copied.dueAt).toBeNull()
+    expect(copied.closeAt).toBeNull()
+  })
+
+  it("copies unit-test-mode fields and code policy lists", async () => {
+    const { db, course, ins } = await courseFixture()
+    const week1 = await getWeekByNo(db, course, 1)
+    await createProblem(db, {
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      weekId: week1!.id,
+      title: "Unit problem",
+      problemType: "unit",
+      functionName: "add",
+      starterCode: "def add(a, b):",
+      unitTestCode: "assert add(1, 2) == 3",
+      blacklist: ["eval", "exec"],
+      whitelist: ["def"],
+    })
+
+    await duplicateCourseOffering(db, course, { year: course.year, semester: 2 }, ins.id)
+
+    const target = { code: course.code, year: course.year, semester: 2 }
+    const [copied] = await listProblems(db, target)
+    const detail = await getProblemById(db, copied.id)
+    expect(detail?.problemType).toBe("unit")
+    expect(detail?.functionName).toBe("add")
+    expect(detail?.starterCode).toBe("def add(a, b):")
+    expect(detail?.unitTestCode).toBe("assert add(1, 2) == 3")
+    expect(detail?.blacklist).toEqual(["eval", "exec"])
+    expect(detail?.whitelist).toEqual(["def"])
+  })
+
+  it("preserves problem_no order within a week across multiple problems", async () => {
+    const { db, course, ins } = await courseFixture()
+    const week1 = await getWeekByNo(db, course, 1)
+    const base = {
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      weekId: week1!.id,
+    }
+    await createProblem(db, { ...base, title: "First" })
+    await createProblem(db, { ...base, title: "Second" })
+
+    await duplicateCourseOffering(db, course, { year: course.year, semester: 2 }, ins.id)
+
+    const target = { code: course.code, year: course.year, semester: 2 }
+    const problems = await listProblems(db, target)
+    expect(problems.map((p) => [p.problemNo, p.title])).toEqual([
+      [1, "First"],
+      [2, "Second"],
+    ])
+  })
+
+  it("does not copy submissions onto the target problems", async () => {
+    const { db, course, ins } = await courseFixture()
+    const week1 = await getWeekByNo(db, course, 1)
+    const srcProblem = await createProblem(db, {
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      weekId: week1!.id,
+      title: "Graded",
+    })
+    const student = await createUser(db, { email: "stu@kmitl.ac.th", name: "Stu" })
+    await assignRole(db, student.id, "Student")
+    await createSubmission(db, {
+      problemId: srcProblem.id,
+      userId: student.id,
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      code: "print(1)",
+      language: "python",
+      pointsEarned: 10,
+      pointsMax: 10,
+      isLate: false,
+      results: [],
+    })
+
+    await duplicateCourseOffering(db, course, { year: course.year, semester: 2 }, ins.id)
+
+    const target = { code: course.code, year: course.year, semester: 2 }
+    const [copied] = await listProblems(db, target)
+    expect(await listSubmissionsForProblem(db, copied.id)).toHaveLength(0)
   })
 })
