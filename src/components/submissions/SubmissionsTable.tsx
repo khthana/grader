@@ -96,6 +96,7 @@ export function SubmissionsTable({ courseSlug, problemId, pointsMax }: Submissio
   const [loading, setLoading] = useState(true)
   const [overrideTarget, setOverrideTarget] = useState<SubmissionItem | null>(null)
 
+  // Manual refresh (after a score override) — shows the spinner via setLoading(true).
   async function load() {
     setLoading(true)
     const res = await fetch(`/api/courses/${courseSlug}/problems/${problemId}/submissions`)
@@ -106,7 +107,20 @@ export function SubmissionsTable({ courseSlug, problemId, pointsMax }: Submissio
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [courseSlug, problemId])
+  // Initial load: `loading` starts true, so all setters live in the async
+  // continuation (avoids synchronous setState in the effect).
+  useEffect(() => {
+    let active = true
+    fetch(`/api/courses/${courseSlug}/problems/${problemId}/submissions`)
+      .then((r) => (r.ok ? r.json() : { submissions: [] }))
+      .then((data) => {
+        if (!active) return
+        setSubmissions(data.submissions ?? [])
+        setLoading(false)
+      })
+      .catch(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [courseSlug, problemId])
 
   async function handleOverrideSave(score: number | null) {
     if (!overrideTarget) return

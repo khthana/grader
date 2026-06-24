@@ -60,18 +60,28 @@ export function ReviewWorkbench({ problems, courseSlug }: Props) {
     [courseSlug]
   )
 
-  useEffect(() => {
-    if (!pid) return
+  // Reset stale detail/bonus synchronously when the URL selection changes,
+  // before paint — replaces two setState-in-effect resets. Clears detail on any
+  // pid/sid change; clears bonus only when there is no full selection (matches
+  // the prior effect, which set bonus from the fetched submission otherwise).
+  const [prevSel, setPrevSel] = useState({ pid, sid })
+  if (prevSel.pid !== pid || prevSel.sid !== sid) {
+    setPrevSel({ pid, sid })
     setDetail(null)
-    fetchQueue(pid)
+    if (!pid || !sid) setBonus(0)
+  }
+
+  useEffect(() => {
+    // Loads the queue (with its spinner) on every problem switch, not just on
+    // mount — the synchronous spinner inside fetchQueue is intentional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (pid) fetchQueue(pid)
   }, [pid, fetchQueue])
 
   useEffect(() => {
-    if (!pid || !sid) {
-      setDetail(null)
-      setBonus(0)
-      return
-    }
+    if (!pid || !sid) return
+    // Spinner on every selection change (not mount-only) — intentional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingDetail(true)
     fetch(`/api/courses/${courseSlug}/problems/${pid}/submissions/${sid}`)
       .then((r) => r.json())

@@ -73,6 +73,9 @@ export function ProblemsTable({
   useEffect(() => {
     const week = weeks.find((w) => w.weekNo === activeWeekNo)
     if (!week) return
+    // Re-runs on every week switch (not mount-only), so showing the spinner is
+    // intentional — the synchronous set is wanted here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     fetch(`/api/courses/${courseSlug}/problems?week=${week.id}`)
       .then((r) => r.json())

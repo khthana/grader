@@ -12,7 +12,7 @@ export default async function ProblemsPage() {
         <div className="mt-6 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white py-20 text-center">
           <p className="text-lg font-medium text-slate-500">ยังไม่มีรายวิชา</p>
           <p className="text-sm text-slate-400">
-            เลือกรายวิชาจาก switcher ด้านบน หรือสร้างรายวิชาใหม่ที่หน้า "รายวิชา"
+            เลือกรายวิชาจาก switcher ด้านบน หรือสร้างรายวิชาใหม่ที่หน้า &quot;รายวิชา&quot;
           </p>
         </div>
       </div>

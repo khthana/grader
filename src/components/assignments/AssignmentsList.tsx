@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { WeekBar, type Week } from "@/components/problems/WeekBar"
@@ -102,8 +102,9 @@ export function AssignmentsList({
   const [items, setItems] = useState<AssignmentItem[]>([])
   const [loading, setLoading] = useState(true)
 
-  const fetchData = useCallback(() => {
-    setLoading(true)
+  // Load weeks + assignments. `loading` starts true, so all setters live in the
+  // async continuation (avoids synchronous setState in the effect).
+  useEffect(() => {
     Promise.all([
       fetch(`/api/courses/${courseSlug}/weeks`).then((r) => r.json()),
       fetch(`/api/courses/${courseSlug}/assignments`).then((r) => r.json()),
@@ -111,14 +112,10 @@ export function AssignmentsList({
       .then(([weeksBody, assignBody]) => {
         setWeeks(weeksBody.weeks ?? [])
         setItems(assignBody.assignments ?? [])
+        setLoading(false)
       })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+      .catch(() => setLoading(false))
   }, [courseSlug])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
 
   function handleWeekChange(weekNo: number) {
     router.push(`?week=${weekNo}`)

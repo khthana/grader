@@ -21,15 +21,18 @@ interface CodeEditorProps {
 }
 
 function useEditorPrefs() {
-  const [theme, setThemeState] = useState<Theme>("dark")
-  const [fontSize, setFontSizeState] = useState<FontSize>(15)
-  const [tabSize, setTabSizeState] = useState<TabSize>(4)
-
-  useEffect(() => {
-    setThemeState((localStorage.getItem("editor-theme") as Theme) ?? "dark")
-    setFontSizeState((Number(localStorage.getItem("editor-font-size")) as FontSize) || 15)
-    setTabSizeState((Number(localStorage.getItem("editor-tab-size")) as TabSize) || 4)
-  }, [])
+  // CodeEditor is dynamically imported with ssr:false, so localStorage is
+  // available at first render — read prefs in lazy initializers instead of a
+  // mount effect (avoids synchronous setState in useEffect).
+  const [theme, setThemeState] = useState<Theme>(
+    () => (typeof localStorage === "undefined" ? null : (localStorage.getItem("editor-theme") as Theme)) ?? "dark"
+  )
+  const [fontSize, setFontSizeState] = useState<FontSize>(
+    () => (typeof localStorage === "undefined" ? 0 : (Number(localStorage.getItem("editor-font-size")) as FontSize)) || 15
+  )
+  const [tabSize, setTabSizeState] = useState<TabSize>(
+    () => (typeof localStorage === "undefined" ? 0 : (Number(localStorage.getItem("editor-tab-size")) as TabSize)) || 4
+  )
 
   function setTheme(v: Theme) {
     setThemeState(v)
@@ -110,7 +113,18 @@ function SettingsPopover({
 
 export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode = "", problemType = "io" }: CodeEditorProps) {
   const key = draftKey ?? `editor-code-${problemId}`
-  const [code, setCode] = useState("")
+  // Seed from the saved draft, falling back to starter code. Lazy init covers
+  // mount; the render-time adjustment below reloads when the problem (key) or
+  // starterCode changes without a remount — replaces a mount/sync effect.
+  const [code, setCode] = useState<string>(() => localStorage.getItem(key) ?? starterCode ?? "")
+  const [prevKey, setPrevKey] = useState(key)
+  const [prevStarter, setPrevStarter] = useState(starterCode)
+  if (key !== prevKey || starterCode !== prevStarter) {
+    setPrevKey(key)
+    setPrevStarter(starterCode)
+    const next = localStorage.getItem(key) ?? starterCode
+    if (next) setCode(next)
+  }
   const [result, setResult] = useState<GradeResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [activeMode, setActiveMode] = useState<"run" | "submit" | null>(null)
@@ -118,11 +132,6 @@ export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode 
   const [showSettings, setShowSettings] = useState(false)
 
   const { theme, fontSize, tabSize, setTheme, setFontSize, setTabSize } = useEditorPrefs()
-
-  useEffect(() => {
-    const initial = localStorage.getItem(key) ?? starterCode
-    if (initial) setCode(initial)
-  }, [key, starterCode])
 
   const handleChange = useCallback((value: string) => {
     setCode(value)

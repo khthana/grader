@@ -90,9 +90,13 @@ export default function LoginPage() {
   }
 
   useEffect(() => {
+    // Reading window.location is client-only; doing it in a lazy initializer or
+    // during render would diverge from the server render (hydration mismatch),
+    // so the effect is the correct tool and the synchronous set is intentional.
     const params = new URLSearchParams(window.location.search)
     const errorKey = params.get('error')
     if (errorKey) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setErrors({ general: GOOGLE_ERROR_MESSAGES[errorKey] ?? MSG_GOOGLE_FAIL })
     }
   }, [])

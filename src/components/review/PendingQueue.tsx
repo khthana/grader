@@ -89,6 +89,7 @@ export function PendingQueue({ courseSlug, coursePath }: { courseSlug: string; c
   const [loading, setLoading] = useState(true)
   const [reviewTarget, setReviewTarget] = useState<PendingItem | null>(null)
 
+  // Manual refresh (after saving a review) — shows the spinner via setLoading(true).
   async function load() {
     setLoading(true)
     const res = await fetch(`/api/courses/${courseSlug}/review`)
@@ -99,7 +100,20 @@ export function PendingQueue({ courseSlug, coursePath }: { courseSlug: string; c
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [courseSlug])
+  // Initial load: `loading` starts true, so all setters live in the async
+  // continuation (avoids synchronous setState in the effect).
+  useEffect(() => {
+    let active = true
+    fetch(`/api/courses/${courseSlug}/review`)
+      .then((r) => (r.ok ? r.json() : { submissions: [] }))
+      .then((data) => {
+        if (!active) return
+        setItems(data.submissions ?? [])
+        setLoading(false)
+      })
+      .catch(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [courseSlug])
 
   async function handleSave(score: number | null) {
     if (!reviewTarget) return
