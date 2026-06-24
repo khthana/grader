@@ -14,7 +14,7 @@ interface Props {
 export function CourseDuplicateDialog({ source, onClose, onSaved }: Props) {
   const { notify } = useToast()
   const [year, setYear] = useState(String(source.year))
-  const [semester, setSemester] = useState(String(source.semester === 3 ? 1 : source.semester + 1))
+  const [semester, setSemester] = useState(String((source.semester % 3) + 1))
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 

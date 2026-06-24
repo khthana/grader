@@ -74,12 +74,14 @@ export async function duplicateCourseOffering(
   for (const p of problems) {
     const detail = await getProblemById(db, p.id)
     if (!detail) continue
+    const targetWeekId = weekIdMap.get(detail.weekId)
+    if (targetWeekId == null) continue // every source week was mirrored above
     const referenceSolution = await getReferenceSolution(db, p.id)
     const created = await createProblem(db, {
       courseCode: course.code,
       courseYear: course.year,
       courseSemester: course.semester,
-      weekId: weekIdMap.get(detail.weekId)!,
+      weekId: targetWeekId,
       title: detail.title,
       description: detail.description,
       inputSpec: detail.inputSpec,

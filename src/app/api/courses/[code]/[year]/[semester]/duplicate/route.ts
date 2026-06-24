@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { withTransaction } from "@/lib/db"
 import { courseRoute } from "@/lib/courses/route"
 import { courseSlugString } from "@/lib/courses/slug"
+import { validateCourseOffering } from "@/lib/courses/validation"
 import { duplicateCourseOffering } from "@/lib/courses/duplicate"
 
 export const POST = courseRoute({ manage: true }, async (request, auth) => {
@@ -11,9 +12,10 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
   const year = Number(body?.year)
   const semester = Number(body?.semester)
 
-  if (!Number.isInteger(year) || year <= 0 || ![1, 2, 3].includes(semester)) {
+  const { valid, errors } = validateCourseOffering(year, semester)
+  if (!valid) {
     return NextResponse.json(
-      { error: "ปีหรือภาคการศึกษาปลายทางไม่ถูกต้อง" },
+      { error: "ปีหรือภาคการศึกษาปลายทางไม่ถูกต้อง", errors },
       { status: 400 }
     )
   }
