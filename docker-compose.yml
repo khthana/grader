@@ -16,6 +16,36 @@ services:
       timeout: 5s
       retries: 10
 
+  # ── Piston code execution engine ─────────────────────────────────────────────
+  piston:
+    image: ghcr.io/engineer-man/piston
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - piston-data:/piston
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:2000/api/v2/runtimes > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  # ── Install Python runtime into Piston (runs once, exits) ────────────────────
+  piston-init:
+    image: curlimages/curl:8
+    depends_on:
+      piston:
+        condition: service_healthy
+    command:
+      - curl
+      - -sf
+      - -X
+      - POST
+      - http://piston:2000/api/v2/packages
+      - -H
+      - Content-Type: application/json
+      - -d
+      - '{"language":"python","version":"3.10.0"}'
+
   # ── Schema setup + seed (runs once, exits) ──────────────────────────────────
   migrate:
     build:
@@ -44,14 +74,17 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      piston-init:
+        condition: service_completed_successfully
     environment:
-      DATABASE_URL:       postgresql://grader:grader@db:5432/grader
-      SESSION_SECRET:     ${SESSION_SECRET:?SESSION_SECRET is required — set it in .env}
-      NEXTAUTH_URL:       ${NEXTAUTH_URL:-http://localhost:3000}
-      GOOGLE_CLIENT_ID:   ${GOOGLE_CLIENT_ID:-}
+      DATABASE_URL:         postgresql://grader:grader@db:5432/grader
+      SESSION_SECRET:       ${SESSION_SECRET:?SESSION_SECRET is required — set it in .env}
+      NEXTAUTH_URL:         ${NEXTAUTH_URL:-http://localhost:3000}
+      GOOGLE_CLIENT_ID:     ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      # Optional — enables AI test-case generation
-      ANTHROPIC_API_KEY:  ${ANTHROPIC_API_KEY:-}
+      PISTON_URL:           http://piston:2000/api/v2
+      ANTHROPIC_API_KEY:    ${ANTHROPIC_API_KEY:-}
 
 volumes:
   grader-db-data:
+  piston-data:
