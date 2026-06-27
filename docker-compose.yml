@@ -1,0 +1,57 @@
+services:
+
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: grader
+      POSTGRES_PASSWORD: grader
+      POSTGRES_DB: grader
+    volumes:
+      - grader-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grader -d grader"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Schema setup + seed (runs once, exits) ──────────────────────────────────
+  migrate:
+    build:
+      context: .
+      target: migrator
+    command: npx tsx scripts/setup-db.ts
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://grader:grader@db:5432/grader
+      SEED_ADMIN_EMAIL:    ${SEED_ADMIN_EMAIL:-admin@kmitl.ac.th}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Password123!}
+      SEED_ADMIN_NAME:     ${SEED_ADMIN_NAME:-System Admin}
+
+  # ── Next.js app ──────────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL:       postgresql://grader:grader@db:5432/grader
+      SESSION_SECRET:     ${SESSION_SECRET:?SESSION_SECRET is required — set it in .env}
+      NEXTAUTH_URL:       ${NEXTAUTH_URL:-http://localhost:3000}
+      GOOGLE_CLIENT_ID:   ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # Optional — enables AI test-case generation
+      ANTHROPIC_API_KEY:  ${ANTHROPIC_API_KEY:-}
+
+volumes:
+  grader-db-data:
