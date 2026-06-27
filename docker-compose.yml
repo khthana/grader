@@ -42,7 +42,7 @@ services:
       - POST
       - http://piston:2000/api/v2/packages
       - -H
-      - Content-Type: application/json
+      - "Content-Type: application/json"
       - -d
       - '{"language":"python","version":"3.10.0"}'
 
