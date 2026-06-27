@@ -1,6 +1,6 @@
 # Handoff — CE-Grader (Current State)
 
-Date: 2026-06-24  
+Date: 2026-06-27  
 Repo: https://github.com/khthana/grader.git  
 Branch: `main`
 
@@ -10,7 +10,17 @@ Branch: `main`
 
 All planned features shipped. 462 tests / 63 files — all pass.
 
-Latest work was an architecture **deepening pass** (ADR 0007) — no new features, no
+**Latest work (2026-06-27) — infrastructure + housekeeping, no app/schema change:**
+- **Full-stack Docker Compose** (ADR 0008) — `docker compose up -d --build` runs db +
+  piston + python-init + migrate + app. Two env files: **`.env`** for Compose, **`.env.local`**
+  for host `npm run dev` (not interchangeable — a value in only one is invisible to the other).
+  App on **http://localhost:3000** (Windows WinNAT may reserve 3000 → `APP_PORT=3100` or
+  restart winnat; see README troubleshooting).
+- **Repo tidy** — DB dumps + saved notes moved to gitignored **`local/`** (also in
+  `.dockerignore`); raw lab source material moved to `requirement/labs/`. Commits `995b6ef`,
+  `cf883e4`.
+
+Prior work was an architecture **deepening pass** (ADR 0007) — no new features, no
 schema change: grading collapsed into `src/lib/grading/` behind a `CodeRunner` seam,
 Problem/Week reads scoped by CourseKey (closing a week-PUT cross-course leak), and the
 Reference Solution read gated by `getReferenceSolutionForStaff`.
@@ -66,7 +76,7 @@ Fresh installs (`npm run db:setup`) get all columns via `schema.sql` automatical
 
 ## Environment Variables
 
-Required in `.env.local`:
+**Host dev (`npm run dev`) reads `.env.local`:**
 
 ```
 DATABASE_URL=postgresql://grader:grader@localhost:5433/grader
@@ -74,6 +84,7 @@ SESSION_SECRET=<long random string>
 GOOGLE_CLIENT_ID=         # optional
 GOOGLE_CLIENT_SECRET=     # optional
 NEXTAUTH_URL=http://localhost:3000
+PISTON_URL=http://localhost:2000/api/v2
 ```
 
 Optional for AI generation:
@@ -81,6 +92,11 @@ Optional for AI generation:
 ANTHROPIC_API_KEY=        # or LLM_API_KEY
 LLM_MODEL=                # default: claude-haiku-4-5-20251001
 ```
+
+**Docker Compose reads `.env`** (separate file — ADR 0008): `SESSION_SECRET` (required),
+`NEXTAUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ANTHROPIC_API_KEY`, `APP_PORT`.
+`DATABASE_URL`/`PISTON_URL` are **not** in `.env` — Compose sets them to the `db`/`piston`
+service names internally.
 
 ---
 

@@ -39,15 +39,63 @@ Faculty of Engineering, KMITL — Standalone product (the sibling `DEEP-QA-*` re
 - HMAC-SHA256 session cookie · Google OAuth (optional) · route protection via Next 16 `proxy`
 - **Vitest** + **pg-mem** (in-memory Postgres) for tests · `xlsx` for bulk import/export
 - `react-markdown` + `remark-gfm` — Markdown rendering for problem descriptions
+- **Docker Compose** — full stack (db + piston + app) in one command ([ADR 0008](docs/adr/0008-dockerize-full-stack.md))
 
 > No MUI · No framer-motion · No react-router
 
-## Prerequisites
+## Two ways to run
 
-- Node.js 20+ (developed on 22)
-- PostgreSQL reachable via `DATABASE_URL`
+| | Run with Docker (full stack) | Run on the host (dev) |
+|---|---|---|
+| **Needs** | Docker only | Node 20+ · a reachable PostgreSQL · a Piston engine |
+| **Env file** | `.env` (read by Compose) | `.env.local` (read by Next.js) |
+| **Brings up** | db + piston + python + migrate + app, one command | app only — you provide db/piston |
+| **Best for** | first run, demo, "just make it work" | fast iteration with HMR |
 
-## Setup
+> **The two env files are not interchangeable.** Docker Compose reads **`.env`**;
+> `npm run dev` reads **`.env.local`**. A value set only in `.env.local` is invisible to
+> Compose (and vice-versa). In the Docker path, `DATABASE_URL`/`PISTON_URL` are set to the
+> service names inside `docker-compose.yml`, so they do **not** belong in `.env`. Both files
+> are gitignored. See [ADR 0008](docs/adr/0008-dockerize-full-stack.md).
+
+## Run with Docker (full stack) — recommended
+
+**1. Create `.env`** (Compose reads this; `SESSION_SECRET` is required):
+```
+SESSION_SECRET=<long-random-string>
+NEXTAUTH_URL=http://localhost:3000
+# optional — Google login degrades gracefully if omitted
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+# optional — AI test-case generation
+ANTHROPIC_API_KEY=
+# optional — host port override (default 3000); see WinNAT note below
+# APP_PORT=3100
+```
+
+**2. Bring up the stack**
+```bash
+docker compose up -d --build
+```
+This builds the app image, pulls Postgres + Piston, installs **Python 3.10.0** into
+Piston (`piston-init`), and applies `schema.sql` + seeds the Admin (`migrate`). The
+`migrate` and `piston-init` services are one-shot — they run, exit 0, and show as
+`Exited (0)` in `docker compose ps -a`; that is normal.
+
+Open **http://localhost:3000** → Admin **admin@kmitl.ac.th** / **Password123!**
+
+Everyday commands: `docker compose up -d` · `docker compose down` ·
+`docker compose logs -f app` · `docker compose up -d --build app` (rebuild after code
+changes).
+
+> **Windows port 3000 fails to bind?** If `docker compose up` errors with
+> `bind: An attempt was made to access a socket in a way forbidden by its access permissions`,
+> WinNAT/Hyper-V has reserved the range containing 3000 (seen: 2928–3027). Either free it —
+> `net stop winnat && net start winnat` in an elevated PowerShell — or set `APP_PORT=3100`
+> in `.env` **and** match `NEXTAUTH_URL=http://localhost:3100`. Check reserved ranges with
+> `netsh interface ipv4 show excludedportrange protocol=tcp`.
+
+## Run on the host (dev)
 
 **1. Install dependencies**
 ```bash
@@ -64,13 +112,14 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 ```
 
-**3. (Optional) spin up Postgres with Docker**
+**3. (Optional) spin up just Postgres with Docker**
 ```bash
 docker run -d --name grader-db --restart unless-stopped \
   -e POSTGRES_USER=grader -e POSTGRES_PASSWORD=grader -e POSTGRES_DB=grader \
   -p 5433:5432 -v grader-db-data:/var/lib/postgresql/data postgres:16-alpine
 # DATABASE_URL=postgresql://grader:grader@localhost:5433/grader
 ```
+You still need a Piston engine reachable via `PISTON_URL` for grading to work.
 
 **4. Create tables and seed the initial Admin**
 ```bash
@@ -113,21 +162,28 @@ npx tsx scripts/migrate.ts scripts/migrate-006-unit-test-code.sql           # pr
 
 ## Database backup & restore
 
-`schema.sql` สร้างแค่ตาราง ไม่มีข้อมูล ถ้าต้องการย้ายข้อมูลระหว่างเครื่อง dump/restore Postgres โดยตรง:
+`schema.sql` สร้างแค่ตาราง ไม่มีข้อมูล ถ้าต้องการย้ายข้อมูลระหว่างเครื่อง dump/restore Postgres โดยตรง
+เก็บไฟล์ dump ไว้ใน `local/` (gitignored — dump มีอีเมล + bcrypt hash ของผู้ใช้จริง ห้ามขึ้น git):
 
+**Docker stack** — Postgres คือ service `db` (container `grader-db-1`):
 ```bash
-# Backup
-pg_dump "$DATABASE_URL" --no-owner --no-privileges -f grader-backup.sql
+# Backup — --clean --if-exists ให้ restore ทับ DB เดิมได้
+docker compose exec -T db pg_dump -U grader --clean --if-exists grader > local/grader-backup.sql
 
-# Restore (create schema first, then restore data)
-npm run db:setup
-psql "$DATABASE_URL" -f grader-backup.sql
+# Restore — ล้าง schema ก่อนแล้วโหลด dump
+# (อย่าใช้ db:setup + psql -f ตรง ๆ: DROP CONSTRAINT ใน --clean dump จะ error เพราะ FK
+#  ordering — courses_pkey. ล้างทั้ง schema แล้วให้ CREATE ใน dump สร้างใหม่จะชัวร์กว่า)
+docker compose exec -T db psql -U grader -d grader -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+docker compose exec -T db psql -U grader -d grader < local/grader-backup.sql
 ```
+หมายเหตุ: service `migrate` seed Admin + วิชา `01076021` ทุกครั้งที่ `up` ฉะนั้นการ restore
+ข้อมูลจริงคือการโหลดทับ seed (seed เป็น idempotent ไม่ลบ row ที่ restore เข้ามา)
 
-ถ้า Postgres รันใน Docker (`grader-db`):
+**Host Postgres** (`DATABASE_URL` ตรง ๆ):
 ```bash
-docker exec grader-db pg_dump -U grader --no-owner --no-privileges grader > grader-backup.sql
-docker exec -i grader-db psql -U grader grader < grader-backup.sql
+pg_dump "$DATABASE_URL" --clean --if-exists -f local/grader-backup.sql
+psql "$DATABASE_URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+psql "$DATABASE_URL" -f local/grader-backup.sql
 ```
 
 ## Testing
@@ -179,6 +235,10 @@ src/
 schema.sql                          # database schema (source of truth)
 scripts/
   migrate-001-natural-keys.sql      # one-time dev DB migration
+  seed-lab1.ts setup-db.ts          # seed scripts (natural-key API)
+docker-compose.yml Dockerfile       # full-stack containers (ADR 0008)
+requirement/labs/                   # raw lab source material (not referenced by code)
+local/                              # gitignored — DB dumps, notes, machine-local artifacts
 ```
 
 ## Architecture & conventions

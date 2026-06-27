@@ -249,7 +249,7 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
 5. `GradeResult = { pointsEarned, pointsMax, totalTests, passedTests, results[], feedback }` returned to client.
 
 ## Testing
-- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **461 tests / 63 files** as of 2026-06-24.
+- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **462 tests / 63 files** as of 2026-06-27. Tests use pg-mem — **no Docker required** (independent of the Compose stack).
 - Pure modules are unit-tested directly (session, password, roles, breadcrumbs, validation, import, name).
 - Repository + route handlers are integration-tested against **pg-mem** (in-memory Postgres, no Docker): build a pool with `newDb()` + `mem.public.none(schema.sql)` + `mem.adapters.createPg()`, inject via `setTestDb`, seed through the repository. Route handlers are imported and called with a `NextRequest`; auth is exercised with real `createSessionToken` cookies.
 - **pg-mem gotchas:** explicit casts (`$1::int`); no `STRING_AGG` (use second query + JS); no `DISTINCT ON` (use subquery with `MAX(submitted_at)` + inner join); schema path `../` count must match test file depth exactly.
@@ -262,18 +262,31 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
   - `src/app/api/courses/[code]/[year]/[semester]/problems/[pid]/submissions/` → `../../../../../../../../schema.sql`
 
 ## Environment Variables
-Required in `.env.local`:
+
+**Two env files, two readers (do not conflate — ADR 0008):**
+- **`.env`** — read **automatically by Docker Compose** for variable interpolation. Used only by the Docker path. `SESSION_SECRET` is required (`${SESSION_SECRET:?…}` → Compose refuses to start without it). In-container `DATABASE_URL`/`PISTON_URL` are hard-set to the service names (`@db:5432`, `http://piston:2000/api/v2`) in `docker-compose.yml`, so they do **not** go in `.env`. A value set only in `.env.local` is invisible to Compose.
+- **`.env.local`** — read by **Next.js (`npm run dev`)** on the host and by `scripts/*.ts` when run directly. This is the host-dev path.
+
+Both are gitignored (`.env*`).
+
+`.env.local` (host dev) keys:
 ```
 DATABASE_URL=            # postgresql://user:pass@host:port/db
 SESSION_SECRET=          # long random string (HMAC signing key)
 GOOGLE_CLIENT_ID=        # optional; Google login degrades gracefully if absent
 GOOGLE_CLIENT_SECRET=    # same OAuth client
 NEXTAUTH_URL=            # base URL, e.g. http://localhost:3000
+PISTON_URL=              # e.g. http://localhost:2000/api/v2
 ```
+`.env` (Docker Compose) keys: `SESSION_SECRET` (required), `NEXTAUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ANTHROPIC_API_KEY`, `APP_PORT` (host port, default 3000).
+
 Google redirect URI to register: `{NEXTAUTH_URL}/api/auth/callback/google`. Seeded Admin defaults: `admin@kmitl.ac.th` / `Password123!`.
 
-### Local dev database
-A Postgres is assumed to be reachable via `DATABASE_URL`. Quick local setup with Docker:
+### Run the full stack with Docker Compose (ADR 0008)
+`docker compose up -d --build` brings up **5 services**: `db` (postgres:16-alpine) · `piston` (code runner, TCP healthcheck — no curl in image) · `piston-init` (one-shot: installs **Python 3.10.0** into Piston, then exits 0) · `migrate` (one-shot: `npx tsx scripts/setup-db.ts` → schema + seed Admin/course `01076021`, exits 0) · `app` (Next.js standalone, published `${APP_PORT:-3000}:3000`). The two one-shot containers show as `Exited (0)` — normal; they re-run on each `up`. Named volumes: `grader_grader-db-data`, `grader_piston-data`. **Windows:** WinNAT can reserve port 3000 (`bind: …forbidden`) — fix with `net stop winnat && net start winnat`, or set `APP_PORT=3100` in `.env` + matching `NEXTAUTH_URL`.
+
+### Local dev database (host path)
+A Postgres is assumed to be reachable via `DATABASE_URL`. Quick local setup with Docker (Postgres only — you still need a Piston engine for grading):
 ```
 docker run -d --name grader-db --restart unless-stopped \
   -e POSTGRES_USER=grader -e POSTGRES_PASSWORD=grader -e POSTGRES_DB=grader \
@@ -292,3 +305,5 @@ docker run -d --name grader-db --restart unless-stopped \
 - **Schema migrations are manual:** `schema.sql` uses `CREATE TABLE IF NOT EXISTS`. For existing DBs, apply individual migration scripts via `npx tsx scripts/migrate.ts scripts/migrate-00N-*.sql` (loads `.env.local` automatically if `DATABASE_URL` is set). On Windows/Git-Bash for a fresh install: `set -a; . ./.env.local; set +a; npm run db:setup`.
 - **No surrogate IDs on courses or enrollments.** Always identify a course by `CourseKey = { code, year, semester }`. Client components receive `courseSlug: string` (`"code/year/semester"`) for API fetch paths, and `coursePath: string` (`"/courses/code/year/semester"`) for navigation links.
 - **Problem URLs use week + position:** `/courses/.../problems/[weekNo]/[problemNo]`, not problem ID. The surrogate `id` is only used as a stable FK anchor in `test_cases` and `submissions`.
+- **`local/` is for machine-local artifacts** (DB dumps, saved notes, exports) — gitignored (`/local/`) **and** in `.dockerignore` so nothing leaks into git or an image layer. A DB dump carries real user emails + bcrypt hashes; keep it here, never at the repo root. Raw lab source material (not referenced by code) lives in `requirement/labs/`.
+- **Docker/Compose:** full-stack containerization is **ADR 0008**. The `.env` (Compose) vs `.env.local` (host dev) split is the main footgun — see Environment Variables.
