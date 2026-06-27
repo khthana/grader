@@ -31,20 +31,12 @@ services:
 
   # ── Install Python runtime into Piston (runs once, exits) ────────────────────
   piston-init:
-    image: curlimages/curl:8
+    image: node:20-alpine
     depends_on:
       piston:
         condition: service_healthy
-    command:
-      - curl
-      - -sf
-      - -X
-      - POST
-      - http://piston:2000/api/v2/packages
-      - -H
-      - "Content-Type: application/json"
-      - -d
-      - '{"language":"python","version":"3.10.0"}'
+    command: >-
+      node -e "fetch('http://piston:2000/api/v2/packages',{method:'POST',headers:{'Content-Type':'application/json'},body:'{\"language\":\"python\",\"version\":\"3.10.0\"}'}).then(r=>r.text()).then(console.log).catch(e=>{console.error(e);process.exit(1)})"
 
   # ── Schema setup + seed (runs once, exits) ──────────────────────────────────
   migrate:
