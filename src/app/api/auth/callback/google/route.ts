@@ -22,16 +22,12 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get('code')
   const error = searchParams.get('error')
 
-  const loginWithError = (reason: string) =>
-    NextResponse.redirect(new URL(`/login?error=${reason}`, req.url))
-
-  if (error || !code) {
-    return loginWithError('google_cancelled')
-  }
-
   const clientId = process.env.GOOGLE_CLIENT_ID
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
   const baseUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
+
+  const loginWithError = (reason: string) =>
+    NextResponse.redirect(new URL(`/login?error=${reason}`, baseUrl))
 
   if (!clientId || !clientSecret) {
     return loginWithError('server_error')
@@ -86,7 +82,7 @@ export async function GET(req: NextRequest) {
     picture: userRecord.picture ?? undefined,
   })
 
-  const response = NextResponse.redirect(new URL('/', req.url))
+  const response = NextResponse.redirect(new URL('/', baseUrl))
   response.cookies.set('session', sessionToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
