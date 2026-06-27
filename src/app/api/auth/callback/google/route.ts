@@ -29,6 +29,10 @@ export async function GET(req: NextRequest) {
   const loginWithError = (reason: string) =>
     NextResponse.redirect(new URL(`/login?error=${reason}`, baseUrl))
 
+  if (error || !code) {
+    return loginWithError('google_cancelled')
+  }
+
   if (!clientId || !clientSecret) {
     return loginWithError('server_error')
   }
