@@ -27,8 +27,18 @@ record — a roster entry *is* a User. A Student logs in to submit code.
 
 ### Course
 A subject offering (e.g. `01076021 · โครงสร้างข้อมูลและอัลกอริทึม`). Has a code, a
-Thai name, an English name. Owns a roster of enrolled Students. Selectable via the
-navbar course switcher. Courses are managed (created/edited) by Admin/Instructor.
+Thai name, an English name, and a **Course Language**. Owns a roster of enrolled
+Students. Selectable via the navbar course switcher. Courses are managed
+(created/edited) by Admin/Instructor.
+
+### Course Language (ภาษาของรายวิชา)
+The programming language a Course is taught and graded in — **Python** or **C** (ADR
+0009). Chosen in the course create/edit form and stored on `courses.language`. Every
+**Problem** in the course inherits it: the language is set server-side from the course
+and is shown read-only in the Problem editor (not a per-problem pick). It may be
+changed freely **only while the course has no Problems** (the *language lock*); once
+Problems exist the course language is fixed. C is **I/O-mode only** — **Unit Test
+Mode** and AI generation are Python-only.
 
 ### Enrollment
 The link between a **Student** and a **Course** — i.e. membership in a course's
@@ -49,9 +59,9 @@ Courses without assignment.
 Copying a whole **Course** offering to another academic term — same course `code`, a new
 `(year, semester)`. Triggered by Admin/Instructor from the รายวิชา list. The operation
 **creates** the target offering (it must not already exist) and copies everything that
-defines the course content: **Course staff** (plus the acting user), every **Week**
-(`week_no` + `topic`), every **Problem** (all fields including the **Reference Solution**),
-and every **Test Case**. Term-specific state is deliberately reset: **Due Date** / **Close
+defines the course content: the **Course Language**, **Course staff** (plus the acting
+user), every **Week** (`week_no` + `topic`), every **Problem** (all fields including the
+**Reference Solution**), and every **Test Case**. Term-specific state is deliberately reset: **Due Date** / **Close
 Date** are cleared and every Week starts as an unreleased (hidden) **Released Week**.
 **Enrollments** and **Submissions** are never copied — a new term has a new roster and a
 clean gradebook. The copy is atomic (all-or-nothing).
@@ -83,8 +93,10 @@ FK `(course_code, course_year, course_semester)` + `week_no` + `topic` + `is_rel
 ### Problem (โจทย์ปัญหา)
 A programming challenge belonging to one **Course** and one **Week**. Carries a title,
 description, input/output specification, and one or more **Test Cases**. Total points
-equals the sum of all Test Case scores. Problems are course-scoped and managed
-(created/edited/deleted) by Instructor; TA has view-only access.
+equals the sum of all Test Case scores. Its language is inherited from the **Course
+Language** (server-authoritative — set from the course on create/update, never from
+the client). Problems are course-scoped and managed (created/edited/deleted) by
+Instructor; TA has view-only access.
 
 ### Test Case
 An input/expected-output pair belonging to an **I/O Problem**. Carries a `score` (points),
@@ -95,10 +107,10 @@ Piston rather than typed by hand. (**Unit Test Mode** problems do not use Test C
 they use a single **Unit Test Code** block instead.)
 
 ### Reference Solution (เฉลยอ้างอิง)
-A Python solution authored by the Instructor and stored per **Problem**. Used
-exclusively for authoring-time test-case verification — the Instructor clicks "รันเฉลย"
-to run it against all **Test Case** inputs via Piston and confirm or repair expected
-outputs. The reference solution is **never** exposed to Students or included in any
+A solution (in the **Course Language** — Python or C) authored by the Instructor and
+stored per **Problem**. Used exclusively for authoring-time test-case verification —
+the Instructor clicks "รันเฉลย" to compile + run it against all **Test Case** inputs
+via Piston and confirm or repair expected outputs. The reference solution is **never** exposed to Students or included in any
 student-reachable API response. Request/page paths read it only through the staff-gated
 reader `getReferenceSolutionForStaff` (the Problem edit page); the raw column read is
 reserved for already-authorized server-side work (course duplication). The "รันเฉลย"
@@ -143,7 +155,7 @@ One of `"io"` or `"unit"`, set per **Problem** by the Instructor. Controls how t
 - `"unit"` — the Instructor writes a single **Unit Test Code** block (assert statements); the student's code is prepended and the block runs once. **All-or-nothing** scoring against the Problem's `score`.
 
 ### Unit Test Mode (โหมด Unit Test)
-A **Problem** grading mode (`problem_type = 'unit'`) where the Instructor writes a single block of Python test code using `assert` statements (stored in `problems.unit_test_code`) instead of per-case stdin/stdout or args/return pairs. At grade time the student's submitted code is prepended before the block and the whole thing runs once in Piston: if every assert passes (exit 0) the student earns the full Problem `score`, otherwise `0` (all-or-nothing). On failure the student sees the stderr **traceback** (the failing assert + message) but never the full test block. Unit Test problems do **not** use the **Test Case** table. Students write their solution starting from the **Starter Code** the Instructor provides.
+A **Problem** grading mode (`problem_type = 'unit'`) where the Instructor writes a single block of Python test code using `assert` statements (stored in `problems.unit_test_code`) instead of per-case stdin/stdout or args/return pairs. At grade time the student's submitted code is prepended before the block and the whole thing runs once in Piston: if every assert passes (exit 0) the student earns the full Problem `score`, otherwise `0` (all-or-nothing). On failure the student sees the stderr **traceback** (the failing assert + message) but never the full test block. Unit Test problems do **not** use the **Test Case** table. Students write their solution starting from the **Starter Code** the Instructor provides. **Python-only:** the harness runs through the Python runtime, so Unit Test Mode is unavailable in C courses (hidden in the editor and rejected by validation — ADR 0009).
 
 ### Starter Code (โค้ดตั้งต้น)
 Optional template code set by the Instructor per **Problem** that pre-populates the student's code editor when they first open the problem. In unit test problems, this is typically the function signature (`def add(a, b):`). Applies to both I/O and unit test problems. A student's saved submission takes precedence over starter code when they return to a problem.

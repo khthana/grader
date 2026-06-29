@@ -3,7 +3,7 @@
 ระบบตรวจและให้คะแนน Python code ของนักศึกษาอัตโนมัติ (Computer Engineering Python Grader)  
 Faculty of Engineering, KMITL — Standalone product (the sibling `DEEP-QA-*` repos are read-only design references).
 
-นักศึกษาส่ง Python code เข้ามา ระบบรันกับ test cases ผ่าน [Piston](https://github.com/engineer-man/piston) แล้วให้คะแนนพร้อม feedback ทันที
+นักศึกษาส่งโค้ด (**Python หรือ C** ตามภาษาของรายวิชา) เข้ามา ระบบรัน/คอมไพล์กับ test cases ผ่าน [Piston](https://github.com/engineer-man/piston) แล้วให้คะแนนพร้อม feedback ทันที
 
 ## Features
 
@@ -29,17 +29,19 @@ Faculty of Engineering, KMITL — Standalone product (the sibling `DEEP-QA-*` re
 | **Unit Test Mode** | โจทย์แบบ pytest-style block (`assert`) — all-or-nothing scoring; แสดง traceback เมื่อ fail |
 | **User Profile** | ตั้ง nickname + อัปโหลด avatar (resize 256×256) + เปลี่ยนรหัสผ่าน (ทุก role) |
 | **Course Duplication** | ทำซ้ำทั้งวิชา (โจทย์ + เฉลย + test cases + ผู้สอน + weeks) ไปภาคการศึกษาใหม่คลิกเดียว (Instructor/Admin) |
+| **Multi-language (Python / C)** | เลือกภาษาต่อรายวิชา; โจทย์ทุกข้อ inherit ภาษานั้น; C คอมไพล์+รันผ่าน gcc (I/O mode); Unit Test + AI gen เฉพาะ Python |
 
 ## Tech stack
 
 - **Next.js 16** (App Router, Turbopack) · TypeScript · React 19
 - **Tailwind CSS v4** + `@tailwindcss/typography` · `react-icons`
 - **PostgreSQL** via raw `pg` + SQL · **bcryptjs** password hashing
-- **Piston** — sandboxed code execution (Python 3.10.0)
+- **Piston** — sandboxed code execution (Python 3.10.0 · C `gcc` 10.2.0)
 - HMAC-SHA256 session cookie · Google OAuth (optional) · route protection via Next 16 `proxy`
 - **Vitest** + **pg-mem** (in-memory Postgres) for tests · `xlsx` for bulk import/export
 - `react-markdown` + `remark-gfm` — Markdown rendering for problem descriptions
 - **Docker Compose** — full stack (db + piston + app) in one command ([ADR 0008](docs/adr/0008-dockerize-full-stack.md))
+- **Multi-language** — Python or C chosen per course, problems inherit it ([ADR 0009](docs/adr/0009-multi-language-per-course.md))
 
 > No MUI · No framer-motion · No react-router
 
@@ -77,8 +79,9 @@ ANTHROPIC_API_KEY=
 ```bash
 docker compose up -d --build
 ```
-This builds the app image, pulls Postgres + Piston, installs **Python 3.10.0** into
-Piston (`piston-init`), and applies `schema.sql` + seeds the Admin (`migrate`). The
+This builds the app image, pulls Postgres + Piston, installs **Python 3.10.0 + C `gcc`
+10.2.0** into Piston (`piston-init`), and applies `schema.sql` + seeds the Admin
+(`migrate`). The
 `migrate` and `piston-init` services are one-shot — they run, exit 0, and show as
 `Exited (0)` in `docker compose ps -a`; that is normal.
 
