@@ -76,6 +76,39 @@ export async function updateCourse(
   return rows[0] ? toRecord(rows[0]) : null
 }
 
+export interface CourseCascadeCounts {
+  students: number
+  problems: number
+  submissions: number
+}
+
+/**
+ * Counts the meaningful data that an `ON DELETE CASCADE` would destroy along
+ * with a course. Weeks and instructor assignments are scaffolding created at
+ * course creation, so they are intentionally excluded — an "empty" course
+ * (only seeded weeks + its creator) reports all zeros and can be deleted
+ * without a confirmation prompt.
+ */
+export async function getCourseCascadeCounts(
+  db: Queryable,
+  key: CourseKey
+): Promise<CourseCascadeCounts> {
+  const params = [key.code, key.year, key.semester]
+  const where = `course_code = $1 AND course_year = $2::int AND course_semester = $3::int`
+
+  const [students, problems, submissions] = await Promise.all([
+    db.query<{ n: string }>(`SELECT COUNT(*)::int AS n FROM enrollments WHERE ${where}`, params),
+    db.query<{ n: string }>(`SELECT COUNT(*)::int AS n FROM problems WHERE ${where}`, params),
+    db.query<{ n: string }>(`SELECT COUNT(*)::int AS n FROM submissions WHERE ${where}`, params),
+  ])
+
+  return {
+    students: Number(students.rows[0].n),
+    problems: Number(problems.rows[0].n),
+    submissions: Number(submissions.rows[0].n),
+  }
+}
+
 export async function deleteCourse(
   db: Queryable,
   key: CourseKey

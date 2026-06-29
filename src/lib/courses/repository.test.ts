@@ -6,13 +6,17 @@ import {
   assignInstructor,
   updateCourse,
   deleteCourse,
+  getCourseCascadeCounts,
   setCourseInstructors,
   listCourseInstructors,
   searchStaffCandidates,
 } from "./repository"
 import { createUser, assignRole } from "@/lib/users/repository"
 import { createEnrollment, getEnrollmentByUser } from "@/lib/enrollments/repository"
-import { freshDb, type Queryable } from "@/lib/test-support/db"
+import { createProblem } from "@/lib/problems/repository"
+import { createSubmission } from "@/lib/submissions/repository"
+import { getWeekByNo } from "@/lib/weeks/repository"
+import { courseFixture, freshDb, type Queryable } from "@/lib/test-support/db"
 import type { CourseKey } from "./types"
 
 const KEY: CourseKey = { code: "C01", year: 2567, semester: 1 }
@@ -139,6 +143,75 @@ describe("deleteCourse", () => {
 
   it("returns false for an unknown course", async () => {
     expect(await deleteCourse(db, { code: "NOPE", year: 2567, semester: 1 })).toBe(false)
+  })
+})
+
+describe("getCourseCascadeCounts", () => {
+  it("reports all zeros for a freshly-seeded course (weeks/instructors don't count)", async () => {
+    const { db, course } = await courseFixture()
+    expect(await getCourseCascadeCounts(db, course)).toEqual({
+      students: 0,
+      problems: 0,
+      submissions: 0,
+    })
+  })
+
+  it("counts enrolled students, problems, and submissions", async () => {
+    const { db, course } = await courseFixture()
+    const week = await getWeekByNo(db, course, 1)
+    const stu = await createUser(db, { email: "s@kmitl.ac.th", name: "S", idCode: "1" })
+    await assignRole(db, stu.id, "Student")
+    await createEnrollment(db, {
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      userId: stu.id,
+    })
+    const problem = await createProblem(db, {
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      weekId: week!.id,
+      title: "P1",
+    })
+    await createSubmission(db, {
+      problemId: problem.id,
+      userId: stu.id,
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      code: "print(1)",
+      language: "python",
+      pointsEarned: 10,
+      pointsMax: 10,
+      isLate: false,
+      results: [],
+    })
+
+    expect(await getCourseCascadeCounts(db, course)).toEqual({
+      students: 1,
+      problems: 1,
+      submissions: 1,
+    })
+  })
+
+  it("scopes counts to the given course only", async () => {
+    const { db, course } = await courseFixture()
+    const other = await createCourse(db, course2)
+    const stu = await createUser(db, { email: "s@kmitl.ac.th", name: "S", idCode: "1" })
+    await assignRole(db, stu.id, "Student")
+    await createEnrollment(db, {
+      courseCode: other.code,
+      courseYear: other.year,
+      courseSemester: other.semester,
+      userId: stu.id,
+    })
+
+    expect(await getCourseCascadeCounts(db, course)).toEqual({
+      students: 0,
+      problems: 0,
+      submissions: 0,
+    })
   })
 })
 

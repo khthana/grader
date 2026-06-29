@@ -10,6 +10,7 @@ import { CourseStaffDialog } from "./CourseStaffDialog"
 import { CourseDuplicateDialog } from "./CourseDuplicateDialog"
 
 type DialogState = { mode: "create" } | { mode: "edit"; course: CourseValue } | null
+type CascadeCounts = { students: number; problems: number; submissions: number }
 
 export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
   const { notify } = useToast()
@@ -18,10 +19,11 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
   const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
   const [dialog, setDialog] = useState<DialogState>(openCreate ? { mode: "create" } : null)
-  const [deleteTarget, setDeleteTarget] = useState<CourseValue | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ course: CourseValue; counts: CascadeCounts } | null>(null)
   const [staffTarget, setStaffTarget] = useState<CourseValue | null>(null)
   const [duplicateTarget, setDuplicateTarget] = useState<CourseValue | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [checking, setChecking] = useState<string | null>(null)
   // Refresh this client table AND the server-rendered shell, so the navbar
   // course switcher (fed by the layout's getCourseContext) updates immediately
   // rather than only on the next full page load.
@@ -51,15 +53,41 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
     }
   }, [notify, refreshKey])
 
+  async function deleteCourse(course: CourseValue) {
+    const res = await fetch(`/api/courses/${course.code}/${course.year}/${course.semester}`, { method: "DELETE" })
+    if (!res.ok) throw new Error()
+    notify("success", "ลบรายวิชาแล้ว")
+    reload()
+  }
+
+  // Clicking the trash icon first asks the server what would cascade. An empty
+  // course (no students/problems/submissions) is deleted straight away; one
+  // with data opens a confirmation dialog spelling out what will be lost.
+  async function requestDelete(course: CourseValue) {
+    const slug = `${course.code}/${course.year}/${course.semester}`
+    setChecking(slug)
+    try {
+      const res = await fetch(`/api/courses/${slug}`)
+      if (!res.ok) throw new Error()
+      const { counts } = (await res.json()) as { counts: CascadeCounts }
+      if (counts.students === 0 && counts.problems === 0 && counts.submissions === 0) {
+        await deleteCourse(course)
+      } else {
+        setDeleteTarget({ course, counts })
+      }
+    } catch {
+      notify("error", "ไม่สามารถลบรายวิชาได้")
+    } finally {
+      setChecking(null)
+    }
+  }
+
   async function confirmDelete() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      const res = await fetch(`/api/courses/${deleteTarget.code}/${deleteTarget.year}/${deleteTarget.semester}`, { method: "DELETE" })
-      if (!res.ok) throw new Error()
-      notify("success", "ลบรายวิชาแล้ว")
+      await deleteCourse(deleteTarget.course)
       setDeleteTarget(null)
-      reload()
     } catch {
       notify("error", "ไม่สามารถลบรายวิชาได้")
     } finally {
@@ -140,8 +168,9 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
                         <FaPen className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        onClick={() => setDeleteTarget(c)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600"
+                        onClick={() => requestDelete(c)}
+                        disabled={checking === `${c.code}/${c.year}/${c.semester}`}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                         aria-label="ลบ"
                       >
                         <FaTrash className="h-3.5 w-3.5" />
@@ -183,7 +212,17 @@ export function CoursesTable({ openCreate = false }: { openCreate?: boolean }) {
       {deleteTarget && (
         <ConfirmDialog
           title="ลบรายวิชา"
-          message={`ต้องการลบ ${deleteTarget.code} · ${deleteTarget.nameTh} ใช่หรือไม่? รายชื่อนักศึกษาทั้งหมดในรายวิชานี้จะถูกลบไปด้วย`}
+          message={
+            `ต้องการลบ ${deleteTarget.course.code} · ${deleteTarget.course.nameTh} ใช่หรือไม่?\n\n` +
+            `ข้อมูลต่อไปนี้จะถูกลบไปด้วยและไม่สามารถกู้คืนได้:\n` +
+            [
+              deleteTarget.counts.students > 0 && `• นักศึกษา ${deleteTarget.counts.students} คน`,
+              deleteTarget.counts.problems > 0 && `• โจทย์ ${deleteTarget.counts.problems} ข้อ`,
+              deleteTarget.counts.submissions > 0 && `• การส่งคำตอบ ${deleteTarget.counts.submissions} รายการ`,
+            ]
+              .filter(Boolean)
+              .join("\n")
+          }
           onConfirm={confirmDelete}
           onCancel={() => setDeleteTarget(null)}
           busy={deleting}

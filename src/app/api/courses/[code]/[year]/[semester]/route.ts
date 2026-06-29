@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
 import { courseRoute } from "@/lib/courses/route"
-import { updateCourse, deleteCourse } from "@/lib/courses/repository"
+import { updateCourse, deleteCourse, getCourseCascadeCounts } from "@/lib/courses/repository"
 import { safeLog } from "@/lib/logs"
 
 export const GET = courseRoute({ manage: true }, async (_request, auth) => {
-  return NextResponse.json(auth.course)
+  const db = getDb()
+  const counts = await getCourseCascadeCounts(db, auth.course)
+  return NextResponse.json({ ...auth.course, counts })
 })
 
 export const PUT = courseRoute({ manage: true }, async (request, auth) => {

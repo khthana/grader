@@ -19,7 +19,7 @@ export function ConfirmDialog({ title, message, confirmLabel = "ลบ", onConfi
           <FaExclamationTriangle className="text-2xl text-red-500" />
           <h2 className="text-xl font-semibold text-red-500">{title}</h2>
         </div>
-        <p className="mt-4 text-sm text-slate-600">{message}</p>
+        <p className="mt-4 whitespace-pre-line text-sm text-slate-600">{message}</p>
         <div className="mt-6 flex justify-end gap-3">
           <button
             onClick={onCancel}
