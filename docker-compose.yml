@@ -30,14 +30,19 @@ services:
       retries: 10
       start_period: 15s
 
-  # ── Install Python runtime into Piston (runs once, exits) ────────────────────
+  # ── Install language runtimes into Piston (runs once, exits) ─────────────────
+  # Installs Python and C. The C *install* package is `gcc` (the execute runtime
+  # is exposed as `c`) — verified vs the engine in #61. Re-runs safely on each
+  # `up`: an already-installed package still resolves the fetch, so we exit 0
+  # unless a request truly fails to reach Piston. Keep versions in sync with
+  # src/lib/languages.ts (guarded by languages.docker.test.ts).
   piston-init:
     image: node:20-alpine
     depends_on:
       piston:
         condition: service_healthy
     command: >-
-      node -e "fetch('http://piston:2000/api/v2/packages',{method:'POST',headers:{'Content-Type':'application/json'},body:'{\"language\":\"python\",\"version\":\"3.10.0\"}'}).then(r=>r.text()).then(console.log).catch(e=>{console.error(e);process.exit(1)})"
+      node -e "const pkgs=[{language:'python',version:'3.10.0'},{language:'gcc',version:'10.2.0'}];(async()=>{for(const p of pkgs){const r=await fetch('http://piston:2000/api/v2/packages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});console.log(p.language,p.version,r.status,await r.text())}})().catch(e=>{console.error(e);process.exit(1)})"
 
   # ── Schema setup + seed (runs once, exits) ──────────────────────────────────
   migrate:
