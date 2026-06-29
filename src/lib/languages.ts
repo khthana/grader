@@ -16,7 +16,17 @@ export const LANGUAGE_CONFIG: Record<string, LanguageConfig> = {
   c: { piston: "c", version: "10.2.0", filename: "main.c" },
 }
 
-const DEFAULT_LANGUAGE = "python"
+export const DEFAULT_LANGUAGE = "python"
+
+// The languages a course may be set to — the registry keys, single-sourced.
+export const SUPPORTED_LANGUAGES = Object.keys(LANGUAGE_CONFIG)
+
+// Whether a language code is one a course/problem may declare. Unlike
+// getLanguageConfig (which silently falls back to Python at execution time),
+// this is the strict check used to validate user-supplied input.
+export function isSupportedLanguage(language: string): boolean {
+  return Object.prototype.hasOwnProperty.call(LANGUAGE_CONFIG, language)
+}
 
 // Resolve a language code to its config, falling back to Python for anything
 // unknown so a stray/blank value can never break execution.

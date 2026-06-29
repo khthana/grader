@@ -27,6 +27,19 @@ export function isTeachingStaff(roles: string[]): boolean {
   return roles.some((r) => TEACHING_STAFF.includes(r))
 }
 
+// Whether a course's language may be changed to `desired`. A change is locked
+// once the course has problems (they inherit the language at creation, so
+// flipping it underneath them would be inconsistent — #63). Submitting the
+// current value is never a "change", so editing other fields stays possible.
+export function canChangeCourseLanguage(opts: {
+  current: string
+  desired: string
+  problemCount: number
+}): boolean {
+  if (opts.desired === opts.current) return true
+  return opts.problemCount === 0
+}
+
 // Pick the active course from the user's entitled courses. Prefer the slug
 // from the `active_course` cookie ("code/year/semester") when it matches;
 // otherwise fall back to the first course. Returns null for an empty list.

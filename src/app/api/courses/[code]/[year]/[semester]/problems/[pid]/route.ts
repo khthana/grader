@@ -89,7 +89,9 @@ export const PUT = courseRoute<{ code: string; year: string; semester: string; p
       outputSpec: body.outputSpec?.trim(),
       dueAt: body.dueAt,
       closeAt: body.closeAt,
-      language: body.language,
+      // Language stays course-authoritative (#63) — re-sync to the course
+      // language on every edit; the client value is ignored.
+      language: auth.course.language,
       referenceSolution: body.referenceSolution,
       problemType: body.problemType,
       functionName: body.functionName,

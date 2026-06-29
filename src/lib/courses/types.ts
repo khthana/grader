@@ -8,5 +8,6 @@ export interface CourseRecord extends CourseKey {
   nameTh: string
   nameEn: string
   program: string | null
+  language: string
   createdAt: string
 }

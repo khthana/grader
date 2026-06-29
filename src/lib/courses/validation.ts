@@ -1,5 +1,7 @@
 // Pure validation for a course (create + edit form). program is optional.
 
+import { isSupportedLanguage } from "@/lib/languages"
+
 export interface CourseInput {
   code: string
   year: number
@@ -7,6 +9,7 @@ export interface CourseInput {
   nameTh: string
   nameEn: string
   program?: string
+  language?: string
 }
 
 export interface ValidationResult {
@@ -37,6 +40,10 @@ export function validateCourseInput(input: CourseInput): ValidationResult {
   if (isBlank(input.code)) errors.code = "กรุณากรอกรหัสวิชา"
   if (isBlank(input.nameTh)) errors.nameTh = "กรุณากรอกชื่อวิชา (ภาษาไทย)"
   if (isBlank(input.nameEn)) errors.nameEn = "กรุณากรอกชื่อวิชา (ภาษาอังกฤษ)"
+  // Language is optional (absent → Python downstream); reject only a value that
+  // isn't a supported language.
+  if (input.language !== undefined && !isSupportedLanguage(input.language))
+    errors.language = "ภาษาที่เลือกไม่รองรับ"
 
   return { valid: Object.keys(errors).length === 0, errors }
 }

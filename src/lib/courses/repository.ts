@@ -9,6 +9,7 @@ export interface NewCourse {
   nameTh: string
   nameEn: string
   program?: string | null
+  language?: string
 }
 
 interface CourseRow {
@@ -18,6 +19,7 @@ interface CourseRow {
   name_th: string
   name_en: string
   program: string | null
+  language: string
   created_at: string
 }
 
@@ -29,22 +31,23 @@ function toRecord(row: CourseRow): CourseRecord {
     nameTh: row.name_th,
     nameEn: row.name_en,
     program: row.program,
+    language: row.language,
     createdAt: row.created_at,
   }
 }
 
 const SELECT_COLS =
-  `code, year, semester, name_th, name_en, program, created_at`
+  `code, year, semester, name_th, name_en, program, language, created_at`
 
 export async function createCourse(
   db: Queryable,
   input: NewCourse
 ): Promise<CourseRecord> {
   const { rows } = await db.query<CourseRow>(
-    `INSERT INTO courses (code, year, semester, name_th, name_en, program)
-     VALUES ($1, $2::int, $3::int, $4, $5, $6)
+    `INSERT INTO courses (code, year, semester, name_th, name_en, program, language)
+     VALUES ($1, $2::int, $3::int, $4, $5, $6, $7)
      RETURNING ${SELECT_COLS}`,
-    [input.code, input.year, input.semester, input.nameTh, input.nameEn, input.program ?? null]
+    [input.code, input.year, input.semester, input.nameTh, input.nameEn, input.program ?? null, input.language ?? "python"]
   )
   return toRecord(rows[0])
 }
@@ -64,14 +67,18 @@ export async function getCourseByKey(
 export async function updateCourse(
   db: Queryable,
   key: CourseKey,
-  input: Pick<NewCourse, "nameTh" | "nameEn" | "program">
+  input: Pick<NewCourse, "nameTh" | "nameEn" | "program" | "language">
 ): Promise<CourseRecord | null> {
+  // language is updated only when supplied — a names-only edit leaves it as is.
+  const setLanguage = input.language !== undefined
+  const params: unknown[] = [key.code, key.year, key.semester, input.nameTh, input.nameEn, input.program ?? null]
+  if (setLanguage) params.push(input.language)
   const { rows } = await db.query<CourseRow>(
     `UPDATE courses
-     SET name_th = $4, name_en = $5, program = $6, updated_at = now()
+     SET name_th = $4, name_en = $5, program = $6${setLanguage ? `, language = $7` : ""}, updated_at = now()
      WHERE code = $1 AND year = $2::int AND semester = $3::int
      RETURNING ${SELECT_COLS}`,
-    [key.code, key.year, key.semester, input.nameTh, input.nameEn, input.program ?? null]
+    params
   )
   return rows[0] ? toRecord(rows[0]) : null
 }
@@ -238,7 +245,7 @@ export async function listCoursesForUser(
   }
 
   const { rows } = await db.query<CourseRow>(
-    `SELECT DISTINCT c.code, c.year, c.semester, c.name_th, c.name_en, c.program, c.created_at
+    `SELECT DISTINCT c.code, c.year, c.semester, c.name_th, c.name_en, c.program, c.language, c.created_at
      FROM courses c
      JOIN (
        SELECT course_code, course_year, course_semester FROM course_instructors WHERE user_id = $1::int

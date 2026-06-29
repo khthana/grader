@@ -16,4 +16,15 @@ describe("validateCourseInput", () => {
     expect(validateCourseInput(valid).valid).toBe(true)
     expect(validateCourseInput({ ...valid, program: "วิศวกรรมคอมพิวเตอร์" }).valid).toBe(true)
   })
+
+  it("treats an absent language as valid (defaults to Python downstream)", () => {
+    expect(validateCourseInput(valid).valid).toBe(true)
+  })
+
+  it("accepts a supported language and rejects an unsupported one", () => {
+    expect(validateCourseInput({ ...valid, language: "c" }).valid).toBe(true)
+    const { valid: ok, errors } = validateCourseInput({ ...valid, language: "rust" })
+    expect(ok).toBe(false)
+    expect(errors.language).toBeTruthy()
+  })
 })

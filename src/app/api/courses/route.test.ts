@@ -130,4 +130,23 @@ describe("POST /api/courses", () => {
     const dup = await POST(postReq(newCourse, sessionFor("ins@kmitl.ac.th")))
     expect(dup.status).toBe(409)
   })
+
+  it("persists a chosen language and defaults to python when absent", async () => {
+    await seedRole(db, "ins@kmitl.ac.th", "Instructor")
+
+    const cRes = await POST(postReq({ ...newCourse, language: "c" }, sessionFor("ins@kmitl.ac.th")))
+    expect(cRes.status).toBe(201)
+    expect((await cRes.json()).language).toBe("c")
+
+    const pyRes = await POST(
+      postReq({ code: "OTHER", year: 2567, semester: 1, nameTh: "อื่น", nameEn: "Other" }, sessionFor("ins@kmitl.ac.th"))
+    )
+    expect((await pyRes.json()).language).toBe("python")
+  })
+
+  it("returns 400 for an unsupported language", async () => {
+    await seedRole(db, "ins@kmitl.ac.th", "Instructor")
+    const res = await POST(postReq({ ...newCourse, language: "rust" }, sessionFor("ins@kmitl.ac.th")))
+    expect(res.status).toBe(400)
+  })
 })

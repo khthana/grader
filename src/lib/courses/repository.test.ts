@@ -52,6 +52,25 @@ describe("course repository", () => {
     expect(found?.program).toBe("วิศวกรรมคอมพิวเตอร์")
   })
 
+  it("defaults a course's language to python and round-trips an explicit one", async () => {
+    const py = await createCourse(db, course1)
+    expect(py.language).toBe("python")
+
+    const c = await createCourse(db, { ...course2, language: "c" })
+    expect(c.language).toBe("c")
+    expect((await getCourseByKey(db, course2))?.language).toBe("c")
+  })
+
+  it("updateCourse can change the language and leaves it untouched when omitted", async () => {
+    await createCourse(db, { ...course1, language: "c" })
+    // names-only update keeps the existing language
+    await updateCourse(db, KEY, { nameTh: "ก2", nameEn: "A2", program: null })
+    expect((await getCourseByKey(db, KEY))?.language).toBe("c")
+    // explicit language update changes it
+    await updateCourse(db, KEY, { nameTh: "ก2", nameEn: "A2", program: null, language: "python" })
+    expect((await getCourseByKey(db, KEY))?.language).toBe("python")
+  })
+
   it("enforces (code, year, semester) uniqueness — same code different semester is ok", async () => {
     await createCourse(db, { code: "X", year: 2567, semester: 1, nameTh: "ก", nameEn: "A" })
     // same code, same year, same semester → conflict

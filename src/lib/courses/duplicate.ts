@@ -50,6 +50,7 @@ export async function duplicateCourseOffering(
     nameTh: src.nameTh,
     nameEn: src.nameEn,
     program: src.program ?? undefined,
+    language: src.language,
   })
 
   const instructors = await listCourseInstructors(db, source)

@@ -12,9 +12,16 @@ export interface CourseValue {
   nameTh: string
   nameEn: string
   program: string | null
+  language: string
 }
 
-type FormState = { code: string; year: string; semester: string; nameTh: string; nameEn: string; program: string }
+// Languages a course may use (mirrors the server registry's SUPPORTED_LANGUAGES).
+const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
+  { value: "python", label: "Python" },
+  { value: "c", label: "C" },
+]
+
+type FormState = { code: string; year: string; semester: string; nameTh: string; nameEn: string; program: string; language: string }
 
 interface Props {
   course?: CourseValue
@@ -32,6 +39,7 @@ export function CourseFormDialog({ course, onClose, onSaved }: Props) {
     nameTh: course?.nameTh ?? "",
     nameEn: course?.nameEn ?? "",
     program: course?.program ?? "",
+    language: course?.language ?? "python",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
@@ -48,6 +56,7 @@ export function CourseFormDialog({ course, onClose, onSaved }: Props) {
       nameTh: form.nameTh.trim(),
       nameEn: form.nameEn.trim(),
       program: form.program.trim() || undefined,
+      language: form.language,
     }
     const { valid, errors: ve } = validateCourseInput(input)
     if (!valid) {
@@ -134,6 +143,25 @@ export function CourseFormDialog({ course, onClose, onSaved }: Props) {
           <Field label="หลักสูตร (ค่าเริ่มต้นของนักศึกษาในวิชา)">
             <Input value={form.program} onChange={(v) => set("program", v)} />
           </Field>
+          <Field
+            label="ภาษาโปรแกรม *"
+            error={errors.language}
+            hint={isEdit ? "เปลี่ยนได้เฉพาะเมื่อรายวิชายังไม่มีโจทย์" : undefined}
+          >
+            <select
+              value={form.language}
+              onChange={(e) => set("language", e.target.value)}
+              className={`mt-1 w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm transition focus:border-transparent focus:outline-none focus:ring-2 ${
+                errors.language ? "border-red-300 focus:ring-red-400" : "border-slate-200 focus:ring-blue-500"
+              }`}
+            >
+              {LANGUAGE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
@@ -156,12 +184,16 @@ export function CourseFormDialog({ course, onClose, onSaved }: Props) {
   )
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({ label, error, hint, children }: { label: string; error?: string; hint?: string; children: React.ReactNode }) {
   return (
     <div>
       <label className="text-sm text-gray-500">{label}</label>
       {children}
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error ? (
+        <p className="mt-1 text-xs text-red-600">{error}</p>
+      ) : hint ? (
+        <p className="mt-1 text-xs text-slate-400">{hint}</p>
+      ) : null}
     </div>
   )
 }

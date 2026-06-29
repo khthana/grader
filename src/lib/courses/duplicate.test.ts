@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { courseFixture } from "@/lib/test-support/db"
-import { createCourse, getCourseByKey, listCourseInstructors } from "@/lib/courses/repository"
+import { createCourse, getCourseByKey, listCourseInstructors, assignInstructor } from "@/lib/courses/repository"
 import {
   createProblem,
   getProblemById,
@@ -41,6 +41,26 @@ describe("duplicateCourseOffering", () => {
     expect(target?.nameTh).toBe(course.nameTh)
     expect(target?.nameEn).toBe(course.nameEn)
     expect(target?.program).toBe(course.program)
+  })
+
+  it("copies the source course language to the target", async () => {
+    const { db, course, ins } = await courseFixture()
+    await createCourse(db, {
+      code: "CLANG",
+      year: 2567,
+      semester: 1,
+      nameTh: "ซี",
+      nameEn: "C course",
+      language: "c",
+    })
+    const cKey = { code: "CLANG", year: 2567, semester: 1 }
+    await assignInstructor(db, cKey, ins.id)
+
+    await duplicateCourseOffering(db, cKey, { year: 2567, semester: 2 }, ins.id)
+
+    const target = await getCourseByKey(db, { code: "CLANG", year: 2567, semester: 2 })
+    expect(target?.language).toBe("c")
+    void course
   })
 
   it("copies the source instructors and always includes the acting user", async () => {

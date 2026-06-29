@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS courses (
   name_th    TEXT    NOT NULL,
   name_en    TEXT    NOT NULL,
   program    TEXT,                       -- default program for new enrollments
+  language   TEXT    NOT NULL DEFAULT 'python',  -- problems inherit this (#63)
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (code, year, semester),

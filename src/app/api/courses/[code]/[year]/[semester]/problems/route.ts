@@ -88,7 +88,9 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
     outputSpec: body.outputSpec?.trim(),
     dueAt: body.dueAt ?? null,
     closeAt: body.closeAt ?? null,
-    language: body.language ?? "python",
+    // Language is course-authoritative (#63): every problem inherits the course
+    // language; the client value is ignored.
+    language: auth.course.language,
     referenceSolution: body.referenceSolution,
     problemType: body.problemType,
     functionName: body.functionName,

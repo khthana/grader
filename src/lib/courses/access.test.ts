@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest"
-import { resolveActiveCourse, canMutateRoster, canManageCourses, isTeachingStaff } from "./access"
+import { resolveActiveCourse, canMutateRoster, canManageCourses, isTeachingStaff, canChangeCourseLanguage } from "./access"
 import type { CourseRecord } from "./types"
 
 const courses: CourseRecord[] = [
-  { code: "C1", year: 2567, semester: 1, nameTh: "ก", nameEn: "A", program: null, createdAt: "" },
-  { code: "C2", year: 2567, semester: 1, nameTh: "ข", nameEn: "B", program: null, createdAt: "" },
-  { code: "C3", year: 2567, semester: 1, nameTh: "ค", nameEn: "C", program: null, createdAt: "" },
+  { code: "C1", year: 2567, semester: 1, nameTh: "ก", nameEn: "A", program: null, language: "python", createdAt: "" },
+  { code: "C2", year: 2567, semester: 1, nameTh: "ข", nameEn: "B", program: null, language: "python", createdAt: "" },
+  { code: "C3", year: 2567, semester: 1, nameTh: "ค", nameEn: "C", program: null, language: "python", createdAt: "" },
 ]
 
 describe("resolveActiveCourse", () => {
@@ -70,5 +70,19 @@ describe("isTeachingStaff", () => {
 
   it("counts a user as staff when any role qualifies", () => {
     expect(isTeachingStaff(["Student", "TA"])).toBe(true)
+  })
+})
+
+describe("canChangeCourseLanguage", () => {
+  it("allows a language change while the course has no problems", () => {
+    expect(canChangeCourseLanguage({ current: "python", desired: "c", problemCount: 0 })).toBe(true)
+  })
+
+  it("rejects a language change once the course has problems", () => {
+    expect(canChangeCourseLanguage({ current: "python", desired: "c", problemCount: 3 })).toBe(false)
+  })
+
+  it("allows a same-value submit even with problems (so name-only edits work)", () => {
+    expect(canChangeCourseLanguage({ current: "c", desired: "c", problemCount: 5 })).toBe(true)
   })
 })

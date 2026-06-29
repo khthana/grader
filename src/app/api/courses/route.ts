@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
     nameTh?: string
     nameEn?: string
     program?: string
+    language?: string
   }
   const input = {
     code: (body.code ?? "").trim(),
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
     nameTh: (body.nameTh ?? "").trim(),
     nameEn: (body.nameEn ?? "").trim(),
     program: body.program?.trim() || undefined,
+    language: typeof body.language === "string" ? body.language : undefined,
   }
 
   const { valid, errors } = validateCourseInput(input)
@@ -77,6 +79,7 @@ export async function POST(request: NextRequest) {
     nameTh: input.nameTh,
     nameEn: input.nameEn,
     program: input.program ?? null,
+    language: input.language,
   })
   await assignInstructor(db, course, user.id)
   await seedWeeks(db, course)
