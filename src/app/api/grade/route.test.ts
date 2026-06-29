@@ -345,6 +345,24 @@ describe("POST /api/grade", () => {
     expect(body.results[0].error).toContain("AssertionError")
   })
 
+  it("stores the submission's language from the problem, ignoring the request body", async () => {
+    const weeks = await listWeeks(db, { code: "C01", year: 2567, semester: 1 })
+    const p = await createProblem(db, {
+      courseCode: "C01", courseYear: 2567, courseSemester: 1,
+      weekId: weeks[0].id, title: "C problem", score: 10, language: "c",
+    })
+    await setTestCases(db, p.id, [{ input: "3 4", expectedOutput: "7", isHidden: false, score: 10, sortOrder: 0 }])
+    mockRun.mockResolvedValue([
+      { testCaseId: 1, passed: true, actualOutput: "7", expectedOutput: "7", executionTime: 0 },
+    ])
+    const token = sessionFor("student@kmitl.ac.th")
+    // Client claims python; the server must record the problem's language (c).
+    const res = await POST(gradeReq({ problemId: p.id, code: "int main(){}", language: "python", mode: "submit" }, token))
+    expect(res.status).toBe(200)
+    const subs = await listSubmissions(db, p.id)
+    expect(subs[0].language).toBe("c")
+  })
+
   it("io problem still uses runTestCases — no regression", async () => {
     mockRun.mockResolvedValue([
       { testCaseId: 1, passed: true, actualOutput: "Hello", expectedOutput: "Hello", executionTime: 0 },

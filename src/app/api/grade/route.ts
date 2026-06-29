@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       courseYear: problem.courseYear,
       courseSemester: problem.courseSemester,
       code,
-      language: body.language ?? "python",
+      language: problem.language,
       pointsEarned: result.pointsEarned,
       pointsMax: result.pointsMax,
       isLate,

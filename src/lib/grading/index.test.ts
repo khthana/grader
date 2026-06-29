@@ -29,6 +29,7 @@ function fakeRunner(opts: {
 function ioProblem(over: Partial<GradableProblem> = {}): GradableProblem {
   return {
     problemType: "io",
+    language: "python",
     score: 30,
     unitTestCode: "",
     blacklist: [],
@@ -137,6 +138,21 @@ describe("gradeSubmission", () => {
     expect(result.pointsEarned).toBe(0)
     expect(result.pointsMax).toBe(25)
     expect(ran).toBe(false)
+  })
+
+  it("io mode passes the problem's language through to the runner", async () => {
+    let seenLanguage: string | undefined
+    const runner: CodeRunner = {
+      async runTestCases(_code, _cases, language) {
+        seenLanguage = language
+        return [pass(1, "A")]
+      },
+      async runUnitTestBlock() {
+        return { testCaseId: 0, passed: true, actualOutput: "", expectedOutput: "", executionTime: 0 }
+      },
+    }
+    await gradeSubmission(ioProblem({ language: "c" }), "int main(){}", "submit", runner)
+    expect(seenLanguage).toBe("c")
   })
 
   it("all visible pass → 'ผ่านทุก test case!' feedback", async () => {

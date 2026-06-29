@@ -6,7 +6,7 @@ import { runTestCases, runUnitTestBlock } from "@/lib/piston"
 // not on the HTTP module directly — so tests inject a fake runner (no network)
 // and the real adapter (pistonRunner) stays the only thing that touches Piston.
 export interface CodeRunner {
-  runTestCases(code: string, cases: TestCase[]): Promise<TestResult[]>
+  runTestCases(code: string, cases: TestCase[], language: string): Promise<TestResult[]>
   runUnitTestBlock(studentCode: string, unitTestCode: string): Promise<TestResult>
 }
 
@@ -17,6 +17,7 @@ export const pistonRunner: CodeRunner = { runTestCases, runUnitTestBlock }
 // structurally; the narrow shape keeps grading decoupled from the repository.
 export interface GradableProblem {
   problemType: string
+  language: string
   score: number
   unitTestCode: string
   blacklist: string[]
@@ -97,7 +98,7 @@ export async function gradeSubmission(
     isHidden: tc.isHidden,
   }))
 
-  const results = await runner.runTestCases(code, cases)
+  const results = await runner.runTestCases(code, cases, problem.language)
   const scoreMap = new Map(problem.testCases.map((tc) => [tc.id, tcScore(tc.score)]))
   const pointsEarned = results
     .filter((r) => r.passed)

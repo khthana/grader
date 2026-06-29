@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { runReferenceSolution, runUnitTestBlock } from "./piston"
+import { runReferenceSolution, runUnitTestBlock, runTestCases } from "./piston"
 
 function mockPiston(response: { stdout: string; stderr: string; code: number }) {
   vi.stubGlobal(
@@ -88,5 +88,107 @@ describe("runUnitTestBlock", () => {
     const result = await runUnitTestBlock("x = 1", "assert x == 1")
     expect(result.passed).toBe(false)
     expect(result.error).toContain("network error")
+  })
+})
+
+describe("runTestCases — language-aware execution", () => {
+  it("runs C through the gcc runtime and compares stdout on a clean compile+run", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          compile: { stdout: "", stderr: "", code: 0 },
+          run: { stdout: "7\n", stderr: "", code: 0 },
+        }),
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    const [r] = await runTestCases(
+      "int main(){...}",
+      [{ id: 1, input: "3 4", expectedOutput: "7", isHidden: false }],
+      "c"
+    )
+
+    expect(r.passed).toBe(true)
+    expect(r.actualOutput).toBe("7")
+
+    // The request to Piston carries the C runtime + a named .c source file.
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.language).toBe("c")
+    expect(body.version).toBe("10.2.0")
+    expect(body.files[0].name).toBe("main.c")
+  })
+
+  it("fails the case and surfaces the gcc compile error when C does not compile", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            compile: { stdout: "", stderr: "main.c.c:1:1: error: expected ';'", code: 1 },
+            run: { stdout: "", stderr: "", code: 0 },
+          }),
+      })
+    )
+
+    const [r] = await runTestCases(
+      "int main(){bad}",
+      [{ id: 1, input: "", expectedOutput: "7", isHidden: false }],
+      "c"
+    )
+
+    expect(r.passed).toBe(false)
+    expect(r.error).toContain("error: expected ';'")
+  })
+
+  it("fails the case and surfaces the runtime stderr when C compiles but crashes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            compile: { stdout: "", stderr: "", code: 0 },
+            run: { stdout: "", stderr: "Segmentation fault (core dumped)", code: 139 },
+          }),
+      })
+    )
+
+    const [r] = await runTestCases(
+      "int main(){int*p=0;*p=1;}",
+      [{ id: 1, input: "", expectedOutput: "7", isHidden: false }],
+      "c"
+    )
+
+    expect(r.passed).toBe(false)
+    expect(r.error).toContain("Segmentation fault")
+  })
+
+  it("compiles once and returns a single compile-error result for C (no recompile per case)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          compile: { stdout: "", stderr: "boom: compile error", code: 1 },
+          run: { stdout: "", stderr: "", code: 0 },
+        }),
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    const results = await runTestCases(
+      "int main(){bad}",
+      [
+        { id: 1, input: "a", expectedOutput: "1", isHidden: false },
+        { id: 2, input: "b", expectedOutput: "2", isHidden: false },
+        { id: 3, input: "c", expectedOutput: "3", isHidden: false },
+      ],
+      "c"
+    )
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(results).toHaveLength(1)
+    expect(results[0].passed).toBe(false)
+    expect(results[0].error).toContain("boom: compile error")
   })
 })
