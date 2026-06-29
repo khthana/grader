@@ -61,4 +61,23 @@ describe("POST /api/courses/[code]/[year]/[semester]/problems — language inher
     expect(res.status).toBe(201)
     expect((await res.json()).problem.language).toBe("python")
   })
+
+  it("rejects unit mode in a non-Python course (400)", async () => {
+    await updateCourse(f.db, f.course, { nameTh: "ก", nameEn: "A", program: null, language: "c" })
+    const res = await POST(
+      req(problemBody({ problemType: "unit", unitTestCode: "assert add(1,2)==3", testCases: [] })),
+      ctx()
+    )
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.errors.problemType).toBeTruthy()
+  })
+
+  it("allows unit mode in a Python course", async () => {
+    const res = await POST(
+      req(problemBody({ problemType: "unit", unitTestCode: "assert add(1,2)==3", testCases: [] })),
+      ctx()
+    )
+    expect(res.status).toBe(201)
+  })
 })

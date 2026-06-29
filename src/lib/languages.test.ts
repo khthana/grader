@@ -16,6 +16,13 @@ describe("getLanguageConfig", () => {
   })
 })
 
+describe("display label", () => {
+  it("exposes a human label for each language", () => {
+    expect(getLanguageConfig("python").label).toBe("Python")
+    expect(getLanguageConfig("c").label).toBe("C")
+  })
+})
+
 describe("supported languages", () => {
   it("lists the languages a course may choose (python + c)", () => {
     expect(SUPPORTED_LANGUAGES).toContain("python")

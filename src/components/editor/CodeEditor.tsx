@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import dynamic from "next/dynamic"
-import { python } from "@codemirror/lang-python"
 import { FaCog } from "react-icons/fa"
 import type { GradeResult } from "@/types"
+import { editorExtension, editorLabel } from "./language-support"
 
 const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), { ssr: false })
 
@@ -18,6 +18,7 @@ interface CodeEditorProps {
   isClosed?: boolean
   starterCode?: string
   problemType?: string
+  language?: string
 }
 
 function useEditorPrefs() {
@@ -111,7 +112,7 @@ function SettingsPopover({
   )
 }
 
-export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode = "", problemType = "io" }: CodeEditorProps) {
+export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode = "", problemType = "io", language = "python" }: CodeEditorProps) {
   const key = draftKey ?? `editor-code-${problemId}`
   // Seed from the saved draft, falling back to starter code. Lazy init covers
   // mount; the render-time adjustment below reloads when the problem (key) or
@@ -151,7 +152,7 @@ export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode 
       const res = await fetch("/api/grade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ problemId, code, language: "python", mode }),
+        body: JSON.stringify({ problemId, code, language, mode }),
       })
 
       const data = await res.json()
@@ -175,7 +176,7 @@ export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode 
       <div className="overflow-hidden rounded-lg border border-gray-700">
         {/* Toolbar */}
         <div className="flex items-center justify-between border-b border-gray-700/60 bg-[#1e1e2e] px-3 py-1.5">
-          <span className="font-mono text-xs text-slate-400">Python</span>
+          <span className="font-mono text-xs text-slate-400">{editorLabel(language)}</span>
           <div className="relative">
             <button
               type="button"
@@ -204,10 +205,10 @@ export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode 
             value={code}
             height="256px"
             theme={theme}
-            extensions={[python()]}
+            extensions={[editorExtension(language)]}
             onChange={handleChange}
             editable={!isClosed}
-            placeholder="พิมพ์ Python code ของคุณที่นี่..."
+            placeholder={`พิมพ์ ${editorLabel(language)} code ของคุณที่นี่...`}
             basicSetup={{
               lineNumbers: true,
               foldGutter: false,

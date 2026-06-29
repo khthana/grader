@@ -59,7 +59,17 @@ describe("POST /api/courses/[code]/[year]/[semester]/problems/run-reference", ()
     expect(body.outputs).toHaveLength(2)
     expect(body.outputs[0]).toEqual({ stdout: "42", stderr: "", ok: true })
     expect(body.outputs[1]).toEqual({ stdout: "", stderr: "err", ok: false })
-    expect(mockRun).toHaveBeenCalledWith("print(42)", ["", ""])
+    expect(mockRun).toHaveBeenCalledWith("print(42)", ["", ""], "python")
+  })
+
+  it("io mode threads the course language into runReferenceSolution", async () => {
+    const { updateCourse } = await import("@/lib/courses/repository")
+    await updateCourse(f.db, f.course, { nameTh: "ก", nameEn: "A", program: null, language: "c" })
+    mockRun.mockResolvedValue([{ stdout: "7", stderr: "", ok: true }])
+
+    const res = await POST(req({ code: "int main(){...}", inputs: ["3 4"] }), ctx())
+    expect(res.status).toBe(200)
+    expect(mockRun).toHaveBeenCalledWith("int main(){...}", ["3 4"], "c")
   })
 
   it("unit mode: runs reference solution + unit test block, returns single ok result", async () => {

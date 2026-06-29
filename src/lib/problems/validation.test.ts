@@ -109,4 +109,29 @@ describe("validateProblemInput", () => {
     const result = validateProblemInput({ ...validInput, whitelist: undefined })
     expect(result.valid).toBe(true)
   })
+
+  it("unit mode in a non-Python course → error (unit harness is Python-only)", () => {
+    const result = validateProblemInput({
+      ...validInput,
+      problemType: "unit",
+      unitTestCode: "assert add(1,2)==3",
+      language: "c",
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.problemType).toBeTruthy()
+  })
+
+  it("io mode in a non-Python course → valid", () => {
+    const result = validateProblemInput({ ...validInput, problemType: "io", language: "c" })
+    expect(result.valid).toBe(true)
+  })
+
+  it("unit mode with no language given → valid (defaults to Python)", () => {
+    const result = validateProblemInput({
+      ...validInput,
+      problemType: "unit",
+      unitTestCode: "assert add(1,2)==3",
+    })
+    expect(result.valid).toBe(true)
+  })
 })

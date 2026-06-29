@@ -63,6 +63,45 @@ describe("runReferenceSolution", () => {
     expect(r.ok).toBe(false)
     expect(r.stderr).toContain("network error")
   })
+
+  it("runs a C reference solution through the gcc runtime", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          compile: { stdout: "", stderr: "", code: 0 },
+          run: { stdout: "7\n", stderr: "", code: 0 },
+        }),
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    const [r] = await runReferenceSolution("int main(){...}", ["3 4"], "c")
+    expect(r.ok).toBe(true)
+    expect(r.stdout).toBe("7")
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.language).toBe("c")
+    expect(body.version).toBe("10.2.0")
+    expect(body.files[0].name).toBe("main.c")
+  })
+
+  it("reports ok:false with the gcc compile error when a C reference does not compile", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            compile: { stdout: "", stderr: "main.c.c:1:1: error: expected ';'", code: 1 },
+            run: { stdout: "", stderr: "", code: 0 },
+          }),
+      })
+    )
+
+    const [r] = await runReferenceSolution("int main(){bad}", ["3 4"], "c")
+    expect(r.ok).toBe(false)
+    expect(r.stderr).toContain("error: expected ';'")
+  })
 })
 
 describe("runUnitTestBlock", () => {

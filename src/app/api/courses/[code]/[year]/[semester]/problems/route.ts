@@ -72,6 +72,8 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
     unitTestCode: body.unitTestCode,
     blacklist: body.blacklist,
     whitelist: body.whitelist,
+    // Validate against the course language so unit mode is rejected for C (#64).
+    language: auth.course.language,
   })
   if (!valid) return NextResponse.json({ errors }, { status: 400 })
 

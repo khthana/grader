@@ -174,6 +174,7 @@ export default async function CourseProblemPage({ params }: PageProps) {
           isClosed={isClosed}
           starterCode={problem.starterCode || ""}
           problemType={problem.problemType}
+          language={problem.language}
         />
       </div>
     </div>

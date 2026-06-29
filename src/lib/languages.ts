@@ -9,11 +9,13 @@ export interface LanguageConfig {
   piston: string
   version: string
   filename: string
+  // Human-readable label for editor toolbars / pickers (UI single-sources it).
+  label: string
 }
 
 export const LANGUAGE_CONFIG: Record<string, LanguageConfig> = {
-  python: { piston: "python", version: "3.10.0", filename: "main.py" },
-  c: { piston: "c", version: "10.2.0", filename: "main.c" },
+  python: { piston: "python", version: "3.10.0", filename: "main.py", label: "Python" },
+  c: { piston: "c", version: "10.2.0", filename: "main.c", label: "C" },
 }
 
 export const DEFAULT_LANGUAGE = "python"

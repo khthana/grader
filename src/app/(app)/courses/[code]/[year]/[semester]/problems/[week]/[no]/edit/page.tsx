@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/session"
 import { canManageCourses } from "@/lib/courses/access"
 import { getDb } from "@/lib/db"
 import { getProblemByWeekAndNo, getReferenceSolutionForStaff } from "@/lib/problems/repository"
+import { getCourseByKey } from "@/lib/courses/repository"
 import { getWeekByNo, listWeeks } from "@/lib/weeks/repository"
 import { ProblemEditor } from "@/components/problems/ProblemEditor"
 
@@ -24,11 +25,12 @@ export default async function EditProblemPage({ params }: PageProps) {
   if (!Number.isFinite(weekNo) || !Number.isFinite(problemNo)) notFound()
 
   const db = getDb()
-  const [weekRecord, weeks] = await Promise.all([
+  const [weekRecord, weeks, course] = await Promise.all([
     getWeekByNo(db, slug, weekNo),
     listWeeks(db, slug),
+    getCourseByKey(db, slug),
   ])
-  if (!weekRecord) notFound()
+  if (!weekRecord || !course) notFound()
 
   const problem = await getProblemByWeekAndNo(db, weekRecord.id, problemNo)
   if (!problem) notFound()
@@ -45,6 +47,7 @@ export default async function EditProblemPage({ params }: PageProps) {
     <ProblemEditor
       courseSlug={courseSlug}
       coursePath={coursePath}
+      courseLanguage={course.language}
       weeks={weeks}
       mode="edit"
       problem={problem}

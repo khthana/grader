@@ -16,6 +16,7 @@ import {
 import { useToast } from "@/components/shell/ToastProvider"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { SolutionEditor } from "@/components/editor/SolutionEditor"
+import { getLanguageConfig } from "@/lib/languages"
 
 interface TestCaseForm {
   id?: number
@@ -34,6 +35,7 @@ interface WeekOption {
 interface Props {
   courseSlug: string
   coursePath: string
+  courseLanguage: string
   weeks: WeekOption[]
   mode: "create" | "edit"
   initialWeekId?: number
@@ -63,9 +65,15 @@ function emptyCase(sortOrder: number): TestCaseForm {
   return { input: "", expectedOutput: "", isHidden: false, sortOrder }
 }
 
-export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeekId, referenceSolution: initialRefSolution, problem }: Props) {
+export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, mode, initialWeekId, referenceSolution: initialRefSolution, problem }: Props) {
   const router = useRouter()
   const { notify } = useToast()
+
+  // Problems are server-authoritative on language (#63): a problem always uses
+  // its course's language, so it is shown read-only here, never picked. Unit
+  // mode + AI generation are Python-only (#64).
+  const language = courseLanguage
+  const isPython = courseLanguage === "python"
 
   const defaultWeekId = problem?.weekId ?? initialWeekId ?? weeks[0]?.id
   const [title, setTitle] = useState(problem?.title ?? "")
@@ -76,14 +84,13 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
   const [score, setScore] = useState(problem?.score ?? 10)
   const [dueAt, setDueAt] = useState(problem?.dueAt ? toDatetimeLocal(problem.dueAt) : "")
   const [closeAt, setCloseAt] = useState(problem?.closeAt ? toDatetimeLocal(problem.closeAt) : "")
-  const [language, setLanguage] = useState(problem?.language ?? "python")
   const [cases, setCases] = useState<TestCaseForm[]>(
     problem?.testCases.length
       ? problem.testCases
       : [emptyCase(0)]
   )
   const [problemType, setProblemType] = useState<"io" | "unit">(
-    problem?.problemType === "unit" ? "unit" : "io"
+    isPython && problem?.problemType === "unit" ? "unit" : "io"
   )
   const [functionName, setFunctionName] = useState(problem?.functionName ?? "")
   const [starterCode, setStarterCode] = useState(problem?.starterCode ?? "")
@@ -394,7 +401,8 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
                   value={starterCode}
                   onChange={setStarterCode}
                   label="Starter Code"
-                  placeholder="# โค้ดตั้งต้นสำหรับนักศึกษา เช่น def add(a, b):"
+                  language={language}
+                  placeholder={language === "c" ? "// โค้ดตั้งต้นสำหรับนักศึกษา เช่น #include <stdio.h>" : "# โค้ดตั้งต้นสำหรับนักศึกษา เช่น def add(a, b):"}
                 />
               </>
             ) : (
@@ -406,6 +414,7 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
                   value={refSolution}
                   onChange={setRefSolution}
                   label="เฉลยอ้างอิง"
+                  language={language}
                 />
               </>
             )}
@@ -414,25 +423,30 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
           {/* Test cases card */}
           <div className="rounded-xl border border-gray-200 bg-white p-5">
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              {/* Problem type toggle */}
-              <div className="flex gap-1.5 mr-auto">
-                {(["io", "unit"] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setProblemType(t)}
-                    className={`rounded-lg border px-3 py-1 text-sm font-medium transition ${
-                      problemType === t
-                        ? "border-primary bg-primary text-white"
-                        : "border-gray-200 text-slate-500 hover:border-primary hover:text-primary"
-                    }`}
-                  >
-                    {t === "io" ? "I/O" : "Unit Test"}
-                  </button>
-                ))}
-              </div>
-              {/* Action buttons */}
-              {!llmUnavailable && (
+              {/* Problem type toggle — Unit mode is Python-only (#64), so the
+                  toggle is hidden (forced I/O) in non-Python courses. */}
+              {isPython ? (
+                <div className="flex gap-1.5 mr-auto">
+                  {(["io", "unit"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setProblemType(t)}
+                      className={`rounded-lg border px-3 py-1 text-sm font-medium transition ${
+                        problemType === t
+                          ? "border-primary bg-primary text-white"
+                          : "border-gray-200 text-slate-500 hover:border-primary hover:text-primary"
+                      }`}
+                    >
+                      {t === "io" ? "I/O" : "Unit Test"}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="mr-auto" />
+              )}
+              {/* Action buttons — AI generation is Python-only this release (#64). */}
+              {isPython && !llmUnavailable && (
                 <button
                   type="button"
                   onClick={handleGenerate}
@@ -655,13 +669,10 @@ export function ProblemEditor({ courseSlug, coursePath, weeks, mode, initialWeek
                 </div>
               </Field>
               <Field label="ภาษา">
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  className="input-base w-full"
-                >
-                  <option value="python">Python</option>
-                </select>
+                <div className="input-base w-full bg-slate-50 text-slate-500">
+                  {getLanguageConfig(language).label}
+                </div>
+                <p className="mt-1 text-xs text-slate-400">กำหนดจากภาษาของรายวิชา</p>
               </Field>
               <Field label="กำหนดส่ง (due_at)" error={errors.dueAt}>
                 <input

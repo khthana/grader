@@ -4,7 +4,7 @@ import { runReferenceSolution, runUnitTestBlock } from "@/lib/piston"
 
 export const POST = courseRoute<{ code: string; year: string; semester: string }>(
   { manage: true },
-  async (request) => {
+  async (request, auth) => {
     const body = await request.json().catch(() => null)
 
     if (!body || typeof body.code !== "string") {
@@ -34,7 +34,13 @@ export const POST = courseRoute<{ code: string; year: string; semester: string }
       )
     }
 
-    const outputs = await runReferenceSolution(body.code as string, body.inputs as string[])
+    // Compile + run the reference solution in the course's language (#64) so an
+    // Instructor can compute expected outputs for a C problem too.
+    const outputs = await runReferenceSolution(
+      body.code as string,
+      body.inputs as string[],
+      auth.course.language
+    )
     return NextResponse.json({ outputs })
   }
 )

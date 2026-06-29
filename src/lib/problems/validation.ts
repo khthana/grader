@@ -10,6 +10,7 @@ export interface ProblemInput {
   unitTestCode?: string
   blacklist?: unknown[]
   whitelist?: unknown[]
+  language?: string
 }
 
 export function validateProblemInput(input: ProblemInput): {
@@ -32,6 +33,11 @@ export function validateProblemInput(input: ProblemInput): {
 
   // Unit mode (#55) uses a single test-code block instead of per-case test cases.
   if (input.problemType === "unit") {
+    // The unit-test harness is Python-only (#64) — reject it for any other
+    // course language so a C submission can never reach the Python harness.
+    if (input.language != null && input.language !== "python") {
+      errors.problemType = "โหมด Unit Test ใช้ได้กับภาษา Python เท่านั้น"
+    }
     if (!input.unitTestCode?.trim()) {
       errors.unitTestCode = "ต้องระบุ Unit Test Code สำหรับโจทย์ประเภท Unit Test"
     }
