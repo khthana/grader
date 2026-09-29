@@ -97,6 +97,18 @@ describe("POST /api/grade", () => {
     expect(res.status).toBe(404)
   })
 
+  it("an inaccessible problem looks exactly like an unknown one — no id probing (#80)", async () => {
+    const out = await createUser(db, { email: "out@kmitl.ac.th", name: "Out" })
+    await assignRole(db, out.id, "Instructor")
+    const token = sessionFor("out@kmitl.ac.th")
+    const probe = async (id: number) => {
+      const res = await POST(gradeReq({ problemId: id, code: "print('x')", mode: "run" }, token))
+      return { status: res.status, body: await res.json() }
+    }
+    expect(await probe(problemId)).toEqual(await probe(99999))
+    expect(mockRun).not.toHaveBeenCalled()
+  })
+
   it("mode:run — pass all visible → pointsEarned = sum of visible tc scores", async () => {
     mockRun.mockResolvedValue([
       { testCaseId: 1, passed: true, actualOutput: "Hello", expectedOutput: "Hello", executionTime: 0 },
@@ -216,12 +228,23 @@ describe("POST /api/grade", () => {
     expect(subs[0].userId).toBe(studentId)
   })
 
-  it("mode:submit student not enrolled → 403", async () => {
+  it("mode:submit student not enrolled → 404 (not linked to the course, #80)", async () => {
     const other = await createUser(db, { email: "other@kmitl.ac.th", name: "Other", idCode: "99" })
     await assignRole(db, other.id, "Student")
     const token = sessionFor("other@kmitl.ac.th")
     const res = await POST(gradeReq({ problemId, code: "print('x')", mode: "submit" }, token))
+    expect(res.status).toBe(404)
+  })
+
+  it("mode:submit linked to the course but neither enrolled nor staff → 403", async () => {
+    // A course_instructors row with only the Student role links the user to
+    // the course without making them staff — so the enrollment check decides.
+    const other = await createUser(db, { email: "linked@kmitl.ac.th", name: "Linked" })
+    await assignRole(db, other.id, "Student")
+    await assignInstructor(db, { code: "C01", year: 2567, semester: 1 }, other.id)
+    const res = await POST(gradeReq({ problemId, code: "print('x')", mode: "submit" }, sessionFor("linked@kmitl.ac.th")))
     expect(res.status).toBe(403)
+    expect(mockRun).not.toHaveBeenCalled()
   })
 
   it("no deadlines (both NULL) → 200, is_late = false", async () => {

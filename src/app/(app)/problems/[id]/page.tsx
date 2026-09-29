@@ -1,7 +1,8 @@
 import { notFound, redirect } from "next/navigation"
 import { getDb } from "@/lib/db"
-import { getProblemById } from "@/lib/problems/repository"
-import { buildCoursePath } from "@/lib/courses/slug"
+import { SESSION_ENDED_PATH } from "@/lib/auth"
+import { getCurrentUser } from "@/lib/session"
+import { resolveLegacyProblemPath } from "@/lib/problems/legacy-path"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -12,16 +13,11 @@ export default async function LegacyProblemPage({ params }: PageProps) {
   const problemId = Number.parseInt(id, 10)
   if (!Number.isFinite(problemId)) notFound()
 
-  const db = getDb()
-  const problem = await getProblemById(db, problemId)
-  if (!problem) notFound()
+  const user = await getCurrentUser()
+  if (!user) redirect(SESSION_ENDED_PATH)
 
-  const { rows } = await db.query<{ week_no: number }>(
-    "SELECT week_no FROM weeks WHERE id = $1::int",
-    [problem.weekId]
-  )
-  if (!rows[0]) notFound()
-
-  const key = { code: problem.courseCode, year: problem.courseYear, semester: problem.courseSemester }
-  redirect(`${buildCoursePath(key)}/problems/${rows[0].week_no}/${problem.problemNo}`)
+  // Gated like the target page, or the redirect itself leaks where the problem lives (#80).
+  const path = await resolveLegacyProblemPath(getDb(), user, problemId, "")
+  if (!path) notFound()
+  redirect(path)
 }

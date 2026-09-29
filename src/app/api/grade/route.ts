@@ -25,25 +25,24 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // An unknown id, a problem in a course the user isn't linked to, and (for
+  // non-staff) one in an unreleased week all get the same answer, so ids
+  // can't be probed for existence (#80).
+  const problemNotFound = () => NextResponse.json({ error: "Problem not found" }, { status: 404 })
+
   const db = getDb()
   const problem = await getProblemById(db, Number(problemId))
-  if (!problem) {
-    return NextResponse.json({ error: "Problem not found" }, { status: 404 })
-  }
+  if (!problem) return problemNotFound()
 
   // Authorize against the problem's own course, for run as well as submit —
   // running code costs a Piston job and reveals test behaviour (#74).
   const courseKey = { code: problem.courseCode, year: problem.courseYear, semester: problem.courseSemester }
   const access = await resolveCourseAccess(db, user, courseKey)
-  if (!access) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-  }
+  if (!access) return problemNotFound()
   // access.staff = staff of *this* course, not a global TA/Instructor role.
   if (!access.staff) {
     const week = await getWeekForCourse(db, courseKey, problem.weekId)
-    if (!week?.isReleased) {
-      return NextResponse.json({ error: "ยังไม่เปิดรับ" }, { status: 403 })
-    }
+    if (!week?.isReleased) return problemNotFound()
   }
 
   const runMode = mode === "run" ? "run" : "submit"

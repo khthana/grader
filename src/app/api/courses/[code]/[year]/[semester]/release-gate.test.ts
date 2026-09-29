@@ -125,9 +125,15 @@ describe("week release + course-scoped staff rights in the API (#74)", () => {
       expect(items.map((a) => a.problemId)).toEqual([ids.a1])
     })
 
-    it("cannot run or submit it", async () => {
-      expect((await grade(gradeReq(ids.a2, "run", STUDENT))).status).toBe(403)
-      expect((await grade(gradeReq(ids.a2, "submit", STUDENT))).status).toBe(403)
+    it("cannot run or submit it — and can't tell it from an unknown id (#80)", async () => {
+      const probe = async (id: number, mode: "run" | "submit") => {
+        const res = await grade(gradeReq(id, mode, STUDENT))
+        return { status: res.status, body: await res.json() }
+      }
+      for (const mode of ["run", "submit"] as const) {
+        expect(await probe(ids.a2, mode)).toEqual({ status: 404, body: { error: "Problem not found" } })
+        expect(await probe(ids.a2, mode)).toEqual(await probe(99999, mode))
+      }
       expect(mockRun).not.toHaveBeenCalled()
     })
 
@@ -141,14 +147,15 @@ describe("week release + course-scoped staff rights in the API (#74)", () => {
   })
 
   describe("non-entitled users on /api/grade", () => {
-    it("a Student not in the course gets 403 on mode:run", async () => {
-      expect((await grade(gradeReq(ids.a1, "run", OUTSIDER))).status).toBe(403)
+    // 404, same as an unknown id — a 403 would confirm the problem exists (#80).
+    it("a Student not in the course gets 404 on mode:run", async () => {
+      expect((await grade(gradeReq(ids.a1, "run", OUTSIDER))).status).toBe(404)
       expect(mockRun).not.toHaveBeenCalled()
     })
 
-    it("an Instructor of another course gets 403 on run and submit", async () => {
-      expect((await grade(gradeReq(ids.a1, "run", OTHER_INS))).status).toBe(403)
-      expect((await grade(gradeReq(ids.a1, "submit", OTHER_INS))).status).toBe(403)
+    it("an Instructor of another course gets 404 on run and submit", async () => {
+      expect((await grade(gradeReq(ids.a1, "run", OTHER_INS))).status).toBe(404)
+      expect((await grade(gradeReq(ids.a1, "submit", OTHER_INS))).status).toBe(404)
     })
   })
 
@@ -173,7 +180,7 @@ describe("week release + course-scoped staff rights in the API (#74)", () => {
     })
 
     it("cannot grade B's hidden-week problem and gets redacted results", async () => {
-      expect((await grade(gradeReq(ids.b2, "run", TA))).status).toBe(403)
+      expect((await grade(gradeReq(ids.b2, "run", TA))).status).toBe(404)
       mockRun.mockImplementation(async (_code, cases) =>
         cases.map((tc) => ({
           testCaseId: tc.id,
