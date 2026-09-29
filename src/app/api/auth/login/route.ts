@@ -32,6 +32,15 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Checked after the password so an inactive account's status is only
+  // revealed to someone who knows its password (#75).
+  if (!user.isActive) {
+    return NextResponse.json(
+      { error: "Your account has been deactivated", reason: "inactive" },
+      { status: 403 }
+    )
+  }
+
   const sessionToken = createSessionToken({
     email: user.email,
     name: user.name,

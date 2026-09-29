@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { verifySessionToken } from "@/lib/auth"
+import { verifySessionToken, SESSION_ENDED_ERROR, SESSION_COOKIE_OPTIONS } from "@/lib/auth"
 
 // Next 16 proxy (formerly middleware) — runs on the Node.js runtime, so the
 // HMAC session verification (node:crypto) works here.
@@ -13,8 +13,17 @@ export function proxy(req: NextRequest) {
   const session = token ? verifySessionToken(token) : null
 
   if (pathname === LOGIN_PATH) {
-    // Already signed in? Don't show the login page again.
-    if (session) return NextResponse.redirect(new URL(LANDING_PATH, req.url))
+    const error = req.nextUrl.searchParams.get("error")
+    // The app sends a signed-but-dead session (deactivated or deleted account)
+    // here; drop the cookie so the next /login isn't bounced back again (#75).
+    if (error === SESSION_ENDED_ERROR) {
+      const res = NextResponse.next()
+      res.cookies.set("session", "", { ...SESSION_COOKIE_OPTIONS, maxAge: 0 })
+      return res
+    }
+    // Already signed in? Don't show the login page again — unless it is
+    // reporting an error (bouncing it to the landing page would hide it).
+    if (session && !error) return NextResponse.redirect(new URL(LANDING_PATH, req.url))
     return NextResponse.next()
   }
 

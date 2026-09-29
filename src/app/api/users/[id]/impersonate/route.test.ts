@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { NextRequest } from "next/server"
 import { POST } from "./route"
-import { createUser, assignRole } from "@/lib/users/repository"
+import { createUser, assignRole, setUserActive } from "@/lib/users/repository"
 import { verifySessionToken } from "@/lib/auth"
 import { freshDb, setTestDb, sessionFor, type Queryable } from "@/lib/test-support/db"
 
@@ -47,6 +47,14 @@ describe("POST /api/users/[id]/impersonate", () => {
 
     expect(res.cookies.get("active_role")?.value).toBe("")
     expect(res.cookies.get("active_course")?.value).toBe("")
+  })
+
+  it("refuses a deactivated target with 409 and leaves the Admin's session alone (#75)", async () => {
+    await setUserActive(db, studentId, false)
+    const res = await POST(req(studentId, sessionFor("admin@kmitl.ac.th")), makeCtx(studentId))
+    expect(res.status).toBe(409)
+    expect(res.cookies.get("session")).toBeUndefined()
+    expect(res.cookies.get("impersonator")).toBeUndefined()
   })
 
   it("records a user.impersonate activity log", async () => {

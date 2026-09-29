@@ -49,4 +49,10 @@ describe("proxy (route protection)", () => {
     expect(res.status).toBe(307)
     expect(new URL(res.headers.get("location")!).pathname).toBe("/login")
   })
+
+  it("lets a signed-in request reach /login?error=session_ended and clears the dead cookie (#75)", () => {
+    const res = proxy(request("/login?error=session_ended", validSession()))
+    expect(res.headers.get("location")).toBeNull()
+    expect(res.cookies.get("session")?.value).toBe("")
+  })
 })

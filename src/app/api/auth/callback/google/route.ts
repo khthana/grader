@@ -79,6 +79,9 @@ export async function GET(req: NextRequest) {
   if (!userRecord) {
     return loginWithError('not_registered')
   }
+  if (!userRecord.isActive) {
+    return loginWithError('inactive')
+  }
 
   const sessionToken = createSessionToken({
     email: userRecord.email,

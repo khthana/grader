@@ -55,7 +55,8 @@ Specs: `requirement/PRD.md` + `requirement/PRD-week-release.md` + `requirement/P
 - **Session cookie:** HMAC-SHA256-signed token (`<base64url(payload)>.<signature>`) via `src/lib/auth.ts`, payload `{ email, name, picture, exp }`, 8h expiry, signed with `SESSION_SECRET`. Pure module — `createSessionToken` / `verifySessionToken`.
 - **Passwords:** bcrypt via `bcryptjs` (`src/lib/password.ts` — `hashPassword` / `verifyPassword`). Passwords are optional (Google-only accounts have a null hash).
 - **User lookup is Postgres-backed.** `POST /api/auth/login` validates against the DB (401 wrong password, 403 unregistered) and sets the cookie; `POST /api/auth/logout` clears it; `GET /api/auth/me` returns the current user + roles.
-- Resolve the current user: `getCurrentUser()` (`src/lib/session.ts`, server components, reads `next/headers` cookies) or `getUserFromRequest(req)` / `requireAdmin(req)` (`src/lib/auth-guard.ts`, route handlers, reads `NextRequest`).
+- Resolve the current user: `getCurrentUser()` (`src/lib/session.ts`, server components, reads `next/headers` cookies) or `getUserFromRequest(req)` / `requireAdmin(req)` (`src/lib/auth-guard.ts`, route handlers, reads `NextRequest`). Both delegate to **`resolveSessionUser(token)`** (`src/lib/session-user.ts`) — the single cookie→user gate: signature valid **and** the account exists **and `is_active`**, so deactivating a user kills their open sessions at once (#75). Never re-implement the lookup inline (`/api/auth/me` uses `getUserFromRequest`).
+- **Inactive accounts (#75):** password login → 403 `{ reason: "inactive" }` (checked *after* the password, so status isn't revealed without it); Google callback → `/login?error=inactive`. A signed cookie for a dead account → server pages redirect to **`SESSION_ENDED_PATH`** (`/login?error=session_ended`, `src/lib/auth.ts`) — **every server-side "not signed in" redirect must use it, never bare `/login`** (the proxy bounces a signed cookie off bare `/login` → loop). `proxy.ts` lets it through and clears the dead `session` cookie; any other `/login?error=…` also passes (the message isn't bounced away). Impersonating a deactivated account → 409.
 
 ### Roles & landing
 - Four roles: **Admin / Instructor / TA / Student**, many-to-many (`user_roles`); **Admin is a superset**. Priority Admin > Instructor > TA > Student.
@@ -248,7 +249,7 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
 5. `GradeResult = { pointsEarned, pointsMax, totalTests, passedTests, results[], feedback }` returned to client.
 
 ## Testing
-- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **581 tests / 76 files** as of 2026-09-29. Tests use pg-mem — **no Docker required** (independent of the Compose stack).
+- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **592 tests / 78 files** as of 2026-09-29. Tests use pg-mem — **no Docker required** (independent of the Compose stack).
 - Pure modules are unit-tested directly (session, password, roles, breadcrumbs, validation, import, name).
 - Repository + route handlers are integration-tested against **pg-mem** (in-memory Postgres, no Docker): build a pool with `newDb()` + `mem.public.none(schema.sql)` + `mem.adapters.createPg()`, inject via `setTestDb`, seed through the repository. Route handlers are imported and called with a `NextRequest`; auth is exercised with real `createSessionToken` cookies.
 - **pg-mem gotchas:** explicit casts (`$1::int`); no `STRING_AGG` (use second query + JS); no `DISTINCT ON` (use subquery with `MAX(submitted_at)` + inner join); schema path `../` count must match test file depth exactly.

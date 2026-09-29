@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation"
+import { SESSION_ENDED_PATH } from "@/lib/auth"
 import { getCurrentUser, getActiveRoleCookie } from "@/lib/session"
 import { resolveActiveRole, getLandingRoute, type Role } from "@/lib/roles"
 
 // Post-login landing resolver: send each user to their role's home page.
 export default async function DashboardPage() {
   const user = await getCurrentUser()
-  if (!user) redirect("/login")
+  if (!user) redirect(SESSION_ENDED_PATH)
 
   const requested = (await getActiveRoleCookie()) as Role | undefined
   const activeRole = resolveActiveRole(user.roles as Role[], requested)

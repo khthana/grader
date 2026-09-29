@@ -51,11 +51,16 @@ const MSG_WRONG_CREDS = 'Invalid email or password. Please try again.'
 const MSG_NOT_REGISTERED = 'Your account is not registered in this system. Please contact your administrator.'
 const MSG_SERVER = 'Something went wrong. Please try again later.'
 const MSG_GOOGLE_FAIL = 'Google sign-in was cancelled or failed. Please try again.'
+const MSG_INACTIVE = 'Your account has been deactivated. Please contact your administrator.'
+const MSG_SESSION_ENDED = 'Your session has ended. Please sign in again.'
 
-const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
+// `?error=` codes (Google callback, dead session) and 403 `reason`s → message.
+const LOGIN_ERROR_MESSAGES: Record<string, string> = {
   google_cancelled: MSG_GOOGLE_FAIL,
   server_error: MSG_SERVER,
   not_registered: MSG_NOT_REGISTERED,
+  inactive: MSG_INACTIVE,
+  session_ended: MSG_SESSION_ENDED,
 }
 
 interface Errors {
@@ -97,7 +102,7 @@ export default function LoginPage() {
     const errorKey = params.get('error')
     if (errorKey) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setErrors({ general: GOOGLE_ERROR_MESSAGES[errorKey] ?? MSG_GOOGLE_FAIL })
+      setErrors({ general: LOGIN_ERROR_MESSAGES[errorKey] ?? MSG_GOOGLE_FAIL })
     }
   }, [])
 
@@ -125,7 +130,8 @@ export default function LoginPage() {
       } else if (res.status === 401) {
         setErrors({ general: MSG_WRONG_CREDS })
       } else if (res.status === 403) {
-        setErrors({ general: MSG_NOT_REGISTERED })
+        const body = await res.json().catch(() => null)
+        setErrors({ general: LOGIN_ERROR_MESSAGES[body?.reason] ?? MSG_NOT_REGISTERED })
       } else {
         setErrors({ general: MSG_SERVER })
       }

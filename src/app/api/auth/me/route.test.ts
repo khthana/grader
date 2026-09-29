@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { NextRequest } from "next/server"
 import { GET } from "./route"
-import { createUser, assignRole } from "@/lib/users/repository"
+import { createUser, assignRole, findUserByEmail, setUserActive } from "@/lib/users/repository"
 import { createSessionToken } from "@/lib/auth"
 import { freshDb, setTestDb, type Queryable } from "@/lib/test-support/db"
 
@@ -46,5 +46,12 @@ describe("GET /api/auth/me", () => {
     expect(body.email).toBe("admin@kmitl.ac.th")
     expect(body.name).toBe("System Admin")
     expect(body.roles).toEqual(["Admin"])
+  })
+
+  it("returns 401 for an existing session once the account is deactivated (#75)", async () => {
+    const token = createSessionToken({ email: "admin@kmitl.ac.th", name: "System Admin" })
+    const u = await findUserByEmail(db, "admin@kmitl.ac.th")
+    await setUserActive(db, u!.id, false)
+    expect((await GET(meRequest(token))).status).toBe(401)
   })
 })

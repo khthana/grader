@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import type { ReactNode } from "react"
+import { SESSION_ENDED_PATH } from "@/lib/auth"
 import { getCurrentUser, getActiveRoleCookie, isImpersonating } from "@/lib/session"
 import { resolveActiveRole, type Role } from "@/lib/roles"
 import { getCourseContext } from "@/lib/courses/server"
@@ -8,7 +9,8 @@ import { courseSlugString } from "@/lib/courses/slug"
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await getCurrentUser()
-  if (!user) redirect("/login")
+  // A valid-looking cookie for a deactivated/deleted account also lands here.
+  if (!user) redirect(SESSION_ENDED_PATH)
 
   const roles = user.roles as Role[]
   const requested = (await getActiveRoleCookie()) as Role | undefined

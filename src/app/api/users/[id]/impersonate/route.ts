@@ -35,6 +35,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const db = getDb()
   const target = await getUserById(db, id)
   if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  // A deactivated account can't hold a session (#75) — swapping into one would
+  // strand the Admin on the login page with their token parked in `impersonator`.
+  if (!target.isActive) return NextResponse.json({ error: "inactive" }, { status: 409 })
 
   const adminToken = request.cookies.get("session")?.value
   const targetToken = createSessionToken({

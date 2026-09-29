@@ -12,6 +12,13 @@ const SESSION_DURATION_MS = 8 * 60 * 60 * 1000 // 8 hours
 // Cookie options for the `session` cookie (and the `impersonator` cookie that
 // holds a saved Admin session). One copy, so every issuer agrees on scope and
 // lifetime; logout reuses it with maxAge 0.
+// Where a page sends a request whose signed cookie no longer maps to an active
+// account (deactivated or deleted — #75). The proxy lets this through despite
+// the cookie (a bare /login would bounce back to the app and loop) and clears
+// the dead cookie. Every server-side "not signed in" redirect must use it.
+export const SESSION_ENDED_ERROR = "session_ended"
+export const SESSION_ENDED_PATH = `/login?error=${SESSION_ENDED_ERROR}`
+
 export const SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",

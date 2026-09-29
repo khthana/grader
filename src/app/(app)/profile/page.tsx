@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { SESSION_ENDED_PATH } from "@/lib/auth"
 import { getCurrentUser } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import { findUserByEmail } from "@/lib/users/repository"
@@ -6,7 +7,7 @@ import { ProfileForm } from "@/components/profile/ProfileForm"
 
 export default async function ProfilePage() {
   const user = await getCurrentUser()
-  if (!user) redirect("/login")
+  if (!user) redirect(SESSION_ENDED_PATH)
 
   const db = getDb()
   const record = await findUserByEmail(db, user.email)
