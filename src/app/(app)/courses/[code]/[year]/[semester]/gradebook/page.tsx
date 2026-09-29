@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation"
 import { parseCourseSlug, courseSlugString } from "@/lib/courses/slug"
-import { getCurrentUser } from "@/lib/session"
-import { isTeachingStaff } from "@/lib/courses/access"
+import { getCourseAccess } from "@/lib/courses/server"
 import { GradebookTable } from "@/components/gradebook/GradebookTable"
 
 interface PageProps {
@@ -13,8 +12,7 @@ export default async function CourseGradebookPage({ params }: PageProps) {
   const slug = parseCourseSlug(code, year, semester)
   if (!slug) notFound()
 
-  const user = await getCurrentUser()
-  if (!user || !isTeachingStaff(user.roles)) notFound()
+  if (!(await getCourseAccess(slug))?.staff) notFound()
 
   const courseSlug = courseSlugString(slug)
 

@@ -1,9 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 import { parseCourseSlug, buildCoursePath, courseSlugString } from "@/lib/courses/slug"
-import { getCurrentUser } from "@/lib/session"
-import { canManageCourses } from "@/lib/courses/access"
+import { getCourseAccess } from "@/lib/courses/server"
 import { listWeeks } from "@/lib/weeks/repository"
-import { getCourseByKey } from "@/lib/courses/repository"
 import { getDb } from "@/lib/db"
 import { ProblemEditor } from "@/components/problems/ProblemEditor"
 
@@ -17,15 +15,15 @@ export default async function NewProblemPage({ params, searchParams }: PageProps
   const slug = parseCourseSlug(code, year, semester)
   if (!slug) notFound()
 
-  const user = await getCurrentUser()
-  if (!user || !canManageCourses(user.roles)) redirect(buildCoursePath(slug) + "/problems")
+  const access = await getCourseAccess(slug)
+  if (!access?.manager) redirect(buildCoursePath(slug) + "/problems")
+  const { course } = access
 
   const { weekId: weekIdParam } = await searchParams
   const weekIdFromParam = weekIdParam ? Number.parseInt(weekIdParam, 10) : undefined
 
   const db = getDb()
-  const [weeks, course] = await Promise.all([listWeeks(db, slug), getCourseByKey(db, slug)])
-  if (!course) notFound()
+  const weeks = await listWeeks(db, slug)
   const initialWeekId = weeks.find((w) => w.id === weekIdFromParam)?.id ?? weeks[0]?.id
 
   return (

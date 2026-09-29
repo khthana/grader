@@ -1,8 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 import { Suspense } from "react"
 import { parseCourseSlug, courseSlugString, buildCoursePath } from "@/lib/courses/slug"
-import { getCurrentUser } from "@/lib/session"
-import { canManageCourses } from "@/lib/courses/access"
+import { getCourseAccess } from "@/lib/courses/server"
 import { getDb } from "@/lib/db"
 import { listProblems } from "@/lib/problems/repository"
 import { getProblemIdsWithSubmissions } from "@/lib/submissions/repository"
@@ -20,8 +19,7 @@ export default async function CourseReviewPage({ params, searchParams }: PagePro
   const slug = parseCourseSlug(code, year, semester)
   if (!slug) notFound()
 
-  const user = await getCurrentUser()
-  if (!user || !canManageCourses(user.roles)) notFound()
+  if (!(await getCourseAccess(slug))?.manager) notFound()
 
   const db = getDb()
   const [problems, problemIdsWithSubs] = await Promise.all([

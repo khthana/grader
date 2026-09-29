@@ -11,7 +11,8 @@ import {
   deleteProblem,
   setTestCases,
 } from "./repository"
-import { createCourse } from "@/lib/courses/repository"
+import { createCourse, assignInstructor } from "@/lib/courses/repository"
+import { createUser, assignRole } from "@/lib/users/repository"
 import { seedWeeks, listWeeks } from "@/lib/weeks/repository"
 import { freshDb, type Queryable } from "@/lib/test-support/db"
 import type { CourseKey } from "@/lib/courses/types"
@@ -217,25 +218,54 @@ describe("problem repository", () => {
       expect(await getReferenceSolution(db, p.id)).toBe("print(42)")
     })
 
-    it("getReferenceSolutionForStaff returns the value for course managers", async () => {
-      const p = await createProblem(db, {
-        courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
-        weekId, title: "Q", referenceSolution: "print('secret')",
-      })
-      const inst = await getReferenceSolutionForStaff(db, p.id, ["Instructor"])
-      expect(inst).toEqual({ ok: true, solution: "print('secret')" })
-      const admin = await getReferenceSolutionForStaff(db, p.id, ["Admin"])
-      expect(admin).toEqual({ ok: true, solution: "print('secret')" })
-    })
+    describe("getReferenceSolutionForStaff — gate rides the read (#73)", () => {
+      let problemId: number
+      let insId: number
 
-    it("getReferenceSolutionForStaff forbids non-managers (gate rides the read)", async () => {
-      const p = await createProblem(db, {
-        courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
-        weekId, title: "Q", referenceSolution: "print('secret')",
+      async function userWith(email: string, role: string) {
+        const u = await createUser(db, { email, name: email })
+        await assignRole(db, u.id, role)
+        return { id: u.id, roles: [role] }
+      }
+
+      beforeEach(async () => {
+        problemId = (
+          await createProblem(db, {
+            courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
+            weekId, title: "Q", referenceSolution: "print('secret')",
+          })
+        ).id
+        const ins = await userWith("ins@kmitl.ac.th", "Instructor")
+        await assignInstructor(db, courseKey, ins.id)
+        insId = ins.id
       })
-      expect(await getReferenceSolutionForStaff(db, p.id, ["Student"])).toEqual({ ok: false, reason: "forbidden" })
-      expect(await getReferenceSolutionForStaff(db, p.id, ["TA"])).toEqual({ ok: false, reason: "forbidden" })
-      expect(await getReferenceSolutionForStaff(db, p.id, [])).toEqual({ ok: false, reason: "forbidden" })
+
+      const read = (user: { id: number; roles: string[] }, course: CourseKey = courseKey, id = problemId) =>
+        getReferenceSolutionForStaff(db, { problemId: id, course, user })
+
+      it("returns the value to a manager of the problem's course", async () => {
+        expect(await read({ id: insId, roles: ["Instructor"] })).toEqual({ ok: true, solution: "print('secret')" })
+        expect(await read(await userWith("admin@kmitl.ac.th", "Admin"))).toEqual({ ok: true, solution: "print('secret')" })
+      })
+
+      it("forbids an Instructor who does not teach this course", async () => {
+        const outsider = await userWith("other@kmitl.ac.th", "Instructor")
+        expect(await read(outsider)).toEqual({ ok: false, reason: "forbidden" })
+      })
+
+      it("forbids non-managers of the course (TA, Student)", async () => {
+        const ta = await userWith("ta@kmitl.ac.th", "TA")
+        await assignInstructor(db, courseKey, ta.id)
+        expect(await read(ta)).toEqual({ ok: false, reason: "forbidden" })
+        expect(await read({ id: insId, roles: ["Student"] })).toEqual({ ok: false, reason: "forbidden" })
+      })
+
+      it("forbids reading a problem through a course it does not belong to", async () => {
+        const other = await createCourse(db, { code: "C02", year: 2567, semester: 1, nameTh: "ข", nameEn: "B" })
+        await assignInstructor(db, other, insId)
+        // Manager of C02, asking for a C01 problem via the C02 key.
+        expect(await read({ id: insId, roles: ["Instructor"] }, other)).toEqual({ ok: false, reason: "forbidden" })
+      })
     })
 
     it("getProblemById does not expose referenceSolution (leak prevention)", async () => {

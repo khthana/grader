@@ -1,9 +1,7 @@
 import { notFound } from "next/navigation"
 import { Suspense } from "react"
 import { parseCourseSlug, buildCoursePath, courseSlugString } from "@/lib/courses/slug"
-import { getCurrentUser } from "@/lib/session"
-import { getDb } from "@/lib/db"
-import { getCourseByKey } from "@/lib/courses/repository"
+import { getCourseAccess } from "@/lib/courses/server"
 import { AssignmentsList } from "@/components/assignments/AssignmentsList"
 
 interface PageProps {
@@ -18,11 +16,10 @@ export default async function CourseAssignmentsPage({ params, searchParams }: Pa
   const slug = parseCourseSlug(code, year, semester)
   if (!slug) notFound()
 
-  const user = await getCurrentUser()
-  if (!user) notFound()
-
-  const course = await getCourseByKey(getDb(), slug)
-  if (!course) notFound()
+  // Self-check (don't rely on the layout alone — they render in parallel, #73).
+  const access = await getCourseAccess(slug)
+  if (!access) notFound()
+  const { course } = access
 
   const courseSlug = courseSlugString(slug)
   const coursePath = buildCoursePath(slug)

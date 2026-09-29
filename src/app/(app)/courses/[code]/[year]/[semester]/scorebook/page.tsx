@@ -1,9 +1,8 @@
 import { notFound } from "next/navigation"
 import { Suspense } from "react"
 import { parseCourseSlug, buildCoursePath, courseSlugString } from "@/lib/courses/slug"
-import { getCurrentUser } from "@/lib/session"
 import { getDb } from "@/lib/db"
-import { getCourseByKey } from "@/lib/courses/repository"
+import { getCourseAccess } from "@/lib/courses/server"
 import { getUserById } from "@/lib/users/repository"
 import { ScoreList } from "@/components/scorebook/ScoreList"
 
@@ -19,15 +18,11 @@ export default async function CourseScorebookPage({ params, searchParams }: Page
   const slug = parseCourseSlug(code, year, semester)
   if (!slug) notFound()
 
-  const sessionUser = await getCurrentUser()
-  if (!sessionUser) notFound()
-
-  const db = getDb()
-  const [course, userDetail] = await Promise.all([
-    getCourseByKey(db, slug),
-    getUserById(db, sessionUser.id),
-  ])
-  if (!course) notFound()
+  // Self-check (don't rely on the layout alone — they render in parallel, #73).
+  const access = await getCourseAccess(slug)
+  if (!access) notFound()
+  const sessionUser = access.user
+  const userDetail = await getUserById(getDb(), sessionUser.id)
 
   const courseSlug = courseSlugString(slug)
   const coursePath = buildCoursePath(slug)

@@ -261,6 +261,29 @@ export async function listCoursesForUser(
   return rows.map(toRecord)
 }
 
+// How a user is linked to one course offering: on its staff
+// (course_instructors — Instructors and TAs) and/or enrolled as a student.
+export async function getCourseMembership(
+  db: Queryable,
+  key: CourseKey,
+  userId: number
+): Promise<{ staff: boolean; enrolled: boolean }> {
+  const params = [key.code, key.year, key.semester, userId]
+  const [staff, enrolled] = await Promise.all([
+    db.query(
+      `SELECT 1 FROM course_instructors
+       WHERE course_code = $1 AND course_year = $2::int AND course_semester = $3::int AND user_id = $4::int`,
+      params
+    ),
+    db.query(
+      `SELECT 1 FROM enrollments
+       WHERE course_code = $1 AND course_year = $2::int AND course_semester = $3::int AND user_id = $4::int`,
+      params
+    ),
+  ])
+  return { staff: staff.rows.length > 0, enrolled: enrolled.rows.length > 0 }
+}
+
 export async function listCourses(db: Queryable): Promise<CourseRecord[]> {
   const { rows } = await db.query<CourseRow>(
     `SELECT ${SELECT_COLS} FROM courses ORDER BY code, year, semester`

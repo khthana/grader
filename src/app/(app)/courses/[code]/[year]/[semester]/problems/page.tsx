@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation"
 import { parseCourseSlug, buildCoursePath, courseSlugString } from "@/lib/courses/slug"
-import { getCurrentUser } from "@/lib/session"
-import { canManageCourses } from "@/lib/courses/access"
+import { getCourseAccess } from "@/lib/courses/server"
 import { ProblemsTable } from "@/components/problems/ProblemsTable"
 
 interface PageProps {
@@ -13,12 +12,12 @@ export default async function CourseProblemsPage({ params }: PageProps) {
   const slug = parseCourseSlug(code, year, semester)
   if (!slug) notFound()
 
-  const user = await getCurrentUser()
-  if (!user) notFound()
+  const access = await getCourseAccess(slug)
+  if (!access) notFound()
 
   const coursePath = buildCoursePath(slug)
   const courseSlug = courseSlugString(slug)
-  const canManage = canManageCourses(user.roles)
+  const canManage = access.manager
 
   return (
     <div className="font-thai">

@@ -5,8 +5,7 @@ import { getDb } from "@/lib/db"
 import { parseCourseSlug, buildCoursePath, courseSlugString } from "@/lib/courses/slug"
 import { getProblemByWeekAndNo } from "@/lib/problems/repository"
 import { getWeekByNo } from "@/lib/weeks/repository"
-import { getCurrentUser } from "@/lib/session"
-import { canManageCourses } from "@/lib/courses/access"
+import { getCourseAccess } from "@/lib/courses/server"
 import { SubmissionsTable } from "@/components/submissions/SubmissionsTable"
 
 interface PageProps {
@@ -18,8 +17,7 @@ export default async function ProblemSubmissionsPage({ params }: PageProps) {
   const slug = parseCourseSlug(code, year, semester)
   if (!slug) notFound()
 
-  const user = await getCurrentUser()
-  if (!user || !canManageCourses(user.roles)) notFound()
+  if (!(await getCourseAccess(slug))?.manager) notFound()
 
   const weekNo = Number.parseInt(week, 10)
   const problemNo = Number.parseInt(no, 10)

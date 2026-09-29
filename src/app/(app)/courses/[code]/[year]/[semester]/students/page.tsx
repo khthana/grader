@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation"
 import { parseCourseSlug, buildCoursePath, courseSlugString } from "@/lib/courses/slug"
-import { getCurrentUser } from "@/lib/session"
-import { canMutateRoster, isTeachingStaff } from "@/lib/courses/access"
+import { getCourseAccess } from "@/lib/courses/server"
 import { RosterTable } from "@/components/students/RosterTable"
 
 interface PageProps {
@@ -13,13 +12,15 @@ export default async function CourseStudentsPage({ params }: PageProps) {
   const slug = parseCourseSlug(code, year, semester)
   if (!slug) notFound()
 
-  const user = await getCurrentUser()
-  // Roster is teaching staff only — a Student has no access (ADR 0001, #70).
-  if (!user || !isTeachingStaff(user.roles)) notFound()
+  // Roster is teaching staff of this course only — a Student has no access
+  // (ADR 0001, #70), nor does staff of another course (#73).
+  const access = await getCourseAccess(slug)
+  if (!access?.staff) notFound()
 
   const coursePath = buildCoursePath(slug)
   const courseSlug = courseSlugString(slug)
-  const canMutate = canMutateRoster(user.roles)
+  // Roster mutators (Admin/Instructor) are exactly this course's managers.
+  const canMutate = access.manager
 
   return (
     <div className="font-thai">

@@ -8,8 +8,7 @@ import { parseCourseSlug, buildCoursePath } from "@/lib/courses/slug"
 import { getProblemByWeekAndNo } from "@/lib/problems/repository"
 import { problemMaxScore } from "@/lib/problems/score"
 import { getWeekByNo } from "@/lib/weeks/repository"
-import { getCurrentUser } from "@/lib/session"
-import { isTeachingStaff } from "@/lib/courses/access"
+import { getCourseAccess } from "@/lib/courses/server"
 import { getLastSubmission } from "@/lib/submissions/repository"
 
 interface PageProps {
@@ -40,8 +39,13 @@ export default async function CourseProblemPage({ params }: PageProps) {
   const weekRecord = await getWeekByNo(db, slug, weekNo)
   if (!weekRecord) notFound()
 
-  const user = await getCurrentUser()
-  const isPrivileged = user != null && isTeachingStaff(user.roles)
+  // The layout already 404s a user with no link to this course (#73). Staff of
+  // *this* course see hidden weeks; everyone else (incl. staff of other courses
+  // enrolled here as students) gets the student view.
+  const access = await getCourseAccess(slug)
+  if (!access) notFound()
+  const user = access.user
+  const isPrivileged = access.staff
 
   if (!isPrivileged && !weekRecord.isReleased) {
     const coursePath = buildCoursePath(slug)
@@ -68,7 +72,7 @@ export default async function CourseProblemPage({ params }: PageProps) {
   const problem = await getProblemByWeekAndNo(db, weekRecord.id, problemNo)
   if (!problem) notFound()
   const lastSubmission =
-    user && !isPrivileged ? await getLastSubmission(db, problem.id, user.id) : null
+    !isPrivileged ? await getLastSubmission(db, problem.id, user.id) : null
 
   const visibleCases = problem.testCases.filter((tc) => !tc.isHidden)
   const dueDate = formatDate(problem.dueAt)

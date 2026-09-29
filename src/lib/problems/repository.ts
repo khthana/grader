@@ -1,6 +1,6 @@
 import type { Queryable } from "@/lib/db"
 import type { CourseKey } from "@/lib/courses/types"
-import { canManageCourses } from "@/lib/courses/access"
+import { resolveCourseAccess } from "@/lib/courses/course-access"
 import { testCaseScore } from "@/lib/problems/score"
 import { toProblemType, type ProblemType } from "@/lib/problems/problem-type"
 import { DEFAULT_LANGUAGE } from "@/lib/languages"
@@ -217,18 +217,25 @@ export type ReferenceSolutionResult =
   | { ok: true; solution: string }
   | { ok: false; reason: "forbidden" }
 
-// Staff-only read of the Reference Solution: the gate rides the read. A caller
-// whose roles can't manage courses gets "forbidden", never the value — so the
-// invariant (CONTEXT.md: "never exposed to Students") is enforced by shape, not
-// by each caller remembering to gate. This is the entry every request/page
-// path should use to reach the Reference Solution.
+// Staff-only read of the Reference Solution: the gate rides the read. Only a
+// manager of *this* course (Admin, or an Instructor on its staff — #73) gets
+// the value, and only for a problem that belongs to that course; everyone else
+// gets "forbidden". The invariant (CONTEXT.md: "never exposed to Students", nor
+// to other courses' staff) is enforced by shape, not by each caller
+// remembering to gate. This is the entry every request/page path should use.
 export async function getReferenceSolutionForStaff(
   db: Queryable,
-  problemId: number,
-  roles: string[]
+  { problemId, course, user }: { problemId: number; course: CourseKey; user: { id: number; roles: string[] } }
 ): Promise<ReferenceSolutionResult> {
-  if (!canManageCourses(roles)) return { ok: false, reason: "forbidden" }
-  return { ok: true, solution: await getReferenceSolution(db, problemId) }
+  const access = await resolveCourseAccess(db, user, course)
+  if (!access?.manager) return { ok: false, reason: "forbidden" }
+  const { rows } = await db.query<{ reference_solution: string }>(
+    `SELECT reference_solution FROM problems
+     WHERE id = $1::int AND course_code = $2 AND course_year = $3::int AND course_semester = $4::int`,
+    [problemId, course.code, course.year, course.semester]
+  )
+  if (!rows[0]) return { ok: false, reason: "forbidden" }
+  return { ok: true, solution: rows[0].reference_solution }
 }
 
 export async function getProblemById(
