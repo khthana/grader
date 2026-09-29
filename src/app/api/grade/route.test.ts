@@ -372,8 +372,9 @@ ${tests}`,
       expect(JSON.stringify(full?.results)).toContain("SECRET_TEST")
     })
 
-    it("course staff still see the traceback", async () => {
-      const res = await POST(gradeReq({ problemId: pid, code: DUMP, mode: "run" }, sessionFor("ins@kmitl.ac.th")))
+    it.each(["run", "submit"] as const)("course staff still see the traceback (mode:%s)", async (mode) => {
+      const res = await POST(gradeReq({ problemId: pid, code: DUMP, mode }, sessionFor("ins@kmitl.ac.th")))
+      expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.results[0].error).toContain("SECRET_TEST")
     })
