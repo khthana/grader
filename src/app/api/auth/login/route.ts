@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createSessionToken } from "@/lib/auth"
+import { createSessionToken, SESSION_COOKIE_OPTIONS } from "@/lib/auth"
 import { verifyPassword } from "@/lib/password"
 import { getDb } from "@/lib/db"
 import { findUserByEmail } from "@/lib/users/repository"
@@ -47,13 +47,7 @@ export async function POST(request: NextRequest) {
   })
 
   const response = NextResponse.json({ ok: true })
-  response.cookies.set("session", sessionToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 8,
-  })
+  response.cookies.set("session", sessionToken, SESSION_COOKIE_OPTIONS)
 
   return response
 }

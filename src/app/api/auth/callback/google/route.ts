@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSessionToken } from '@/lib/auth'
+import { createSessionToken, SESSION_COOKIE_OPTIONS } from '@/lib/auth'
 import { getDb } from '@/lib/db'
 import { findUserByEmail } from '@/lib/users/repository'
 
@@ -87,12 +87,6 @@ export async function GET(req: NextRequest) {
   })
 
   const response = NextResponse.redirect(new URL('/', baseUrl))
-  response.cookies.set('session', sessionToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 60 * 60 * 8, // 8 hours
-  })
+  response.cookies.set('session', sessionToken, SESSION_COOKIE_OPTIONS)
   return response
 }

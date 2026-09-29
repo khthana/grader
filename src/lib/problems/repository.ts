@@ -2,6 +2,8 @@ import type { Queryable } from "@/lib/db"
 import type { CourseKey } from "@/lib/courses/types"
 import { canManageCourses } from "@/lib/courses/access"
 import { testCaseScore } from "@/lib/problems/score"
+import { toProblemType, type ProblemType } from "@/lib/problems/problem-type"
+import { DEFAULT_LANGUAGE } from "@/lib/languages"
 export type { Queryable, CourseKey }
 
 export interface ProblemRecord {
@@ -19,7 +21,7 @@ export interface ProblemRecord {
   dueAt: string | null
   closeAt: string | null
   language: string
-  problemType: string
+  problemType: ProblemType
   functionName: string
   starterCode: string
   unitTestCode: string
@@ -110,7 +112,7 @@ function toRecord(row: ProblemRow): ProblemRecord {
     dueAt: row.due_at,
     closeAt: row.close_at,
     language: row.language,
-    problemType: row.problem_type,
+    problemType: toProblemType(row.problem_type),
     functionName: row.function_name,
     starterCode: row.starter_code,
     unitTestCode: row.unit_test_code,
@@ -153,7 +155,7 @@ export async function createProblem(
     closeAt?: string | null
     language?: string
     referenceSolution?: string
-    problemType?: string
+    problemType?: ProblemType
     functionName?: string
     starterCode?: string
     unitTestCode?: string
@@ -182,7 +184,7 @@ export async function createProblem(
       data.score ?? 10,
       data.dueAt ?? null,
       data.closeAt ?? null,
-      data.language ?? "python",
+      data.language ?? DEFAULT_LANGUAGE,
       data.referenceSolution ?? "",
       data.problemType ?? "io",
       data.functionName ?? "",
@@ -344,7 +346,7 @@ export async function updateProblem(
     closeAt: string | null
     language: string
     referenceSolution: string
-    problemType: string
+    problemType: ProblemType
     functionName: string
     starterCode: string
     unitTestCode: string

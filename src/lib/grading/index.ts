@@ -1,7 +1,8 @@
-import type { GradeResult, TestCase, TestResult } from "@/types"
+import type { GradeMode, GradeResult, TestCase, TestResult } from "@/types"
 import { checkCodePolicy } from "@/lib/code-policy"
 import { runTestCases, runUnitTestBlock } from "@/lib/piston"
 import { problemMaxScore, testCaseScore } from "@/lib/problems/score"
+import type { ProblemType } from "@/lib/problems/problem-type"
 
 // The Piston seam expressed as an interface. Grading depends on this contract,
 // not on the HTTP module directly — so tests inject a fake runner (no network)
@@ -17,7 +18,7 @@ export const pistonRunner: CodeRunner = { runTestCases, runUnitTestBlock }
 // The slice of a Problem that grading needs. ProblemDetail satisfies this
 // structurally; the narrow shape keeps grading decoupled from the repository.
 export interface GradableProblem {
-  problemType: string
+  problemType: ProblemType
   language: string
   score: number
   unitTestCode: string
@@ -58,7 +59,7 @@ function summarize(
 export async function gradeSubmission(
   problem: GradableProblem,
   code: string,
-  mode: "run" | "submit",
+  mode: GradeMode,
   runner: CodeRunner = pistonRunner
 ): Promise<GradeResult> {
   const isUnit = problem.problemType === "unit"

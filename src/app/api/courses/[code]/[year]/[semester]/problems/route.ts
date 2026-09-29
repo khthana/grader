@@ -6,6 +6,7 @@ import { validateProblemInput } from "@/lib/problems/validation"
 import { problemMaxScore } from "@/lib/problems/score"
 import { countSubmitted, countPending } from "@/lib/submissions/repository"
 import { safeLog } from "@/lib/logs"
+import { toProblemType } from "@/lib/problems/problem-type"
 
 export const GET = courseRoute({}, async (request, auth) => {
   const url = new URL(request.url)
@@ -78,6 +79,7 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
   })
   if (!valid) return NextResponse.json({ errors }, { status: 400 })
 
+  const problemType = toProblemType(body.problemType)
   const db = getDb()
   const problem = await createProblem(db, {
     courseCode: auth.course.code,
@@ -87,7 +89,7 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
     title: body.title!.trim(),
     // Max score is derived server-side (#66): io = sum of test-case scores.
     score: problemMaxScore({
-      problemType: body.problemType ?? "io",
+      problemType,
       score: body.score ?? 10,
       testCases: body.testCases ?? [],
     }),
@@ -100,7 +102,7 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
     // language; the client value is ignored.
     language: auth.course.language,
     referenceSolution: body.referenceSolution,
-    problemType: body.problemType,
+    problemType,
     functionName: body.functionName,
     starterCode: body.starterCode,
     unitTestCode: body.unitTestCode,

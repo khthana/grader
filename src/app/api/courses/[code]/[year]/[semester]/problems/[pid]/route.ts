@@ -12,6 +12,7 @@ import { studentProblemView } from "@/lib/problems/visibility"
 import { isTeachingStaff } from "@/lib/courses/access"
 import { problemMaxScore } from "@/lib/problems/score"
 import { safeLog } from "@/lib/logs"
+import { toProblemType } from "@/lib/problems/problem-type"
 
 export const GET = courseRoute<{ code: string; year: string; semester: string; pid: string }>(
   {},
@@ -88,12 +89,14 @@ export const PUT = courseRoute<{ code: string; year: string; semester: string; p
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
+    // Absent → keep the stored type (not rewritten below); otherwise normalise.
+    const requestedType = body.problemType === undefined ? undefined : toProblemType(body.problemType)
 
     const updated = await updateProblem(db, problemId, {
       title: body.title?.trim(),
       // Max score is derived server-side (#66): io = sum of test-case scores.
       score: problemMaxScore({
-        problemType: body.problemType ?? existing.problemType,
+        problemType: requestedType ?? existing.problemType,
         score: body.score ?? existing.score,
         testCases: body.testCases ?? [],
       }),
@@ -106,7 +109,7 @@ export const PUT = courseRoute<{ code: string; year: string; semester: string; p
       // language on every edit; the client value is ignored.
       language: auth.course.language,
       referenceSolution: body.referenceSolution,
-      problemType: body.problemType,
+      problemType: requestedType,
       functionName: body.functionName,
       starterCode: body.starterCode,
       unitTestCode: body.unitTestCode,

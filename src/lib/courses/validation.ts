@@ -32,6 +32,13 @@ export function validateCourseOffering(year: number, semester: number): Validati
   return { valid: Object.keys(errors).length === 0, errors }
 }
 
+// Language is optional (absent → Python downstream); reject only a value that
+// isn't a supported language. Shared by course create and course edit.
+export function validateCourseLanguage(language: string | undefined): string | undefined {
+  if (language !== undefined && !isSupportedLanguage(language)) return "ภาษาที่เลือกไม่รองรับ"
+  return undefined
+}
+
 export function validateCourseInput(input: CourseInput): ValidationResult {
   const errors: Record<string, string> = {
     ...validateCourseOffering(input.year, input.semester).errors,
@@ -40,10 +47,8 @@ export function validateCourseInput(input: CourseInput): ValidationResult {
   if (isBlank(input.code)) errors.code = "กรุณากรอกรหัสวิชา"
   if (isBlank(input.nameTh)) errors.nameTh = "กรุณากรอกชื่อวิชา (ภาษาไทย)"
   if (isBlank(input.nameEn)) errors.nameEn = "กรุณากรอกชื่อวิชา (ภาษาอังกฤษ)"
-  // Language is optional (absent → Python downstream); reject only a value that
-  // isn't a supported language.
-  if (input.language !== undefined && !isSupportedLanguage(input.language))
-    errors.language = "ภาษาที่เลือกไม่รองรับ"
+  const languageError = validateCourseLanguage(input.language)
+  if (languageError) errors.language = languageError
 
   return { valid: Object.keys(errors).length === 0, errors }
 }

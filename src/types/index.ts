@@ -29,9 +29,13 @@ export interface GradeResult {
   policyViolations?: string[]
 }
 
+// `run` = visible Test Cases only, nothing stored; `submit` = all cases + a Submission.
+export type GradeMode = "run" | "submit"
+
+// Body of POST /api/grade. The language is not sent — the route uses the
+// Problem's (server-authoritative).
 export interface SubmissionRequest {
   problemId: number
   code: string
-  language: string
-  mode: "run" | "submit"
+  mode: GradeMode
 }

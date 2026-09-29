@@ -9,6 +9,7 @@ import { getProblemByWeekAndNo } from "@/lib/problems/repository"
 import { problemMaxScore } from "@/lib/problems/score"
 import { getWeekByNo } from "@/lib/weeks/repository"
 import { getCurrentUser } from "@/lib/session"
+import { isTeachingStaff } from "@/lib/courses/access"
 import { getLastSubmission } from "@/lib/submissions/repository"
 
 interface PageProps {
@@ -40,7 +41,7 @@ export default async function CourseProblemPage({ params }: PageProps) {
   if (!weekRecord) notFound()
 
   const user = await getCurrentUser()
-  const isPrivileged = user?.roles.some((r) => ["Admin", "Instructor", "TA"].includes(r))
+  const isPrivileged = user != null && isTeachingStaff(user.roles)
 
   if (!isPrivileged && !weekRecord.isReleased) {
     const coursePath = buildCoursePath(slug)

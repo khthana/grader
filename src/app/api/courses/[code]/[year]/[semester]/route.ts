@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db"
 import { courseRoute } from "@/lib/courses/route"
 import { updateCourse, deleteCourse, getCourseCascadeCounts } from "@/lib/courses/repository"
 import { canChangeCourseLanguage } from "@/lib/courses/access"
-import { isSupportedLanguage } from "@/lib/languages"
+import { validateCourseLanguage } from "@/lib/courses/validation"
 import { safeLog } from "@/lib/logs"
 
 export const GET = courseRoute({ manage: true }, async (_request, auth) => {
@@ -35,8 +35,9 @@ export const PUT = courseRoute({ manage: true }, async (request, auth) => {
   // the current language, so it never trips the lock.
   const language = typeof body.language === "string" ? body.language : undefined
   if (language !== undefined) {
-    if (!isSupportedLanguage(language)) {
-      return NextResponse.json({ errors: { language: "ภาษาที่เลือกไม่รองรับ" } }, { status: 400 })
+    const languageError = validateCourseLanguage(language)
+    if (languageError) {
+      return NextResponse.json({ errors: { language: languageError } }, { status: 400 })
     }
     const { problems } = await getCourseCascadeCounts(db, course)
     if (!canChangeCourseLanguage({ current: course.language, desired: language, problemCount: problems })) {

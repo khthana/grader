@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { getLanguageConfig, isSupportedLanguage, SUPPORTED_LANGUAGES, LANGUAGE_OPTIONS, commentLine } from "./languages"
+import { getLanguageConfig, isSupportedLanguage, SUPPORTED_LANGUAGES, LANGUAGE_OPTIONS, commentLine, supportsUnitTests, supportsAiGeneration } from "./languages"
 
 describe("getLanguageConfig", () => {
   it("returns the C runtime config (Piston c / gcc 10.2.0 / main.c)", () => {
@@ -57,5 +57,21 @@ describe("commentLine (#68)", () => {
 
   it("falls back to Python's prefix for an unknown language", () => {
     expect(commentLine("rust", "hint")).toBe("# hint")
+  })
+})
+
+describe("supportsUnitTests", () => {
+  it("is Python-only (the unit harness runs Python)", () => {
+    expect(supportsUnitTests("python")).toBe(true)
+    expect(supportsUnitTests("c")).toBe(false)
+    expect(supportsUnitTests("rust")).toBe(false)
+  })
+})
+
+describe("supportsAiGeneration", () => {
+  it("is Python-only (the prompts ask for Python code)", () => {
+    expect(supportsAiGeneration("python")).toBe(true)
+    expect(supportsAiGeneration("c")).toBe(false)
+    expect(supportsAiGeneration("rust")).toBe(false)
   })
 })

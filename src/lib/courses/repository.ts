@@ -1,5 +1,6 @@
 import type { Queryable } from "@/lib/db"
 import type { CourseKey, CourseRecord } from "./types"
+import { DEFAULT_LANGUAGE } from "@/lib/languages"
 export type { Queryable, CourseKey, CourseRecord }
 
 export interface NewCourse {
@@ -47,7 +48,7 @@ export async function createCourse(
     `INSERT INTO courses (code, year, semester, name_th, name_en, program, language)
      VALUES ($1, $2::int, $3::int, $4, $5, $6, $7)
      RETURNING ${SELECT_COLS}`,
-    [input.code, input.year, input.semester, input.nameTh, input.nameEn, input.program ?? null, input.language ?? "python"]
+    [input.code, input.year, input.semester, input.nameTh, input.nameEn, input.program ?? null, input.language ?? DEFAULT_LANGUAGE]
   )
   return toRecord(rows[0])
 }

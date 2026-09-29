@@ -15,9 +15,16 @@ export interface LanguageConfig {
   commentPrefix: string
   // A typical first line of starter code, shown as an example in the editor.
   starterHint: string
+  // Whether unit-test mode is available — its harness only runs Python (#64).
+  unitTests: boolean
+  // Whether "สร้างด้วย AI" is offered — the prompts ask for Python code.
+  aiGeneration: boolean
 }
 
-export const LANGUAGE_CONFIG: Record<string, LanguageConfig> = {
+// A language code a course may declare (a key of the registry below).
+export type Language = "python" | "c"
+
+export const LANGUAGE_CONFIG: Record<Language, LanguageConfig> = {
   python: {
     piston: "python",
     version: "3.10.0",
@@ -25,6 +32,8 @@ export const LANGUAGE_CONFIG: Record<string, LanguageConfig> = {
     label: "Python",
     commentPrefix: "#",
     starterHint: "def add(a, b):",
+    unitTests: true,
+    aiGeneration: true,
   },
   c: {
     piston: "c",
@@ -33,13 +42,15 @@ export const LANGUAGE_CONFIG: Record<string, LanguageConfig> = {
     label: "C",
     commentPrefix: "//",
     starterHint: "#include <stdio.h>",
+    unitTests: false,
+    aiGeneration: false,
   },
 }
 
-export const DEFAULT_LANGUAGE = "python"
+export const DEFAULT_LANGUAGE: Language = "python"
 
 // The languages a course may be set to — the registry keys, single-sourced.
-export const SUPPORTED_LANGUAGES = Object.keys(LANGUAGE_CONFIG)
+export const SUPPORTED_LANGUAGES = Object.keys(LANGUAGE_CONFIG) as Language[]
 
 // `<select>` options for picking a course language — derived from the
 // registry, so adding a language never needs a second list (#68).
@@ -50,17 +61,28 @@ export const LANGUAGE_OPTIONS: { value: string; label: string }[] = SUPPORTED_LA
 // Whether a language code is one a course/problem may declare. Unlike
 // getLanguageConfig (which silently falls back to Python at execution time),
 // this is the strict check used to validate user-supplied input.
-export function isSupportedLanguage(language: string): boolean {
+export function isSupportedLanguage(language: string): language is Language {
   return Object.prototype.hasOwnProperty.call(LANGUAGE_CONFIG, language)
 }
 
 // Resolve a language code to its config, falling back to Python for anything
 // unknown so a stray/blank value can never break execution.
 export function getLanguageConfig(language: string): LanguageConfig {
-  return LANGUAGE_CONFIG[language] ?? LANGUAGE_CONFIG[DEFAULT_LANGUAGE]
+  return isSupportedLanguage(language) ? LANGUAGE_CONFIG[language] : LANGUAGE_CONFIG[DEFAULT_LANGUAGE]
 }
 
 // `text` as a line comment in the given language (e.g. an editor placeholder).
 export function commentLine(language: string, text: string): string {
   return `${getLanguageConfig(language).commentPrefix} ${text}`
+}
+
+// Whether unit-test mode may be used in a course of this language. Strict: an
+// unknown language gets io-only, never the Python harness.
+export function supportsUnitTests(language: string): boolean {
+  return isSupportedLanguage(language) && LANGUAGE_CONFIG[language].unitTests
+}
+
+// Whether AI test-case generation may be offered for this language.
+export function supportsAiGeneration(language: string): boolean {
+  return isSupportedLanguage(language) && LANGUAGE_CONFIG[language].aiGeneration
 }

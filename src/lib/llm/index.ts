@@ -1,3 +1,5 @@
+import type { ProblemType } from "@/lib/problems/problem-type"
+
 export class LlmNotConfiguredError extends Error {
   name = "LlmNotConfiguredError"
   constructor() {
@@ -20,7 +22,7 @@ export async function generateTestPlan(problem: {
   description: string
   inputSpec?: string | null
   outputSpec?: string | null
-  problemType?: "io" | "unit"
+  problemType?: ProblemType
 }): Promise<IoTestPlan | UnitTestPlan> {
   const apiKey = process.env.ANTHROPIC_API_KEY || process.env.LLM_API_KEY || ""
   if (!apiKey) throw new LlmNotConfiguredError()

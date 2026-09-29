@@ -61,9 +61,11 @@ export const DELETE = courseRoute<{ code: string; year: string; semester: string
     }
 
     const db = getDb()
-    const weeks = await listWeeks(db, auth.course)
-    const target = weeks.find((w) => w.id === weekId)
+    const target = await getWeekForCourse(db, auth.course, weekId)
     if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 })
+
+    // The whole list is still needed for the keep-one / last-only rules.
+    const weeks = await listWeeks(db, auth.course)
 
     if (weeks.length <= 1) {
       return NextResponse.json({ error: "ต้องมีอย่างน้อย 1 สัปดาห์" }, { status: 409 })

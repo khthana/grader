@@ -1,3 +1,5 @@
+import { supportsUnitTests } from "@/lib/languages"
+
 export interface ProblemInput {
   title?: string
   weekId?: number
@@ -35,7 +37,7 @@ export function validateProblemInput(input: ProblemInput): {
   if (input.problemType === "unit") {
     // The unit-test harness is Python-only (#64) — reject it for any other
     // course language so a C submission can never reach the Python harness.
-    if (input.language != null && input.language !== "python") {
+    if (input.language != null && !supportsUnitTests(input.language)) {
       errors.problemType = "โหมด Unit Test ใช้ได้กับภาษา Python เท่านั้น"
     }
     if (!input.unitTestCode?.trim()) {

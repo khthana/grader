@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { validateCourseInput } from "./validation"
+import { validateCourseInput, validateCourseLanguage } from "./validation"
 
 const valid = { code: "01076021", year: 2567, semester: 1, nameTh: "โครงสร้างข้อมูล", nameEn: "Data Structures" }
 
@@ -26,5 +26,16 @@ describe("validateCourseInput", () => {
     const { valid: ok, errors } = validateCourseInput({ ...valid, language: "rust" })
     expect(ok).toBe(false)
     expect(errors.language).toBeTruthy()
+  })
+})
+
+describe("validateCourseLanguage", () => {
+  it("accepts a supported language or an absent one", () => {
+    expect(validateCourseLanguage("c")).toBeUndefined()
+    expect(validateCourseLanguage(undefined)).toBeUndefined()
+  })
+
+  it("returns an error message for an unsupported language", () => {
+    expect(validateCourseLanguage("rust")).toBeTruthy()
   })
 })

@@ -3,13 +3,14 @@ import { getDb } from "@/lib/db"
 import { courseRoute } from "@/lib/courses/route"
 import { getProblemForCourse } from "@/lib/problems/repository"
 import { generateTestPlan, LlmNotConfiguredError } from "@/lib/llm"
+import { toProblemType, type ProblemType } from "@/lib/problems/problem-type"
 
 export const POST = courseRoute<{ code: string; year: string; semester: string }>(
   { manage: true },
   async (request, auth) => {
     const body = await request.json().catch(() => null)
 
-    let fields: { title: string; description: string; inputSpec?: string | null; outputSpec?: string | null; problemType?: "io" | "unit" }
+    let fields: { title: string; description: string; inputSpec?: string | null; outputSpec?: string | null; problemType?: ProblemType }
 
     if (body && typeof body.problemId === "number") {
       const db = getDb()
@@ -18,14 +19,14 @@ export const POST = courseRoute<{ code: string; year: string; semester: string }
         return NextResponse.json({ error: "Not found" }, { status: 404 })
       }
       // Prefer the request's problemType (current UI state, may be unsaved) over the DB value
-      const requestedType =
+      const requestedType: ProblemType | null =
         body.problemType === "unit" || body.problemType === "io" ? body.problemType : null
       fields = {
         title: problem.title,
         description: problem.description,
         inputSpec: problem.inputSpec,
         outputSpec: problem.outputSpec,
-        problemType: (requestedType ?? (problem.problemType === "unit" ? "unit" : "io")) as "io" | "unit",
+        problemType: requestedType ?? problem.problemType,
       }
     } else if (body && typeof body.title === "string") {
       if (!body.title.trim()) {
@@ -36,7 +37,7 @@ export const POST = courseRoute<{ code: string; year: string; semester: string }
         description: typeof body.description === "string" ? (body.description as string) : "",
         inputSpec: typeof body.inputSpec === "string" ? (body.inputSpec as string) : null,
         outputSpec: typeof body.outputSpec === "string" ? (body.outputSpec as string) : null,
-        problemType: (body.problemType === "unit" ? "unit" : "io") as "io" | "unit",
+        problemType: toProblemType(body.problemType),
       }
     } else {
       return NextResponse.json(

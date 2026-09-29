@@ -1,5 +1,5 @@
 import { TestCase, TestResult } from "@/types"
-import { getLanguageConfig } from "@/lib/languages"
+import { DEFAULT_LANGUAGE, getLanguageConfig } from "@/lib/languages"
 
 const PISTON_API = process.env.PISTON_URL ?? "https://emkc.org/api/v2/piston"
 
@@ -20,7 +20,7 @@ interface PistonResponse {
 async function runCode(
   code: string,
   input: string,
-  language = "python"
+  language: string = DEFAULT_LANGUAGE
 ): Promise<PistonResponse> {
   const cfg = getLanguageConfig(language)
   const res = await fetch(`${PISTON_API}/execute`, {
@@ -44,7 +44,7 @@ async function runCode(
 export async function runReferenceSolution(
   code: string,
   inputs: string[],
-  language = "python"
+  language: string = DEFAULT_LANGUAGE
 ): Promise<Array<{ stdout: string; stderr: string; ok: boolean }>> {
   return Promise.all(
     inputs.map(async (input) => {
@@ -161,7 +161,7 @@ async function runOneCase(
 export async function runTestCases(
   code: string,
   testCases: TestCase[],
-  language = "python"
+  language: string = DEFAULT_LANGUAGE
 ): Promise<TestResult[]> {
   if (testCases.length === 0) return []
 

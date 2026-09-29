@@ -1,3 +1,5 @@
+import type { ProblemType } from "./problem-type"
+
 // The single rule for a Problem's max score (#66). io mode: the sum of every
 // Test Case's score (PRD-unit-test-blacklist #26). Unit mode is all-or-nothing,
 // so the max is the problem's own score. Grading, the problem page, and the
@@ -10,7 +12,7 @@ export function testCaseScore(score?: number | null): number {
 }
 
 export function problemMaxScore(problem: {
-  problemType: string
+  problemType: ProblemType
   score: number
   testCases: Array<{ score?: number | null }>
 }): number {

@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { commentLine } from "@/lib/languages"
+import { commentLine, DEFAULT_LANGUAGE } from "@/lib/languages"
 import { editorExtension, editorLabel } from "./language-support"
 
 const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), { ssr: false })
@@ -19,7 +19,7 @@ export function SolutionEditor({
   onChange,
   label = "เฉลยอ้างอิง",
   placeholder,
-  language = "python",
+  language = DEFAULT_LANGUAGE,
 }: Props) {
   const langLabel = editorLabel(language)
   const ph = placeholder ?? commentLine(language, `เขียน ${langLabel} เฉลยของโจทย์ที่นี่...`)

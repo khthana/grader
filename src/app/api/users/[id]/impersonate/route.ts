@@ -2,19 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth-guard"
 import { getDb } from "@/lib/db"
 import { getUserById } from "@/lib/users/repository"
-import { createSessionToken } from "@/lib/auth"
+import { createSessionToken, SESSION_COOKIE_OPTIONS } from "@/lib/auth"
 import { canImpersonate } from "@/lib/users/impersonation"
 import { safeLog } from "@/lib/logs"
 
 type RouteContext = { params: Promise<{ id: string }> }
-
-const SESSION_COOKIE = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-  path: "/",
-  maxAge: 60 * 60 * 8, // 8 hours, matching the login session
-}
 
 // Begin impersonating a user (dev-only). Saves the Admin's current session into
 // an `impersonator` cookie and swaps `session` to a token for the target user,
@@ -52,8 +44,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
   })
 
   const response = NextResponse.json({ ok: true })
-  if (adminToken) response.cookies.set("impersonator", adminToken, SESSION_COOKIE)
-  response.cookies.set("session", targetToken, SESSION_COOKIE)
+  if (adminToken) response.cookies.set("impersonator", adminToken, SESSION_COOKIE_OPTIONS)
+  response.cookies.set("session", targetToken, SESSION_COOKIE_OPTIONS)
   response.cookies.delete("active_role")
   response.cookies.delete("active_course")
 

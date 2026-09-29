@@ -8,6 +8,17 @@ export interface SessionPayload {
 }
 
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000 // 8 hours
+
+// Cookie options for the `session` cookie (and the `impersonator` cookie that
+// holds a saved Admin session). One copy, so every issuer agrees on scope and
+// lifetime; logout reuses it with maxAge 0.
+export const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: SESSION_DURATION_MS / 1000,
+}
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-session-secret"
 
 function toBase64Url(value: string) {

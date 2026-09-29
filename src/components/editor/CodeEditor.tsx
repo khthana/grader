@@ -3,7 +3,9 @@
 import { useState, useCallback, useEffect, useRef } from "react"
 import dynamic from "next/dynamic"
 import { FaCog } from "react-icons/fa"
-import type { GradeResult } from "@/types"
+import type { GradeMode, GradeResult } from "@/types"
+import { DEFAULT_LANGUAGE } from "@/lib/languages"
+import type { ProblemType } from "@/lib/problems/problem-type"
 import { editorExtension, editorLabel } from "./language-support"
 
 const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), { ssr: false })
@@ -17,7 +19,7 @@ interface CodeEditorProps {
   draftKey?: string
   isClosed?: boolean
   starterCode?: string
-  problemType?: string
+  problemType?: ProblemType
   language?: string
 }
 
@@ -112,7 +114,7 @@ function SettingsPopover({
   )
 }
 
-export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode = "", problemType = "io", language = "python" }: CodeEditorProps) {
+export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode = "", problemType = "io", language = DEFAULT_LANGUAGE }: CodeEditorProps) {
   const key = draftKey ?? `editor-code-${problemId}`
   // Seed from the saved draft, falling back to starter code. Lazy init covers
   // mount; the render-time adjustment below reloads when the problem (key) or
@@ -128,7 +130,7 @@ export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode 
   }
   const [result, setResult] = useState<GradeResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [activeMode, setActiveMode] = useState<"run" | "submit" | null>(null)
+  const [activeMode, setActiveMode] = useState<GradeMode | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
 
@@ -141,7 +143,7 @@ export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode 
 
   const handleCloseSettings = useCallback(() => setShowSettings(false), [])
 
-  async function handleGrade(mode: "run" | "submit") {
+  async function handleGrade(mode: GradeMode) {
     if (!code.trim()) return
     setIsLoading(true)
     setActiveMode(mode)

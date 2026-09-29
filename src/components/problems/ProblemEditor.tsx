@@ -16,7 +16,8 @@ import {
 import { useToast } from "@/components/shell/ToastProvider"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { SolutionEditor } from "@/components/editor/SolutionEditor"
-import { commentLine, getLanguageConfig } from "@/lib/languages"
+import { commentLine, getLanguageConfig, supportsAiGeneration, supportsUnitTests } from "@/lib/languages"
+import { toProblemType, type ProblemType } from "@/lib/problems/problem-type"
 import { DEFAULT_TEST_CASE_SCORE, problemMaxScore, testCaseScore } from "@/lib/problems/score"
 
 interface TestCaseForm {
@@ -53,7 +54,7 @@ interface Props {
     closeAt: string | null
     language: string
     weekId: number
-    problemType: string
+    problemType: ProblemType
     functionName: string
     starterCode: string
     unitTestCode: string
@@ -75,7 +76,8 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
   // its course's language, so it is shown read-only here, never picked. Unit
   // mode + AI generation are Python-only (#64).
   const language = courseLanguage
-  const isPython = courseLanguage === "python"
+  const unitTestsAvailable = supportsUnitTests(courseLanguage)
+  const aiAvailable = supportsAiGeneration(courseLanguage)
 
   const defaultWeekId = problem?.weekId ?? initialWeekId ?? weeks[0]?.id
   const [title, setTitle] = useState(problem?.title ?? "")
@@ -91,8 +93,8 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
       ? problem.testCases.map((tc) => ({ ...tc, score: testCaseScore(tc.score) }))
       : [emptyCase(0)]
   )
-  const [problemType, setProblemType] = useState<"io" | "unit">(
-    isPython && problem?.problemType === "unit" ? "unit" : "io"
+  const [problemType, setProblemType] = useState<ProblemType>(
+    unitTestsAvailable ? toProblemType(problem?.problemType) : "io"
   )
   const [functionName, setFunctionName] = useState(problem?.functionName ?? "")
   const [starterCode, setStarterCode] = useState(problem?.starterCode ?? "")
@@ -430,7 +432,7 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
             <div className="mb-3 flex flex-wrap items-center gap-2">
               {/* Problem type toggle — Unit mode is Python-only (#64), so the
                   toggle is hidden (forced I/O) in non-Python courses. */}
-              {isPython ? (
+              {unitTestsAvailable ? (
                 <div className="flex gap-1.5 mr-auto">
                   {(["io", "unit"] as const).map((t) => (
                     <button
@@ -451,7 +453,7 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
                 <div className="mr-auto" />
               )}
               {/* Action buttons — AI generation is Python-only this release (#64). */}
-              {isPython && !llmUnavailable && (
+              {aiAvailable && !llmUnavailable && (
                 <button
                   type="button"
                   onClick={handleGenerate}
