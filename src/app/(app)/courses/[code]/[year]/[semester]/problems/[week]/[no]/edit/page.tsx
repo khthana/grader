@@ -29,7 +29,7 @@ export default async function EditProblemPage({ params }: PageProps) {
   const [weekRecord, weeks] = await Promise.all([getWeekByNo(db, slug, weekNo), listWeeks(db, slug)])
   if (!weekRecord) notFound()
 
-  const problem = await getProblemByWeekAndNo(db, weekRecord.id, problemNo)
+  const problem = await getProblemByWeekAndNo(db, slug, weekRecord.id, problemNo)
   if (!problem) notFound()
 
   // Gate rides the read: only managers of this course receive the value (the

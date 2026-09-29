@@ -27,7 +27,7 @@ export default async function ProblemSubmissionsPage({ params }: PageProps) {
   const weekRecord = await getWeekByNo(db, slug, weekNo)
   if (!weekRecord) notFound()
 
-  const problem = await getProblemByWeekAndNo(db, weekRecord.id, problemNo)
+  const problem = await getProblemByWeekAndNo(db, slug, weekRecord.id, problemNo)
   if (!problem) notFound()
 
   const pointsMax =

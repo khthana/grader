@@ -72,7 +72,7 @@ export default async function CourseProblemPage({ params }: PageProps) {
     )
   }
 
-  const problem = await getProblemByWeekAndNo(db, weekRecord.id, problemNo)
+  const problem = await getProblemByWeekAndNo(db, slug, weekRecord.id, problemNo)
   if (!problem) notFound()
   const lastSubmission =
     !isPrivileged ? await getLastSubmission(db, problem.id, user.id) : null

@@ -163,6 +163,15 @@ export async function createProblem(
     whitelist?: string[]
   }
 ): Promise<ProblemRecord> {
+  // The single-column week_id FK accepts any course's Week — refuse one that
+  // isn't this course's, whoever the caller is (#88). Routes check first and 400.
+  const { rows: week } = await db.query(
+    `SELECT 1 FROM weeks
+     WHERE id = $1::int AND course_code = $2 AND course_year = $3::int AND course_semester = $4::int`,
+    [data.weekId, data.courseCode, data.courseYear, data.courseSemester]
+  )
+  if (week.length === 0) throw new Error(`Week ${data.weekId} does not belong to course ${data.courseCode}`)
+
   const { rows } = await db.query<ProblemRow>(
     `INSERT INTO problems
        (course_code, course_year, course_semester, week_id, problem_no,
@@ -276,15 +285,18 @@ export async function getProblemForCourse(
 }
 
 // Look up a problem by its human-readable URL coordinates (weekId + problemNo).
+// Course-scoped (#88): a Week id alone doesn't prove the problem is this course's.
 export async function getProblemByWeekAndNo(
   db: Queryable,
+  key: CourseKey,
   weekId: number,
   problemNo: number
 ): Promise<ProblemDetail | null> {
   const { rows } = await db.query<ProblemRow>(
     `SELECT ${PROBLEM_COLS} FROM problems
-     WHERE week_id = $1::int AND problem_no = $2::int`,
-    [weekId, problemNo]
+     WHERE week_id = $1::int AND problem_no = $2::int
+       AND course_code = $3 AND course_year = $4::int AND course_semester = $5::int`,
+    [weekId, problemNo, key.code, key.year, key.semester]
   )
   if (!rows[0]) return null
   return getProblemById(db, rows[0].id)

@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db"
 import { courseRoute } from "@/lib/courses/route"
 import { createProblem, listProblems, setTestCases } from "@/lib/problems/repository"
 import { buildProblemDraft, type ProblemBody } from "@/lib/problems/draft"
+import { getWeekForCourse } from "@/lib/weeks/repository"
 import { countSubmitted, countPending } from "@/lib/submissions/repository"
 import { safeLog } from "@/lib/logs"
 
@@ -42,6 +43,10 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
   const { testCases: draftCases, ...draft } = result.draft
 
   const db = getDb()
+  // The Week must be this course's — the FK alone would accept any Week (#88).
+  if (!(await getWeekForCourse(db, auth.course, draft.weekId))) {
+    return NextResponse.json({ errors: { weekId: "ไม่พบสัปดาห์นี้ในรายวิชา" } }, { status: 400 })
+  }
   const problem = await createProblem(db, {
     courseCode: auth.course.code,
     courseYear: auth.course.year,

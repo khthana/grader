@@ -82,9 +82,37 @@ describe("problem repository", () => {
       courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester,
       weekId: weeks[0].id, title: "Q1",
     })
-    const found = await getProblemByWeekAndNo(db, weeks[0].id, p.problemNo)
+    const found = await getProblemByWeekAndNo(db, courseKey, weeks[0].id, p.problemNo)
     expect(found?.id).toBe(p.id)
-    expect(await getProblemByWeekAndNo(db, weeks[0].id, 999)).toBeNull()
+    expect(await getProblemByWeekAndNo(db, courseKey, weeks[0].id, 999)).toBeNull()
+  })
+
+  it("getProblemByWeekAndNo ignores a problem of another course sitting in this Week (#88)", async () => {
+    const weeks = await listWeeks(db, courseKey)
+    const other = await createCourse(db, {
+      code: "OTHER", year: courseKey.year, semester: courseKey.semester, nameTh: "ข", nameEn: "B",
+    })
+    // A row planted before #88 (createProblem now refuses it): another
+    // course's problem sitting in our Week.
+    await db.query(
+      `INSERT INTO problems (course_code, course_year, course_semester, week_id, problem_no, title)
+       VALUES ($1, $2::int, $3::int, $4::int, 1, 'planted')`,
+      [other.code, other.year, other.semester, weeks[0].id]
+    )
+    expect(await getProblemByWeekAndNo(db, courseKey, weeks[0].id, 1)).toBeNull()
+  })
+
+  it("createProblem refuses a Week of another course (#88)", async () => {
+    const weeks = await listWeeks(db, courseKey)
+    const other = await createCourse(db, {
+      code: "OTHER", year: courseKey.year, semester: courseKey.semester, nameTh: "ข", nameEn: "B",
+    })
+    await expect(
+      createProblem(db, {
+        courseCode: other.code, courseYear: other.year, courseSemester: other.semester,
+        weekId: weeks[0].id, title: "planted",
+      })
+    ).rejects.toThrow(/does not belong/)
   })
 
   it("getProblemForCourse returns the problem only for its own course, else null", async () => {

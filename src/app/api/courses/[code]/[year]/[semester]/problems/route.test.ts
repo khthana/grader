@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { NextRequest } from "next/server"
 import { GET, POST } from "./route"
-import { updateCourse } from "@/lib/courses/repository"
+import { createCourse, updateCourse } from "@/lib/courses/repository"
 import { createProblem, getProblemById } from "@/lib/problems/repository"
-import { listWeeks, setWeekReleased } from "@/lib/weeks/repository"
+import { listWeeks, seedWeeks, setWeekReleased } from "@/lib/weeks/repository"
 import { createEnrollment } from "@/lib/enrollments/repository"
 import { createUser, assignRole } from "@/lib/users/repository"
 import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
@@ -56,6 +56,20 @@ describe("POST /api/courses/[code]/[year]/[semester]/problems — language inher
     const { problem } = await res.json()
     expect(problem.language).toBe("c")
     expect((await getProblemById(f.db, problem.id))?.language).toBe("c")
+  })
+
+  it("rejects a weekId from another course and writes nothing (#88)", async () => {
+    const other = await createCourse(f.db, {
+      code: "C02", year: 2567, semester: 1, nameTh: "ข", nameEn: "B",
+    })
+    await seedWeeks(f.db, other)
+    const foreignWeekId = (await listWeeks(f.db, other))[0].id
+
+    const res = await POST(req(problemBody({ weekId: foreignWeekId })), ctx())
+    expect(res.status).toBe(400)
+    expect((await res.json()).errors.weekId).toBeTruthy()
+    const { rows } = await f.db.query<{ n: string }>("SELECT COUNT(*)::text AS n FROM problems")
+    expect(rows[0].n).toBe("0")
   })
 
   it("defaults to the course's python when the course is python", async () => {
