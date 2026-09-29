@@ -11,17 +11,41 @@ export interface LanguageConfig {
   filename: string
   // Human-readable label for editor toolbars / pickers (UI single-sources it).
   label: string
+  // Line-comment prefix, for editor placeholders written as a code comment.
+  commentPrefix: string
+  // A typical first line of starter code, shown as an example in the editor.
+  starterHint: string
 }
 
 export const LANGUAGE_CONFIG: Record<string, LanguageConfig> = {
-  python: { piston: "python", version: "3.10.0", filename: "main.py", label: "Python" },
-  c: { piston: "c", version: "10.2.0", filename: "main.c", label: "C" },
+  python: {
+    piston: "python",
+    version: "3.10.0",
+    filename: "main.py",
+    label: "Python",
+    commentPrefix: "#",
+    starterHint: "def add(a, b):",
+  },
+  c: {
+    piston: "c",
+    version: "10.2.0",
+    filename: "main.c",
+    label: "C",
+    commentPrefix: "//",
+    starterHint: "#include <stdio.h>",
+  },
 }
 
 export const DEFAULT_LANGUAGE = "python"
 
 // The languages a course may be set to — the registry keys, single-sourced.
 export const SUPPORTED_LANGUAGES = Object.keys(LANGUAGE_CONFIG)
+
+// `<select>` options for picking a course language — derived from the
+// registry, so adding a language never needs a second list (#68).
+export const LANGUAGE_OPTIONS: { value: string; label: string }[] = SUPPORTED_LANGUAGES.map(
+  (value) => ({ value, label: LANGUAGE_CONFIG[value].label })
+)
 
 // Whether a language code is one a course/problem may declare. Unlike
 // getLanguageConfig (which silently falls back to Python at execution time),
@@ -34,4 +58,9 @@ export function isSupportedLanguage(language: string): boolean {
 // unknown so a stray/blank value can never break execution.
 export function getLanguageConfig(language: string): LanguageConfig {
   return LANGUAGE_CONFIG[language] ?? LANGUAGE_CONFIG[DEFAULT_LANGUAGE]
+}
+
+// `text` as a line comment in the given language (e.g. an editor placeholder).
+export function commentLine(language: string, text: string): string {
+  return `${getLanguageConfig(language).commentPrefix} ${text}`
 }

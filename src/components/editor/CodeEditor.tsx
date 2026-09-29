@@ -152,7 +152,7 @@ export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode 
       const res = await fetch("/api/grade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ problemId, code, language, mode }),
+        body: JSON.stringify({ problemId, code, mode }),
       })
 
       const data = await res.json()

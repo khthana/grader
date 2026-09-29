@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { resolveActiveCourse, canMutateRoster, canManageCourses, isTeachingStaff, canChangeCourseLanguage } from "./access"
+import { resolveActiveCourse, canMutateRoster, canManageCourses, isTeachingStaff, canChangeCourseLanguage, isCourseLanguageLocked } from "./access"
 import type { CourseRecord } from "./types"
 
 const courses: CourseRecord[] = [
@@ -84,5 +84,15 @@ describe("canChangeCourseLanguage", () => {
 
   it("allows a same-value submit even with problems (so name-only edits work)", () => {
     expect(canChangeCourseLanguage({ current: "c", desired: "c", problemCount: 5 })).toBe(true)
+  })
+})
+
+describe("isCourseLanguageLocked (#68)", () => {
+  it("is unlocked while the course has no problems", () => {
+    expect(isCourseLanguageLocked(0)).toBe(false)
+  })
+
+  it("is locked once the course has a problem", () => {
+    expect(isCourseLanguageLocked(1)).toBe(true)
   })
 })

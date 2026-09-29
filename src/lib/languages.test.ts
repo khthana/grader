@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { getLanguageConfig, isSupportedLanguage, SUPPORTED_LANGUAGES } from "./languages"
+import { getLanguageConfig, isSupportedLanguage, SUPPORTED_LANGUAGES, LANGUAGE_OPTIONS, commentLine } from "./languages"
 
 describe("getLanguageConfig", () => {
   it("returns the C runtime config (Piston c / gcc 10.2.0 / main.c)", () => {
@@ -34,5 +34,28 @@ describe("supported languages", () => {
     expect(isSupportedLanguage("c")).toBe(true)
     expect(isSupportedLanguage("rust")).toBe(false)
     expect(isSupportedLanguage("")).toBe(false)
+  })
+})
+
+describe("picker options (#68)", () => {
+  it("lists every supported language with its label, in registry order", () => {
+    expect(LANGUAGE_OPTIONS).toEqual(
+      SUPPORTED_LANGUAGES.map((value) => ({ value, label: getLanguageConfig(value).label }))
+    )
+    expect(LANGUAGE_OPTIONS).toContainEqual({ value: "c", label: "C" })
+  })
+})
+
+describe("commentLine (#68)", () => {
+  it("uses # for Python", () => {
+    expect(commentLine("python", "hint")).toBe("# hint")
+  })
+
+  it("uses // for C", () => {
+    expect(commentLine("c", "hint")).toBe("// hint")
+  })
+
+  it("falls back to Python's prefix for an unknown language", () => {
+    expect(commentLine("rust", "hint")).toBe("# hint")
   })
 })

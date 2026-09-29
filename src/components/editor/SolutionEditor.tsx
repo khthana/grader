@@ -1,6 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
+import { commentLine } from "@/lib/languages"
 import { editorExtension, editorLabel } from "./language-support"
 
 const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), { ssr: false })
@@ -21,7 +22,7 @@ export function SolutionEditor({
   language = "python",
 }: Props) {
   const langLabel = editorLabel(language)
-  const ph = placeholder ?? `// เขียน ${langLabel} เฉลยของโจทย์ที่นี่...`
+  const ph = placeholder ?? commentLine(language, `เขียน ${langLabel} เฉลยของโจทย์ที่นี่...`)
   return (
     <div className="overflow-hidden rounded-lg border border-gray-700">
       <div className="border-b border-gray-700/60 bg-[#1e1e2e] px-3 py-1.5">

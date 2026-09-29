@@ -52,8 +52,8 @@
 - C is **io mode only**. Unit-test mode stays **Python only**.
 
 ### Deep module — Language Registry (new)
-- A single `LANGUAGE_CONFIG` map keyed by language code → `{ label, piston, version, filename }`, plus helpers `getLanguageConfig(lang)` (fallback to python), `isSupportedLanguage(lang)`, and `SUPPORTED_LANGUAGES`.
-- Consumed by: the Piston runner, the course form language dropdown, course validation, and the code editors' CodeMirror mode selection. This is the only place that knows language facts; adding C++/Java later = one new entry.
+- A single `LANGUAGE_CONFIG` map keyed by language code → `{ label, piston, version, filename, commentPrefix, starterHint }`, plus helpers `getLanguageConfig(lang)` (fallback to python), `isSupportedLanguage(lang)`, `SUPPORTED_LANGUAGES`, `LANGUAGE_OPTIONS` (the course-form `<select>` options) and `commentLine(lang, text)` (editor placeholders written as a comment — `#` for Python, `//` for C).
+- Consumed by: the Piston runner, the course form language dropdown, course validation, and the code editors' CodeMirror mode selection. This is the only place that knows language facts; adding C++/Java later = one new entry (plus its CodeMirror grammar in `language-support.ts`, which is kept client-side — a test fails if a registry language lacks one).
 
 ### Piston runner (interface extension)
 - `runCode(code, input, language)`, `runReferenceSolution(code, inputs, language)`, `runTestCases(code, testCases, language)` all take a language; `runCode` builds `files: [{ name: filename, content }]` and passes the runtime/version from the registry.
@@ -76,12 +76,12 @@
 
 ### UI
 - Course form dialog: a language `<select>` populated from `SUPPORTED_LANGUAGES`; in edit mode it is disabled (with an explanatory note) when the course already has problems. The dialog learns the problem count from `GET /api/courses/{slug}`, which already returns `counts`.
-- Problem editor: receives the course language; the language field is read-only and shows the course language; the "สร้างด้วย AI" button is hidden when the course language is not Python; `language` is passed to the reference-solution editor and included in the "รันเฉลย" request body.
+- Problem editor: receives the course language; the language field is read-only and shows the course language; the "สร้างด้วย AI" button is hidden when the course language is not Python; `language` is passed to the reference-solution editor. The "รันเฉลย" request body does **not** carry `language` — the route uses the course language (see below).
 - Code editor & reference-solution editor: receive a `language` prop and pick the CodeMirror extension from the registry (`python()` ↔ `cpp()` for C); toolbar label and placeholder become dynamic. The student problem page passes `problem.language`.
 - New dependency: `@codemirror/lang-cpp` (covers C highlighting).
 
 ### run-reference route
-- Accepts `language` in the request body and forwards it to `runReferenceSolution` (defaults to python when absent).
+- Runs the reference solution in `auth.course.language` (server-authoritative, like problem create/update); a `language` field in the request body is ignored.
 
 ### Infrastructure
 - `schema.sql` adds `courses.language`; migration `scripts/migrate-007-course-language.sql` applies it to existing DBs (`ADD COLUMN IF NOT EXISTS`).

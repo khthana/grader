@@ -1,8 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { FaTimes } from "react-icons/fa"
 import { validateCourseInput } from "@/lib/courses/validation"
+import { isCourseLanguageLocked } from "@/lib/courses/access"
+import { courseSlugString } from "@/lib/courses/slug"
+import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS } from "@/lib/languages"
 import { useToast } from "@/components/shell/ToastProvider"
 
 export interface CourseValue {
@@ -14,12 +17,6 @@ export interface CourseValue {
   program: string | null
   language: string
 }
-
-// Languages a course may use (mirrors the server registry's SUPPORTED_LANGUAGES).
-const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
-  { value: "python", label: "Python" },
-  { value: "c", label: "C" },
-]
 
 type FormState = { code: string; year: string; semester: string; nameTh: string; nameEn: string; program: string; language: string }
 
@@ -39,10 +36,36 @@ export function CourseFormDialog({ course, onClose, onSaved }: Props) {
     nameTh: course?.nameTh ?? "",
     nameEn: course?.nameEn ?? "",
     program: course?.program ?? "",
-    language: course?.language ?? "python",
+    language: course?.language ?? DEFAULT_LANGUAGE,
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
+  // Edit mode: the language is frozen once the course has problems. Until the
+  // count arrives (or if it can't be fetched) the picker stays enabled — the
+  // PUT route's 409 remains the real guard.
+  const [problemCount, setProblemCount] = useState<number | null>(null)
+  const languageLocked = problemCount !== null && isCourseLanguageLocked(problemCount)
+  const courseSlug = course ? courseSlugString(course) : null
+  const storedLanguage = course?.language ?? DEFAULT_LANGUAGE
+
+  useEffect(() => {
+    if (!courseSlug) return
+    let cancelled = false
+    fetch(`/api/courses/${courseSlug}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { counts?: { problems: number } } | null) => {
+        if (cancelled || !body?.counts) return
+        const count = body.counts.problems
+        setProblemCount(count)
+        // A pick made before the count arrived can't be saved once locked —
+        // snap back to the stored language so the disabled select is honest.
+        if (isCourseLanguageLocked(count)) setForm((f) => ({ ...f, language: storedLanguage }))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [courseSlug, storedLanguage])
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -146,14 +169,21 @@ export function CourseFormDialog({ course, onClose, onSaved }: Props) {
           <Field
             label="ภาษาโปรแกรม *"
             error={errors.language}
-            hint={isEdit ? "เปลี่ยนได้เฉพาะเมื่อรายวิชายังไม่มีโจทย์" : undefined}
+            hint={
+              languageLocked
+                ? `เปลี่ยนไม่ได้ — รายวิชานี้มีโจทย์แล้ว ${problemCount} ข้อ`
+                : isEdit
+                  ? "เปลี่ยนได้เฉพาะเมื่อรายวิชายังไม่มีโจทย์"
+                  : undefined
+            }
           >
             <select
               value={form.language}
               onChange={(e) => set("language", e.target.value)}
+              disabled={languageLocked}
               className={`mt-1 w-full rounded-xl border bg-slate-50 px-4 py-2.5 text-sm transition focus:border-transparent focus:outline-none focus:ring-2 ${
                 errors.language ? "border-red-300 focus:ring-red-400" : "border-slate-200 focus:ring-blue-500"
-              }`}
+              } disabled:cursor-not-allowed disabled:opacity-60`}
             >
               {LANGUAGE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>

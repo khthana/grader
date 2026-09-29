@@ -40,11 +40,15 @@ a HITL contract-verification spike (#61).
 ### Single language registry
 
 `src/lib/languages.ts` is the one source of truth for per-language facts:
-`LanguageConfig = { piston, version, filename, label }`, keyed by language code
+`LanguageConfig = { piston, version, filename, label, commentPrefix, starterHint }`, keyed by language code
 (`python`, `c`). It exposes `getLanguageConfig(lang)` (silent fallback to Python for
 unknown/blank values — execution can never break), `isSupportedLanguage(lang)` (strict
-check for validating user input), and `SUPPORTED_LANGUAGES`. Adding a future language
-(C++, Java, …) is one new entry here plus its Piston package in `piston-init`.
+check for validating user input), `SUPPORTED_LANGUAGES`, `LANGUAGE_OPTIONS` (the course
+form's `<select>`) and `commentLine(lang, text)` (comment-style editor placeholders).
+Adding a future language (C++, Java, …) is one new entry here plus its Piston package
+in `piston-init` and its CodeMirror grammar in `src/components/editor/language-support.ts`
+(kept out of the pure registry so server code never imports CodeMirror; a test fails
+if a registry language has no grammar).
 
 ### Per-course binding, server-authoritative inheritance
 
@@ -68,6 +72,8 @@ registry; for a compiled language a non-zero `compile.code` means the source nev
 — the gcc diagnostics are surfaced as the error and, for `runTestCases`, the run
 **short-circuits to a single compile-error result** instead of recompiling once per
 test case. The grading module and grade route thread `problem.language` through.
+The run-reference route likewise uses `auth.course.language`, never a client-sent
+language — the language is server-authoritative on every path.
 
 ### C is I/O-mode only
 

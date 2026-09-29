@@ -16,7 +16,7 @@ import {
 import { useToast } from "@/components/shell/ToastProvider"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { SolutionEditor } from "@/components/editor/SolutionEditor"
-import { getLanguageConfig } from "@/lib/languages"
+import { commentLine, getLanguageConfig } from "@/lib/languages"
 import { DEFAULT_TEST_CASE_SCORE, problemMaxScore, testCaseScore } from "@/lib/problems/score"
 
 interface TestCaseForm {
@@ -407,7 +407,7 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
                   onChange={setStarterCode}
                   label="Starter Code"
                   language={language}
-                  placeholder={language === "c" ? "// โค้ดตั้งต้นสำหรับนักศึกษา เช่น #include <stdio.h>" : "# โค้ดตั้งต้นสำหรับนักศึกษา เช่น def add(a, b):"}
+                  placeholder={commentLine(language, `โค้ดตั้งต้นสำหรับนักศึกษา เช่น ${getLanguageConfig(language).starterHint}`)}
                 />
               </>
             ) : (

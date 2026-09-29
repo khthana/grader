@@ -37,7 +37,13 @@ export function canChangeCourseLanguage(opts: {
   problemCount: number
 }): boolean {
   if (opts.desired === opts.current) return true
-  return opts.problemCount === 0
+  return !isCourseLanguageLocked(opts.problemCount)
+}
+
+// Whether the course-language picker should be disabled: problems inherit the
+// language at creation, so it is frozen once the course has any (#68).
+export function isCourseLanguageLocked(problemCount: number): boolean {
+  return problemCount > 0
 }
 
 // Pick the active course from the user's entitled courses. Prefer the slug
