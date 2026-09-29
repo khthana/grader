@@ -87,7 +87,7 @@ describe("gradebook repository", () => {
 
   it("manual score override supersedes pointsEarned", async () => {
     const s = await createSubmission(db, makeSub({ pointsEarned: 3 }))
-    await reviewSubmission(db, s.id, { manualScore: 9, reviewedBy: instructorId })
+    await reviewSubmission(db, { id: s.id, problemId: s.problemId }, { manualScore: 9, reviewedBy: instructorId })
 
     const gb = await getGradebook(db, course)
     expect(gb.students[0].scores[problemId]).toBe(9)

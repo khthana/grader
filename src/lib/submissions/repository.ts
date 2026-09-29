@@ -162,17 +162,21 @@ export async function getSubmission(
   return rows[0] ? toRecord(rows[0]) : null
 }
 
+// Record a manual review. Scoped to the submission's problem: the write only
+// lands when `id` belongs to `problemId`, so a caller that has authorized a
+// problem can never touch another problem's (or course's) submission (#72).
+// Returns null — nothing written — on a mismatch or unknown id.
 export async function reviewSubmission(
   db: Queryable,
-  id: number,
+  { id, problemId }: { id: number; problemId: number },
   { manualScore, reviewedBy }: { manualScore: number | null; reviewedBy: number }
 ): Promise<SubmissionRecord | null> {
   const { rows } = await db.query<SubmissionRow>(
     `UPDATE submissions
-     SET manual_score = $2, reviewed_by = $3::int, reviewed_at = NOW()
-     WHERE id = $1::int
+     SET manual_score = $3, reviewed_by = $4::int, reviewed_at = NOW()
+     WHERE id = $1::int AND problem_id = $2::int
      RETURNING ${SUB_COLS}`,
-    [id, manualScore, reviewedBy]
+    [id, problemId, manualScore, reviewedBy]
   )
   return rows[0] ? toRecord(rows[0]) : null
 }

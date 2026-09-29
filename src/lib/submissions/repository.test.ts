@@ -105,16 +105,25 @@ describe("submission repository", () => {
 
   it("reviewSubmission sets manual_score, reviewed_by, reviewed_at", async () => {
     const s = await createSubmission(db, makeSub({ pointsEarned: 3 }))
-    const reviewed = await reviewSubmission(db, s.id, { manualScore: 8, reviewedBy: instructorId })
+    const reviewed = await reviewSubmission(db, { id: s.id, problemId: s.problemId }, { manualScore: 8, reviewedBy: instructorId })
     expect(reviewed).not.toBeNull()
     expect(reviewed!.manualScore).toBe(8)
     expect(reviewed!.reviewedBy).toBe(instructorId)
     expect(reviewed!.reviewedAt).not.toBeNull()
   })
 
+  it("reviewSubmission only touches a submission of the given problem (#72)", async () => {
+    const s = await createSubmission(db, makeSub({ pointsEarned: 3 }))
+    const reviewed = await reviewSubmission(db, { id: s.id, problemId: problemId + 999 }, { manualScore: 8, reviewedBy: instructorId })
+    expect(reviewed).toBeNull()
+    const row = await getSubmission(db, s.id)
+    expect(row!.manualScore).toBeNull()
+    expect(row!.reviewedAt).toBeNull()
+  })
+
   it("reviewSubmission with manualScore null still sets reviewed_at", async () => {
     const s = await createSubmission(db, makeSub())
-    const reviewed = await reviewSubmission(db, s.id, { manualScore: null, reviewedBy: instructorId })
+    const reviewed = await reviewSubmission(db, { id: s.id, problemId: s.problemId }, { manualScore: null, reviewedBy: instructorId })
     expect(reviewed!.manualScore).toBeNull()
     expect(reviewed!.reviewedAt).not.toBeNull()
   })
@@ -122,7 +131,7 @@ describe("submission repository", () => {
   it("after reviewSubmission, countPending decreases", async () => {
     const s = await createSubmission(db, makeSub({ pointsEarned: 5 }))
     expect(await countPending(db, problemId)).toBe(1)
-    await reviewSubmission(db, s.id, { manualScore: 5, reviewedBy: instructorId })
+    await reviewSubmission(db, { id: s.id, problemId: s.problemId }, { manualScore: 5, reviewedBy: instructorId })
     expect(await countPending(db, problemId)).toBe(0)
   })
 
@@ -169,7 +178,7 @@ describe("submission repository", () => {
     const s = await createSubmission(db, makeSub({ pointsEarned: 5 }))
     expect(await listPendingSubmissions(db, course)).toHaveLength(1)
 
-    await reviewSubmission(db, s.id, { manualScore: null, reviewedBy: instructorId })
+    await reviewSubmission(db, { id: s.id, problemId: s.problemId }, { manualScore: null, reviewedBy: instructorId })
     expect(await listPendingSubmissions(db, course)).toHaveLength(0)
   })
 

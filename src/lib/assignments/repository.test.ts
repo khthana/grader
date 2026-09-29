@@ -117,7 +117,7 @@ describe("assignments repository", () => {
       isLate: false,
       results: [],
     })
-    await reviewSubmission(db, sub.id, { manualScore: 10, reviewedBy: instructorId })
+    await reviewSubmission(db, { id: sub.id, problemId: sub.problemId }, { manualScore: 10, reviewedBy: instructorId })
 
     const items = await getStudentAssignments(db, course, studentId)
     expect(items[0].submission!.reviewedAt).not.toBeNull()
@@ -137,7 +137,7 @@ describe("assignments repository", () => {
       isLate: true,
       results: [],
     })
-    await reviewSubmission(db, sub.id, { manualScore: 8, reviewedBy: instructorId })
+    await reviewSubmission(db, { id: sub.id, problemId: sub.problemId }, { manualScore: 8, reviewedBy: instructorId })
 
     const items = await getStudentAssignments(db, course, studentId)
     expect(items[0].submission!.manualScore).toBe(8)

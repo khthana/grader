@@ -140,7 +140,7 @@ describe("GET /api/courses/[code]/[year]/[semester]/assignments", () => {
       isLate: false,
       results: [],
     })
-    await reviewSubmission(f.db, sub.id, { manualScore: 10, reviewedBy: f.ins.id })
+    await reviewSubmission(f.db, { id: sub.id, problemId: sub.problemId }, { manualScore: 10, reviewedBy: f.ins.id })
 
     const res = await GET(req(sessionFor("stu3@kmitl.ac.th")), ctx())
     const body = await res.json()
