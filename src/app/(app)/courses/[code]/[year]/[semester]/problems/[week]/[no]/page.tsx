@@ -9,6 +9,7 @@ import { getProblemByWeekAndNo } from "@/lib/problems/repository"
 import { canSeeWeek } from "@/lib/problems/problem-access"
 import { problemMaxScore } from "@/lib/problems/score"
 import { sampleTestCases } from "@/lib/problems/student-view"
+import { submissionWindow } from "@/lib/problems/submission-window"
 import { getWeekByNo } from "@/lib/weeks/repository"
 import { getCourseAccess } from "@/lib/courses/server"
 import { getLastSubmission } from "@/lib/submissions/repository"
@@ -80,9 +81,10 @@ export default async function CourseProblemPage({ params }: PageProps) {
 
   const visibleCases = sampleTestCases(problem)
   const dueDate = formatDate(problem.dueAt)
-  const now = new Date()
-  const isClosed = problem.closeAt ? new Date(problem.closeAt) < now : false
-  const isLateWindow = !isClosed && problem.dueAt ? new Date(problem.dueAt) < now : false
+  // Same rule as the grade route (ADR 0002, #87).
+  const deadlineState = submissionWindow(problem, new Date())
+  const isClosed = deadlineState === "closed"
+  const isLateWindow = deadlineState === "late"
   const pointsMax = problemMaxScore(problem)
   const effectiveScore = lastSubmission?.manualScore ?? lastSubmission?.pointsEarned ?? null
   const coursePath = buildCoursePath(slug)

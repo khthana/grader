@@ -9,32 +9,34 @@ const EXACTLY_NOW = NOW.toISOString()
 describe("deriveAssignmentStatus", () => {
   it("is not-submitted when there is no submission and closeAt is null", () => {
     expect(
-      deriveAssignmentStatus({ closeAt: null, submission: null }, NOW)
+      deriveAssignmentStatus({ dueAt: null, closeAt: null, submission: null }, NOW)
     ).toBe("not-submitted")
   })
 
   it("is not-submitted when there is no submission and closeAt is in the future", () => {
     expect(
-      deriveAssignmentStatus({ closeAt: FUTURE, submission: null }, NOW)
+      deriveAssignmentStatus({ dueAt: null, closeAt: FUTURE, submission: null }, NOW)
     ).toBe("not-submitted")
   })
 
-  it("is closed when closeAt is exactly now (boundary)", () => {
+  // Past only strictly after close_at — the grade route still accepts at that
+  // instant, so the badge must not say closed yet (#87).
+  it("is not-submitted when closeAt is exactly now (boundary)", () => {
     expect(
-      deriveAssignmentStatus({ closeAt: EXACTLY_NOW, submission: null }, NOW)
-    ).toBe("closed")
+      deriveAssignmentStatus({ dueAt: null, closeAt: EXACTLY_NOW, submission: null }, NOW)
+    ).toBe("not-submitted")
   })
 
   it("is closed when there is no submission and closeAt is in the past", () => {
     expect(
-      deriveAssignmentStatus({ closeAt: PAST, submission: null }, NOW)
+      deriveAssignmentStatus({ dueAt: null, closeAt: PAST, submission: null }, NOW)
     ).toBe("closed")
   })
 
   it("is pending when submission exists but reviewedAt is null", () => {
     expect(
       deriveAssignmentStatus(
-        { closeAt: PAST, submission: { reviewedAt: null } },
+        { dueAt: null, closeAt: PAST, submission: { reviewedAt: null } },
         NOW
       )
     ).toBe("pending")
@@ -43,7 +45,7 @@ describe("deriveAssignmentStatus", () => {
   it("is reviewed when submission has a non-null reviewedAt", () => {
     expect(
       deriveAssignmentStatus(
-        { closeAt: PAST, submission: { reviewedAt: "2026-06-11T10:00:00Z" } },
+        { dueAt: null, closeAt: PAST, submission: { reviewedAt: "2026-06-11T10:00:00Z" } },
         NOW
       )
     ).toBe("reviewed")

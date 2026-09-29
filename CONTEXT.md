@@ -135,6 +135,13 @@ The hard cutoff on a **Problem** (`close_at TIMESTAMPTZ NULLABLE`). Submissions 
 this timestamp are rejected by `/api/grade` with 403. If `close_at` is NULL submissions
 are accepted indefinitely (subject to the Due Date late flag only).
 
+### Submission Window
+The state of a **Problem** at a given instant, from its **Due Date** and **Close Date**
+(ADR 0002): **open** → **late** (past the Due Date) → **closed** (past the Close Date,
+checked first). A deadline is past only strictly after its instant; a NULL one never
+passes. `submissionWindow(problem, now)` is the one definition — the grade route, the
+problem page and the student's assignment badges all ask it.
+
 ### Late Submission
 A **Submission** made after the **Due Date** but before the **Close Date**. Stored as
 `is_late = true`. Instructors can filter the student list by late submissions.

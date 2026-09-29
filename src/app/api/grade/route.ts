@@ -6,6 +6,7 @@ import { findEnrollment } from "@/lib/enrollments/repository"
 import { createSubmission } from "@/lib/submissions/repository"
 import { gradeSubmission } from "@/lib/grading"
 import { gradeResultFor } from "@/lib/problems/student-view"
+import { submissionWindow } from "@/lib/problems/submission-window"
 import { resolveProblemVisibility } from "@/lib/problems/problem-access"
 
 export async function POST(request: NextRequest) {
@@ -38,11 +39,11 @@ export async function POST(request: NextRequest) {
   const { problem, access } = visibility
 
   const runMode = mode === "run" ? "run" : "submit"
+  // One clock read per request: the close check and is_late agree (ADR 0002, #87).
+  const deadlineState = submissionWindow(problem, new Date())
 
   if (runMode === "submit") {
-    // Deadline enforcement (ADR 0002): close_at checked first.
-    const now = new Date()
-    if (problem.closeAt && new Date(problem.closeAt) < now) {
+    if (deadlineState === "closed") {
       return NextResponse.json({ error: "หมดเวลาส่งงานแล้ว" }, { status: 403 })
     }
 
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
   // violation (a violation is not a graded attempt; preserves pre-refactor
   // behavior where the route returned before persisting).
   if (runMode === "submit" && !result.policyViolations?.length) {
-    const isLate = problem.dueAt ? new Date(problem.dueAt) < new Date() : false
+    const isLate = deadlineState === "late"
     await createSubmission(db, {
       problemId: problem.id,
       userId: user.id,
