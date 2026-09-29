@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSessionToken, SESSION_COOKIE_OPTIONS } from '@/lib/auth'
 import { getDb } from '@/lib/db'
 import { findUserByEmail } from '@/lib/users/repository'
+import { OAUTH_STATE_COOKIE, OAUTH_STATE_COOKIE_OPTIONS, oauthStateMatches } from '@/lib/oauth-state'
 
 interface GoogleTokenResponse {
   access_token: string
@@ -18,6 +19,13 @@ interface GoogleUserInfo {
 }
 
 export async function GET(req: NextRequest) {
+  // The state cookie is single-use: clear it on every way out of the callback.
+  const response = await handleCallback(req)
+  response.cookies.set(OAUTH_STATE_COOKIE, '', { ...OAUTH_STATE_COOKIE_OPTIONS, maxAge: 0 })
+  return response
+}
+
+async function handleCallback(req: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
   const error = searchParams.get('error')
@@ -28,6 +36,12 @@ export async function GET(req: NextRequest) {
 
   const loginWithError = (reason: string) =>
     NextResponse.redirect(new URL(`/login?error=${reason}`, baseUrl))
+
+  // Login CSRF (#76): only finish a flow this browser started. Checked before
+  // anything else, so a forged callback never reaches Google or the DB.
+  if (!oauthStateMatches(req.cookies.get(OAUTH_STATE_COOKIE)?.value, searchParams.get('state'))) {
+    return loginWithError('invalid_state')
+  }
 
   if (error || !code) {
     return loginWithError('google_cancelled')

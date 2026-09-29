@@ -61,6 +61,7 @@ const LOGIN_ERROR_MESSAGES: Record<string, string> = {
   not_registered: MSG_NOT_REGISTERED,
   inactive: MSG_INACTIVE,
   session_ended: MSG_SESSION_ENDED,
+  invalid_state: MSG_GOOGLE_FAIL,
 }
 
 interface Errors {
