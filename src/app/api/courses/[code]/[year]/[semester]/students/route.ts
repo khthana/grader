@@ -15,7 +15,8 @@ function parsePositiveInt(value: string | null, fallback: number, max?: number):
   return max ? Math.min(n, max) : n
 }
 
-export const GET = courseRoute({}, async (request, auth) => {
+// Roster: teaching staff only — TA read-only, Student no access (ADR 0001).
+export const GET = courseRoute({ staff: true }, async (request, auth) => {
   const { course } = auth
   const db = getDb()
   const { searchParams } = new URL(request.url)

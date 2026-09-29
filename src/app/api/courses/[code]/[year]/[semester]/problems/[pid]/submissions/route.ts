@@ -5,7 +5,8 @@ import { getProblemById } from "@/lib/problems/repository"
 import { listSubmissionsForProblem } from "@/lib/submissions/repository"
 
 export const GET = courseRoute<{ code: string; year: string; semester: string; pid: string }>(
-  {},
+  // Other students' submissions — Admin/Instructor only, like the review pages (ADR 0005).
+  { manage: true },
   async (_request, auth, { pid }) => {
     const problemId = Number.parseInt(pid, 10)
     if (!Number.isFinite(problemId)) {

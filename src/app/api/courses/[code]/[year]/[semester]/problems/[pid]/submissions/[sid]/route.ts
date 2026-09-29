@@ -11,7 +11,8 @@ export const GET = courseRoute<{
   pid: string
   sid: string
 }>(
-  {},
+  // Returns another student's code — Admin/Instructor only (ADR 0005).
+  { manage: true },
   async (_request, auth, { pid, sid }) => {
     const problemId = Number.parseInt(pid, 10)
     const submissionId = Number.parseInt(sid, 10)
