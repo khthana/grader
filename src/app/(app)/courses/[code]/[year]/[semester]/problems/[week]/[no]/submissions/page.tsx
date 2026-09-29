@@ -4,6 +4,7 @@ import { FaArrowLeft } from "react-icons/fa"
 import { getDb } from "@/lib/db"
 import { parseCourseSlug, buildCoursePath, courseSlugString } from "@/lib/courses/slug"
 import { getProblemByWeekAndNo } from "@/lib/problems/repository"
+import { problemMaxScore } from "@/lib/problems/score"
 import { getWeekByNo } from "@/lib/weeks/repository"
 import { getCourseAccess } from "@/lib/courses/server"
 import { SubmissionsTable } from "@/components/submissions/SubmissionsTable"
@@ -30,10 +31,8 @@ export default async function ProblemSubmissionsPage({ params }: PageProps) {
   const problem = await getProblemByWeekAndNo(db, slug, weekRecord.id, problemNo)
   if (!problem) notFound()
 
-  const pointsMax =
-    problem.problemType === "unit"
-      ? problem.score
-      : problem.testCases.reduce((sum, tc) => sum + (tc.score ?? 0), 0)
+  // The one max-score rule (#66) — never a page-local formula (#86).
+  const pointsMax = problemMaxScore(problem)
   const coursePath = buildCoursePath(slug)
   const courseSlug = courseSlugString(slug)
 

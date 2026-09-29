@@ -1,4 +1,4 @@
-import { supportsUnitTests } from "@/lib/languages"
+import { isProblemTypeAllowed, toProblemType } from "./problem-type"
 
 export interface ProblemInput {
   title?: string
@@ -33,13 +33,14 @@ export function validateProblemInput(input: ProblemInput): {
     errors.score = "คะแนนโจทย์ต้องไม่ต่ำกว่า 0"
   }
 
+  // A type the course language can't use is rejected (#64, #86) — e.g. unit
+  // in a C course, so a C submission can never reach the Python harness.
+  if (input.language != null && !isProblemTypeAllowed(toProblemType(input.problemType), input.language)) {
+    errors.problemType = "โหมด Unit Test ใช้ได้กับภาษา Python เท่านั้น"
+  }
+
   // Unit mode (#55) uses a single test-code block instead of per-case test cases.
   if (input.problemType === "unit") {
-    // The unit-test harness is Python-only (#64) — reject it for any other
-    // course language so a C submission can never reach the Python harness.
-    if (input.language != null && !supportsUnitTests(input.language)) {
-      errors.problemType = "โหมด Unit Test ใช้ได้กับภาษา Python เท่านั้น"
-    }
     if (!input.unitTestCode?.trim()) {
       errors.unitTestCode = "ต้องระบุ Unit Test Code สำหรับโจทย์ประเภท Unit Test"
     }

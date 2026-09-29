@@ -30,6 +30,12 @@ describe("problemMaxScore", () => {
     ).toBe(DEFAULT_TEST_CASE_SCORE + 5)
   })
 
+  it("io mode: a null case score is the default too, not 0 (#86 submissions page drift)", () => {
+    expect(
+      problemMaxScore({ problemType: "io", score: 0, testCases: [{ score: null }, { score: 5 }] })
+    ).toBe(DEFAULT_TEST_CASE_SCORE + 5)
+  })
+
   it("unit mode: the problem's own score (all-or-nothing)", () => {
     expect(
       problemMaxScore({ problemType: "unit", score: 40, testCases: [{ score: 5 }] })

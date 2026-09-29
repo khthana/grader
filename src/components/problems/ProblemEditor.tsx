@@ -16,8 +16,13 @@ import {
 import { useToast } from "@/components/shell/ToastProvider"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { SolutionEditor } from "@/components/editor/SolutionEditor"
-import { commentLine, getLanguageConfig, supportsAiGeneration, supportsUnitTests } from "@/lib/languages"
-import { toProblemType, type ProblemType } from "@/lib/problems/problem-type"
+import { commentLine, getLanguageConfig } from "@/lib/languages"
+import {
+  canGenerateTests,
+  isProblemTypeAllowed,
+  toProblemType,
+  type ProblemType,
+} from "@/lib/problems/problem-type"
 import { DEFAULT_TEST_CASE_SCORE, problemMaxScore, testCaseScore } from "@/lib/problems/score"
 
 interface TestCaseForm {
@@ -74,10 +79,10 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
 
   // Problems are server-authoritative on language (#63): a problem always uses
   // its course's language, so it is shown read-only here, never picked. Unit
-  // mode + AI generation are Python-only (#64).
+  // mode + AI generation are Python-only (#64) — the same capability rules the
+  // server enforces (#86).
   const language = courseLanguage
-  const unitTestsAvailable = supportsUnitTests(courseLanguage)
-  const aiAvailable = supportsAiGeneration(courseLanguage)
+  const unitTestsAvailable = isProblemTypeAllowed("unit", courseLanguage)
 
   const defaultWeekId = problem?.weekId ?? initialWeekId ?? weeks[0]?.id
   const [title, setTitle] = useState(problem?.title ?? "")
@@ -96,6 +101,7 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
   const [problemType, setProblemType] = useState<ProblemType>(
     unitTestsAvailable ? toProblemType(problem?.problemType) : "io"
   )
+  const aiAvailable = canGenerateTests(problemType, courseLanguage)
   const [functionName, setFunctionName] = useState(problem?.functionName ?? "")
   const [starterCode, setStarterCode] = useState(problem?.starterCode ?? "")
   const [unitTestCode, setUnitTestCode] = useState(problem?.unitTestCode ?? "")

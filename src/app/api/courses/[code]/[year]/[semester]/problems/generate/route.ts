@@ -3,14 +3,19 @@ import { getDb } from "@/lib/db"
 import { courseRoute } from "@/lib/courses/route"
 import { getProblemForCourse } from "@/lib/problems/repository"
 import { generateTestPlan, LlmNotConfiguredError } from "@/lib/llm"
-import { toProblemType, type ProblemType } from "@/lib/problems/problem-type"
+import { canGenerateTests, isProblemType, toProblemType, type ProblemType } from "@/lib/problems/problem-type"
 
 export const POST = courseRoute<{ code: string; year: string; semester: string }>(
   { manage: true },
   async (request, auth) => {
     const body = await request.json().catch(() => null)
+    // A malformed type is rejected, not defaulted — defaulting to io would
+    // silently override a stored unit problem in edit mode.
+    if (body?.problemType != null && !isProblemType(body.problemType)) {
+      return NextResponse.json({ error: "problemType must be io or unit" }, { status: 400 })
+    }
 
-    let fields: { title: string; description: string; inputSpec?: string | null; outputSpec?: string | null; problemType?: ProblemType }
+    let fields: { title: string; description: string; inputSpec?: string | null; outputSpec?: string | null; problemType: ProblemType }
 
     if (body && typeof body.problemId === "number") {
       const db = getDb()
@@ -18,15 +23,13 @@ export const POST = courseRoute<{ code: string; year: string; semester: string }
       if (!problem) {
         return NextResponse.json({ error: "Not found" }, { status: 404 })
       }
-      // Prefer the request's problemType (current UI state, may be unsaved) over the DB value
-      const requestedType: ProblemType | null =
-        body.problemType === "unit" || body.problemType === "io" ? body.problemType : null
       fields = {
         title: problem.title,
         description: problem.description,
         inputSpec: problem.inputSpec,
         outputSpec: problem.outputSpec,
-        problemType: requestedType ?? problem.problemType,
+        // The request's type (current UI state, may be unsaved) wins over the stored one.
+        problemType: body.problemType ?? problem.problemType,
       }
     } else if (body && typeof body.title === "string") {
       if (!body.title.trim()) {
@@ -42,6 +45,14 @@ export const POST = courseRoute<{ code: string; year: string; semester: string }
     } else {
       return NextResponse.json(
         { error: "problemId (number) or title (string) is required" },
+        { status: 400 }
+      )
+    }
+
+    // The same rule ProblemEditor uses to hide the button, enforced here (#86).
+    if (!canGenerateTests(fields.problemType, auth.course.language)) {
+      return NextResponse.json(
+        { error: "AI generation is not available for this course language" },
         { status: 400 }
       )
     }

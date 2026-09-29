@@ -5,7 +5,7 @@ import type { CourseFixture } from "@/lib/test-support/db"
 import { createUser, assignRole } from "@/lib/users/repository"
 import { createEnrollment } from "@/lib/enrollments/repository"
 import { createProblem } from "@/lib/problems/repository"
-import { createCourse } from "@/lib/courses/repository"
+import { createCourse, updateCourse } from "@/lib/courses/repository"
 import { seedWeeks } from "@/lib/weeks/repository"
 
 // Partial mock: preserve real LlmNotConfiguredError, only mock generateTestPlan
@@ -155,6 +155,38 @@ describe("POST /api/courses/[code]/[year]/[semester]/problems/generate", () => {
     // Request against f's course (C01) using p2's id (belongs to C02) → 404
     const res = await POST(req({ problemId: p2.id }), ctx())
     expect(res.status).toBe(404)
+  })
+
+  describe("course language gate (#86)", () => {
+    beforeEach(async () => {
+      await updateCourse(f.db, f.course, { nameTh: "ก", nameEn: "A", program: null, language: "c" })
+    })
+
+    it("a C course can't generate in create mode (400, LLM never called)", async () => {
+      const res = await POST(req({ title: "Sum", description: "add" }), ctx())
+      expect(res.status).toBe(400)
+      expect(mockGenerate).not.toHaveBeenCalled()
+    })
+
+    it("a C course can't generate in edit mode either", async () => {
+      const res = await POST(req({ problemId }), ctx())
+      expect(res.status).toBe(400)
+      expect(mockGenerate).not.toHaveBeenCalled()
+    })
+  })
+
+  it("edit mode: an omitted problemType uses the stored one; a sent one overrides it", async () => {
+    mockGenerate.mockResolvedValue({ solution: "", inputs: [] })
+    await POST(req({ problemId }), ctx())
+    expect(mockGenerate.mock.calls[0][0].problemType).toBe("io")
+    await POST(req({ problemId, problemType: "unit" }), ctx())
+    expect(mockGenerate.mock.calls[1][0].problemType).toBe("unit")
+  })
+
+  it("a malformed problemType is 400, never silently io", async () => {
+    const res = await POST(req({ problemId, problemType: "garbage" }), ctx())
+    expect(res.status).toBe(400)
+    expect(mockGenerate).not.toHaveBeenCalled()
   })
 
   it("returns 503 when LLM is not configured", async () => {
