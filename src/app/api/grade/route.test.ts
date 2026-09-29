@@ -6,7 +6,7 @@ import { createCourse, assignInstructor } from "@/lib/courses/repository"
 import { seedWeeks, listWeeks, setWeekReleased } from "@/lib/weeks/repository"
 import { createProblem, setTestCases } from "@/lib/problems/repository"
 import { createEnrollment } from "@/lib/enrollments/repository"
-import { listSubmissions } from "@/lib/submissions/repository"
+import { listSubmissions, getSubmission } from "@/lib/submissions/repository"
 import { getProblemById } from "@/lib/problems/repository"
 import { freshDb, setTestDb, sessionFor, type Queryable } from "@/lib/test-support/db"
 
@@ -330,23 +330,53 @@ describe("POST /api/grade", () => {
     expect(mockRun).not.toHaveBeenCalled()
   })
 
-  it("unit problem: block fails → passed=false, pointsEarned=0, traceback in error", async () => {
-    const weeks = await listWeeks(db, { code: "C01", year: 2567, semester: 1 })
-    const p = await createProblem(db, {
-      courseCode: "C01", courseYear: 2567, courseSemester: 1,
-      weekId: weeks[0].id, title: "Add fn wrong", score: 25,
-      problemType: "unit", unitTestCode: "assert add(1, 2) == 3",
+  describe("unit problem failure: the test block stays secret from students (#79)", () => {
+    const TESTS = "assert add(1, 2) == 3  # SECRET_TEST"
+    // Student code runs in the same file as the tests, so it can echo the file
+    // back through the exception message and stdout.
+    const DUMP = "raise AssertionError(open(__file__).read())"
+    let pid: number
+
+    beforeEach(async () => {
+      const weeks = await listWeeks(db, { code: "C01", year: 2567, semester: 1 })
+      const p = await createProblem(db, {
+        courseCode: "C01", courseYear: 2567, courseSemester: 1,
+        weekId: weeks[0].id, title: "Add fn wrong", score: 25,
+        problemType: "unit", unitTestCode: TESTS,
+      })
+      pid = p.id
+      mockUnitRun.mockImplementation(async (code, tests) => ({
+        testCaseId: 0, passed: false, actualOutput: `${code}
+${tests}`, expectedOutput: "",
+        executionTime: 0, error: `Traceback:
+AssertionError: ${code}
+
+${tests}`,
+      }))
     })
-    mockUnitRun.mockResolvedValue(
-      { testCaseId: 0, passed: false, actualOutput: "", expectedOutput: "", executionTime: 0, error: "AssertionError" },
-    )
-    const token = sessionFor("student@kmitl.ac.th")
-    const res = await POST(gradeReq({ problemId: p.id, code: "def add(a, b): return 99", mode: "run" }, token))
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body.pointsEarned).toBe(0)
-    expect(body.results[0].passed).toBe(false)
-    expect(body.results[0].error).toContain("AssertionError")
+
+    it("student gets pass/fail only — no stderr, no stdout", async () => {
+      const res = await POST(gradeReq({ problemId: pid, code: DUMP, mode: "submit" }, sessionFor("student@kmitl.ac.th")))
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.pointsEarned).toBe(0)
+      expect(body.results[0].passed).toBe(false)
+      expect(body.results[0].hidden).toBe(true)
+      expect(JSON.stringify(body)).not.toContain("SECRET_TEST")
+    })
+
+    it("the stored submission keeps the traceback for staff review", async () => {
+      await POST(gradeReq({ problemId: pid, code: DUMP, mode: "submit" }, sessionFor("student@kmitl.ac.th")))
+      const subs = await listSubmissions(db, pid)
+      const full = await getSubmission(db, subs[0].id)
+      expect(JSON.stringify(full?.results)).toContain("SECRET_TEST")
+    })
+
+    it("course staff still see the traceback", async () => {
+      const res = await POST(gradeReq({ problemId: pid, code: DUMP, mode: "run" }, sessionFor("ins@kmitl.ac.th")))
+      const body = await res.json()
+      expect(body.results[0].error).toContain("SECRET_TEST")
+    })
   })
 
   it("stores the submission's language from the problem, ignoring the request body", async () => {

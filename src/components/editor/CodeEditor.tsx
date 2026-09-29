@@ -292,7 +292,9 @@ export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode 
                 </p>
                 {!r.passed && problemType === "unit" && (
                   <div className="mt-2 flex flex-col gap-1 font-mono text-xs">
-                    {r.error
+                    {r.hidden
+                      ? <p className="font-sans">มี assert ที่ไม่ผ่าน — รายละเอียดของชุดทดสอบถูกซ่อนไว้</p>
+                      : r.error
                       ? <pre className="whitespace-pre-wrap rounded bg-white/60 px-2 py-1">{r.error}</pre>
                       : <p className="font-sans">มี test case ที่ไม่ผ่าน</p>}
                   </div>

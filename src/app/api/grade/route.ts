@@ -5,7 +5,7 @@ import { getDb } from "@/lib/db"
 import { getProblemById } from "@/lib/problems/repository"
 import { findEnrollment } from "@/lib/enrollments/repository"
 import { createSubmission } from "@/lib/submissions/repository"
-import { gradeSubmission, redactHiddenResults } from "@/lib/grading"
+import { gradeSubmission, redactForStudent } from "@/lib/grading"
 import { resolveCourseAccess } from "@/lib/courses/course-access"
 import { getWeekForCourse } from "@/lib/weeks/repository"
 
@@ -87,8 +87,8 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // Students see pass/fail only for hidden test cases (#71); the stored
-  // Submission above keeps the full results for staff review.
+  // Students see pass/fail only for hidden test cases (#71) and for a unit
+  // block (#79); the stored Submission above keeps the full results for staff.
   if (access.staff) return NextResponse.json(result)
-  return NextResponse.json(redactHiddenResults(result, problem.testCases))
+  return NextResponse.json(redactForStudent(result, problem))
 }

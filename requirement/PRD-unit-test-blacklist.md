@@ -9,8 +9,9 @@
 > `runUnitTestCases` harness, per-test-case unit scoring, and the `{ tests: [{args,
 > expected_return}] }` AI shape are **historical**. Current behavior: instructor writes one
 > `unit_test_code` block (assert statements), student code is prepended, runs once via
-> `runUnitTestBlock`; pass all → full `score`, else 0; student sees the stderr traceback on
-> failure; `function_name` is optional. Schema: `problems.unit_test_code`
+> `runUnitTestBlock`; pass all → full `score`, else 0; **the student sees pass/fail only**
+> (#79 — the traceback/stdout is withheld because student code runs in the same file as the
+> tests and could echo them; staff and the stored Submission keep it); `function_name` is optional. Schema: `problems.unit_test_code`
 > (`migrate-006-unit-test-code.sql`). See `CONTEXT.md` → "Unit Test Mode" / "Unit Test Code".
 > The **Code Policy** and **Per-Test-Case Scoring (I/O)** parts of this PRD are unchanged.
 
