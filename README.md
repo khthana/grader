@@ -16,18 +16,19 @@ Faculty of Engineering, KMITL — Standalone product (the sibling `DEEP-QA-*` re
 | **Dev Impersonation** | Admin เข้าดู session ของ user อื่นได้ (dev only) |
 | **Course Management** | CRUD รายวิชา + มอบหมาย Instructor/TA (Admin/Instructor) |
 | **Student Roster** | CRUD + bulk xlsx import/export + กรองกลุ่ม (Instructor/TA) |
-| **Problems** | สร้าง/แก้ไขโจทย์พร้อม test cases, คำอธิบาย **Markdown**, กำหนดเวลา due/close |
-| **Grading** | `mode:run` รัน visible tests; `mode:submit` รัน all tests + เก็บ Submission + ตรวจ deadline |
+| **Problems** | สร้าง/แก้ไขโจทย์พร้อม test cases (คะแนนต่อ case, คะแนนเต็ม = ผลรวม), คำอธิบาย **Markdown**, กำหนดเวลา due/close |
+| **Grading** | `mode:run` รัน visible tests; `mode:submit` รัน all tests + เก็บ Submission + ตรวจ deadline (due = ส่งช้า, close = ปิดรับ); นักศึกษาเห็นแค่ผ่าน/ไม่ผ่านของ hidden case |
 | **Review Workbench** | 3-column grading UI — problem switcher + code viewer + score panel; bonus stepper; URL state `?pid=&sid=` (Instructor/Admin) |
 | **Gradebook** | matrix student × problem (effective score = `COALESCE(manual_score, points_earned)`) (Instructor/Admin) |
 | **Assignments** | นักศึกษาดูรายการโจทย์ต่อสัปดาห์พร้อม 4-state badge และคะแนนของตัวเอง |
 | **Scorebook** | นักศึกษาดูคะแนนสรุปของตัวเองต่อสัปดาห์ — donut SVG banner + ตารางคะแนน (Student only) |
 | **Week Release** | Instructor/Admin ปล่อย/ซ่อนโจทย์ราย Week ด้วย lock icon; Student เห็นเฉพาะ Week ที่ปล่อยแล้ว |
-| **Reference Solution** | เก็บเฉลย Python ต่อโจทย์ + ปุ่ม "รันเฉลย" verify expected outputs ผ่าน Piston (ไม่เผยให้ Student) |
+| **Reference Solution** | เก็บเฉลยต่อโจทย์ (ภาษาของรายวิชา) + ปุ่ม "รันเฉลย" verify expected outputs ด้วยกฎผ่าน/ไม่ผ่านเดียวกับการตรวจจริง (ไม่เผยให้ Student) |
 | **AI Test-Case Generation** | ปุ่ม "สร้างด้วย AI" เขียนเฉลย + test inputs (io) หรือ unit test block (unit) ผ่าน LLM |
 | **Code Policy** | Blacklist / Whitelist ต่อโจทย์ — ตรวจ whole-word ก่อนรัน ปฏิเสธโค้ดที่ละเมิด |
-| **Unit Test Mode** | โจทย์แบบ pytest-style block (`assert`) — all-or-nothing scoring; แสดง traceback เมื่อ fail |
+| **Unit Test Mode** | โจทย์แบบ pytest-style block (`assert`) — all-or-nothing scoring; นักศึกษาเห็นแค่ผ่าน/ไม่ผ่าน (traceback เฉพาะ staff) |
 | **User Profile** | ตั้ง nickname + อัปโหลด avatar (resize 256×256) + เปลี่ยนรหัสผ่าน (ทุก role) |
+| **Course-scoped access** | สิทธิ์ผูกกับรายวิชา — TA/Instructor มีสิทธิ์เฉพาะวิชาที่ตัวเองสอน; ปิด id probing / cross-course write |
 | **Course Duplication** | ทำซ้ำทั้งวิชา (โจทย์ + เฉลย + test cases + ผู้สอน + weeks) ไปภาคการศึกษาใหม่คลิกเดียว (Instructor/Admin) |
 | **Multi-language (Python / C)** | เลือกภาษาต่อรายวิชา; โจทย์ทุกข้อ inherit ภาษานั้น; C คอมไพล์+รันผ่าน gcc (I/O mode); Unit Test + AI gen เฉพาะ Python |
 
@@ -42,6 +43,7 @@ Faculty of Engineering, KMITL — Standalone product (the sibling `DEEP-QA-*` re
 - `react-markdown` + `remark-gfm` — Markdown rendering for problem descriptions
 - **Docker Compose** — full stack (db + piston + app) in one command ([ADR 0008](docs/adr/0008-dockerize-full-stack.md))
 - **Multi-language** — Python or C chosen per course, problems inherit it ([ADR 0009](docs/adr/0009-multi-language-per-course.md))
+- **Single-rule modules** — Week-release gate, Problem Draft, Student View, Submission Window ฯลฯ ([ADR 0010](docs/adr/0010-deepen-problem-authoring-and-student-view.md))
 
 > No MUI · No framer-motion · No react-router
 
@@ -144,7 +146,7 @@ npm run dev
 | `npm run dev` | Dev server (Turbopack) |
 | `npm run build` | Production build |
 | `npm run lint` | ESLint |
-| `npm test` | Run the Vitest suite (462 tests) |
+| `npm test` | Run the Vitest suite (688 tests) |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run db:setup` | Apply `schema.sql` + seed Admin (needs `DATABASE_URL`) |
 
@@ -160,6 +162,8 @@ npx tsx scripts/migrate.ts scripts/migrate-003-problem-reference-solution.sql
 npx tsx scripts/migrate.ts scripts/migrate-004-user-nickname.sql
 npx tsx scripts/migrate.ts scripts/migrate-005-unit-test-blacklist.sql      # problem_type/function_name/starter_code/blacklist/whitelist + test_cases.score
 npx tsx scripts/migrate.ts scripts/migrate-006-unit-test-code.sql           # problems.unit_test_code
+npx tsx scripts/migrate.ts scripts/migrate-007-course-language.sql          # courses.language
+npx tsx scripts/migrate.ts scripts/migrate-008-problem-score-from-test-cases.sql  # data-only: problems.score = Σ test-case scores
 ```
 ทุก script รันซ้ำได้ปลอดภัย (idempotent). **Course Duplication ไม่ต้อง migrate** — reuse ตารางเดิม
 
@@ -195,7 +199,7 @@ Unit tests: pure modules (session, password, roles, breadcrumbs, validation, imp
 Integration tests: repositories + API route handlers ทดสอบกับ **pg-mem** — ไม่ต้องใช้ Docker
 
 ```bash
-npm test   # 462 tests / 63 files
+npm test   # 688 tests / 85 files
 ```
 
 ## Project layout
@@ -227,7 +231,8 @@ src/
     courses/ enrollments/ problems/
     weeks/ submissions/ gradebook/
     assignments/ scorebook/ users/ logs/  # repositories + domain logic
-    grading/                          # gradeSubmission() deep module + CodeRunner seam (ADR 0007)
+    grading/                          # gradeSubmission() + verifyReferenceSolution() over the CodeRunner seam (ADR 0007)
+    problems/                         # also: draft · problem-type · problem-access · student-view · submission-window (ADR 0010)
     code-policy/ llm/                 # blacklist/whitelist check · AI test-plan generation
   components/
     shell/                          # Navbar · Sidebar · Breadcrumbs · AppShell
