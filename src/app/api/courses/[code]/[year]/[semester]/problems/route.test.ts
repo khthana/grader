@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { NextRequest } from "next/server"
-import { POST } from "./route"
+import { GET, POST } from "./route"
 import { updateCourse } from "@/lib/courses/repository"
-import { getProblemById } from "@/lib/problems/repository"
-import { listWeeks } from "@/lib/weeks/repository"
+import { createProblem, getProblemById } from "@/lib/problems/repository"
+import { listWeeks, setWeekReleased } from "@/lib/weeks/repository"
+import { createEnrollment } from "@/lib/enrollments/repository"
+import { createUser, assignRole } from "@/lib/users/repository"
 import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
 import type { CourseFixture } from "@/lib/test-support/db"
 
@@ -152,5 +154,48 @@ describe("POST /api/courses/[code]/[year]/[semester]/problems — max score (#66
     )
     expect(res.status).toBe(400)
     expect((await res.json()).errors.testCases).toBeTruthy()
+  })
+})
+
+describe("GET /api/courses/[code]/[year]/[semester]/problems — class counts (#77)", () => {
+  let f: CourseFixture
+  const STUDENT = "stu@kmitl.ac.th"
+  const COUNTS = ["enrolledCount", "submittedCount", "pendingCount"]
+
+  function get(email: string) {
+    const r = new NextRequest(`http://localhost/api/courses/${f.course.code}/${f.course.year}/${f.course.semester}/problems`)
+    r.cookies.set("session", sessionFor(email))
+    return GET(r, {
+      params: Promise.resolve({ code: f.course.code, year: String(f.course.year), semester: String(f.course.semester) }),
+    })
+  }
+  const firstProblem = async (email: string) => ((await (await get(email)).json()).problems as Record<string, unknown>[])[0]
+
+  beforeEach(async () => {
+    f = await courseFixture()
+    setTestDb(f.db)
+    const stu = await createUser(f.db, { email: STUDENT, name: "S" })
+    await assignRole(f.db, stu.id, "Student")
+    await createEnrollment(f.db, { courseCode: f.course.code, courseYear: f.course.year, courseSemester: f.course.semester, userId: stu.id })
+    const week = (await listWeeks(f.db, f.course))[0]
+    await setWeekReleased(f.db, week.id, true)
+    await createProblem(f.db, { courseCode: f.course.code, courseYear: f.course.year, courseSemester: f.course.semester, weekId: week.id, title: "P" })
+  })
+
+  afterEach(() => setTestDb(null))
+
+  it("an enrolled Student gets the plain list — no class-wide aggregates", async () => {
+    const p = await firstProblem(STUDENT)
+    expect(p.title).toBe("P")
+    for (const k of COUNTS) expect(p).not.toHaveProperty(k)
+  })
+
+  it("Instructor and TA keep the counts (ส่งแล้ว X/Y, รอตรวจ N)", async () => {
+    for (const email of [f.ins.email, f.ta.email]) {
+      const p = await firstProblem(email)
+      expect(p.enrolledCount).toBe(1)
+      expect(p.submittedCount).toBe(0)
+      expect(p.pendingCount).toBe(0)
+    }
   })
 })

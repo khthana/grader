@@ -15,6 +15,8 @@ export const GET = courseRoute({}, async (request, auth) => {
 
   const db = getDb()
   const problems = await listProblems(db, auth.course, { weekId, releasedOnly: !auth.staff })
+  // Class-wide counts are roster information — staff only (#77, ADR 0001).
+  if (!auth.staff) return NextResponse.json({ problems })
 
   const { rows: enrollRows } = await db.query<{ count: string }>(
     `SELECT COUNT(*)::text AS count FROM enrollments

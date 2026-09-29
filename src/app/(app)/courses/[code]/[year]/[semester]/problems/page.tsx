@@ -25,7 +25,12 @@ export default async function CourseProblemsPage({ params }: PageProps) {
         <h1 className="text-2xl font-semibold text-primary">โจทย์ปัญหา</h1>
         <p className="mt-0.5 text-sm text-slate-500">{code} · {year}/{semester}</p>
       </div>
-      <ProblemsTable courseSlug={courseSlug} coursePath={coursePath} canManage={canManage} />
+      <ProblemsTable
+        courseSlug={courseSlug}
+        coursePath={coursePath}
+        canManage={canManage}
+        showStats={access.staff}
+      />
     </div>
   )
 }

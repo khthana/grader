@@ -18,9 +18,10 @@ interface ProblemItem {
   pointsMax: number
   dueAt: string | null
   closeAt: string | null
-  submittedCount: number
-  pendingCount: number
-  enrolledCount: number
+  // Class-wide counts — only in the staff response (#77).
+  submittedCount?: number
+  pendingCount?: number
+  enrolledCount?: number
 }
 
 function formatDate(iso: string | null) {
@@ -36,10 +37,13 @@ export function ProblemsTable({
   courseSlug,
   coursePath,
   canManage,
+  showStats,
 }: {
   courseSlug: string
   coursePath: string
   canManage: boolean
+  /** Teaching staff of this course: show the ส่งแล้ว / รอตรวจ columns. */
+  showStats: boolean
 }) {
   const router = useRouter()
   const { notify } = useToast()
@@ -162,8 +166,12 @@ export function ProblemsTable({
                 <th className="px-5 py-3 text-left">ชื่อโจทย์</th>
                 <th className="px-5 py-3 text-right">คะแนน</th>
                 <th className="px-5 py-3 text-left">กำหนดส่ง</th>
-                <th className="px-5 py-3 text-center">ส่งแล้ว</th>
-                <th className="px-5 py-3 text-center">รอตรวจ</th>
+                {showStats && (
+                  <>
+                    <th className="px-5 py-3 text-center">ส่งแล้ว</th>
+                    <th className="px-5 py-3 text-center">รอตรวจ</th>
+                  </>
+                )}
                 {canManage && <th className="px-5 py-3" />}
               </tr>
             </thead>
@@ -181,18 +189,22 @@ export function ProblemsTable({
                     {p.pointsMax}
                   </td>
                   <td className="px-5 py-4 text-slate-500">{formatDate(p.dueAt)}</td>
-                  <td className="px-5 py-4 text-center text-slate-600">
-                    {p.submittedCount}/{p.enrolledCount}
-                  </td>
-                  <td className="px-5 py-4 text-center text-slate-600">
-                    {p.pendingCount > 0 ? (
-                      <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">
-                        {p.pendingCount}
-                      </span>
-                    ) : (
-                      <span className="text-slate-300">–</span>
-                    )}
-                  </td>
+                  {showStats && (
+                    <>
+                      <td className="px-5 py-4 text-center text-slate-600">
+                        {p.submittedCount ?? 0}/{p.enrolledCount ?? 0}
+                      </td>
+                      <td className="px-5 py-4 text-center text-slate-600">
+                        {(p.pendingCount ?? 0) > 0 ? (
+                          <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">
+                            {p.pendingCount}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">–</span>
+                        )}
+                      </td>
+                    </>
+                  )}
                   {canManage && (
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-2">

@@ -172,7 +172,7 @@ Client components that make API calls receive `courseSlug: string` (e.g. `"01076
 
 | Component | Props |
 |-----------|-------|
-| `ProblemsTable` | `courseSlug`, `coursePath`, `canManage` |
+| `ProblemsTable` | `courseSlug`, `coursePath`, `canManage`, `showStats` |
 | `ProblemEditor` | `courseSlug`, `coursePath`, `courseLanguage`, `weeks`, `mode`, `initialWeekId?`, `referenceSolution?`, `problem?` |
 | `GradebookTable` | `courseSlug` |
 | `AssignmentsList` | `courseSlug`, `coursePath`, `initialWeek` |
@@ -197,7 +197,7 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
 ### Problems & grading
 - **Weeks:** `GET /api/courses/[code]/[year]/[semester]/weeks` (list — non-staff of the course receive only `is_released=true` weeks); `POST` (Instructor appends); `PUT …/weeks/[wid]` (edit topic and/or toggle `isReleased`); `DELETE …/weeks/[wid]` (last only, no problems, keep ≥1). `WeekBar` component renders a `grid-cols-6` of week cards; when `canManage`, each card shows a lock/unlock icon to toggle release state.
 - **Week release gate:** problem page checks `week.isReleased`; if Student + hidden → renders "ยังไม่เปิดรับ" notice (not 404). Staff always see the problem. **Enforced by the API too (#74):** for non-staff, the problems list and assignments filter `releasedOnly`, problem `GET …/problems/[pid]` 404s, and `POST /api/grade` 403s (run and submit).
-- **Problems (Instructor):** `GET/POST /api/courses/.../problems`; `GET/PUT/DELETE …/problems/[pid]`. `ProblemEditor` handles create/edit with live test-case management. `validateProblemInput`: title required, weekId required, ≥1 test case, score ≥ 0, `close_at` ≥ `due_at`.
+- **Problems (Instructor):** `GET/POST /api/courses/.../problems` (GET enriches each problem with class-wide `enrolledCount`/`submittedCount`/`pendingCount` **for course staff only** — non-staff get the plain list, #77; `ProblemsTable` shows those columns via `showStats`); `GET/PUT/DELETE …/problems/[pid]`. `ProblemEditor` handles create/edit with live test-case management. `validateProblemInput`: title required, weekId required, ≥1 test case, score ≥ 0, `close_at` ≥ `due_at`.
 - **Student view** (`/courses/.../problems/[week]/[no]`): loaded via `getWeekByNo` + `getProblemByWeekAndNo`.
 - **Code editor** (`src/components/editor/CodeEditor.tsx`): uses `@uiw/react-codemirror`, dynamically imported with `ssr: false`; grammar picked per language via `language-support.ts#editorExtension` — a keyed `GRAMMARS` map (`@codemirror/lang-python` / `@codemirror/lang-cpp` for C); `language-support.test.ts` fails if a registry language has no grammar. Dark theme, line numbers, `editable={!isClosed}`. Comment-style placeholders (`SolutionEditor`, ProblemEditor starter code) use the registry's `commentLine(lang, text)` — `#` for Python, `//` for C (#68).
 - **Reference solution:** `ProblemEditor` has a `SolutionEditor` (`src/components/editor/SolutionEditor.tsx`) CodeMirror widget for the reference solution. "รันเฉลย" button POSTs to `run-reference` (`src/lib/piston.ts#runReferenceSolution`) with `{ code, inputs[] }` → `{ outputs: [{ stdout, stderr, ok }] }`. Per-case result badges: ✅ match / ⚠️ mismatch (+ "ใช้ค่านี้") / 🔴 error. **Security:** `reference_solution` is in `schema.sql` but **never** in `PROBLEM_COLS`, `ProblemRecord`, or `ProblemDetail`; only `getReferenceSolution(db, problemId)` (raw) and the gated `getReferenceSolutionForStaff` (course-scoped `SELECT … WHERE id AND course`) read the column, and request/page paths reach it solely via the gated `getReferenceSolutionForStaff(db, { problemId, course, user })` (edit page); the raw read is used only by trusted server-side orchestration (duplication). Note: `run-reference` does **not** read the stored solution — it runs `code` supplied in the request body.
@@ -250,7 +250,7 @@ Problem links use `weekNo` + `problemNo` (not surrogate `id`): `${coursePath}/pr
 5. `GradeResult = { pointsEarned, pointsMax, totalTests, passedTests, results[], feedback }` returned to client.
 
 ## Testing
-- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **599 tests / 79 files** as of 2026-09-29. Tests use pg-mem — **no Docker required** (independent of the Compose stack).
+- **Vitest** (node environment, `@` alias in `vitest.config.ts`); tests are `src/**/*.test.ts`. **601 tests / 79 files** as of 2026-09-29. Tests use pg-mem — **no Docker required** (independent of the Compose stack).
 - Pure modules are unit-tested directly (session, password, roles, breadcrumbs, validation, import, name).
 - Repository + route handlers are integration-tested against **pg-mem** (in-memory Postgres, no Docker): build a pool with `newDb()` + `mem.public.none(schema.sql)` + `mem.adapters.createPg()`, inject via `setTestDb`, seed through the repository. Route handlers are imported and called with a `NextRequest`; auth is exercised with real `createSessionToken` cookies.
 - **pg-mem gotchas:** explicit casts (`$1::int`); no `STRING_AGG` (use second query + JS); no `DISTINCT ON` (use subquery with `MAX(submitted_at)` + inner join); schema path `../` count must match test file depth exactly.
