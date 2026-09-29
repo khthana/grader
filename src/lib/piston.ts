@@ -100,6 +100,14 @@ ${unitTestCode}`
   }
 }
 
+// A crash (e.g. segfault) often leaves stderr empty — give the student
+// something to go on.
+function describeRunFailure(run: PistonPhase): string {
+  return run.signal
+    ? `Runtime error: terminated by signal ${run.signal}`
+    : `Runtime error: exited with code ${run.code}`
+}
+
 // Run one test case through Piston, mapping compile/run phases to a TestResult.
 // `compileFailed` is reported separately so the caller can short-circuit.
 async function runOneCase(
@@ -113,9 +121,13 @@ async function runOneCase(
     // compile code means the source never ran — surface the gcc diagnostics
     // and fail the case without comparing (empty) output.
     const compileFailed = !!response.compile && response.compile.code !== 0
+    // A run that crashes or exits non-zero fails the case even if it printed
+    // the expected output first (spec: success = compile ok AND run exit 0).
+    const runFailed = response.run.code !== 0 || !!response.run.signal
     const actualOutput = response.run.stdout.trim()
     const expectedOutput = tc.expectedOutput.trim()
-    const passed = !compileFailed && actualOutput === expectedOutput
+    const passed =
+      !compileFailed && !runFailed && actualOutput === expectedOutput
 
     return {
       compileFailed,
@@ -127,7 +139,8 @@ async function runOneCase(
         executionTime: 0,
         error: compileFailed
           ? response.compile!.stderr
-          : response.run.stderr || undefined,
+          : response.run.stderr ||
+            (runFailed ? describeRunFailure(response.run) : undefined),
       } satisfies TestResult,
     }
   } catch (error) {

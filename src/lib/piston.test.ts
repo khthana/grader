@@ -204,6 +204,54 @@ describe("runTestCases — language-aware execution", () => {
     expect(r.error).toContain("Segmentation fault")
   })
 
+  it("fails the case when C prints the right output but then crashes (non-zero exit)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            compile: { stdout: "", stderr: "", code: 0 },
+            run: { stdout: "7\n", stderr: "", code: 139, signal: "SIGSEGV" },
+          }),
+      })
+    )
+
+    const [r] = await runTestCases(
+      "int main(){printf(\"7\\n\");int*p=0;*p=1;}",
+      [{ id: 1, input: "", expectedOutput: "7", isHidden: false }],
+      "c"
+    )
+
+    expect(r.passed).toBe(false)
+    expect(r.actualOutput).toBe("7")
+    // No stderr from the crash — the student still needs to see why it failed.
+    expect(r.error).toContain("SIGSEGV")
+  })
+
+  it("fails the case with an exit-code message when the program exits non-zero silently", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            compile: { stdout: "", stderr: "", code: 0 },
+            run: { stdout: "7\n", stderr: "", code: 1, signal: null },
+          }),
+      })
+    )
+
+    const [r] = await runTestCases(
+      "int main(){printf(\"7\\n\");return 1;}",
+      [{ id: 1, input: "", expectedOutput: "7", isHidden: false }],
+      "c"
+    )
+
+    expect(r.passed).toBe(false)
+    expect(r.error).toContain("1")
+  })
+
   it("compiles once and returns a single compile-error result for C (no recompile per case)", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
