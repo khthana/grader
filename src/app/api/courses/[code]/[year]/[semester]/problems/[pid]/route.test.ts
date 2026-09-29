@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { NextRequest } from "next/server"
-import { PUT } from "./route"
+import { GET, PUT } from "./route"
 import { updateCourse } from "@/lib/courses/repository"
-import { createProblem, getProblemById } from "@/lib/problems/repository"
+import { createUser, assignRole } from "@/lib/users/repository"
+import { createEnrollment } from "@/lib/enrollments/repository"
+import { createProblem, getProblemById, setTestCases } from "@/lib/problems/repository"
 import { listWeeks } from "@/lib/weeks/repository"
 import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
 import type { CourseFixture } from "@/lib/test-support/db"
@@ -75,5 +77,75 @@ describe("PUT /api/courses/[code]/[year]/[semester]/problems/[pid] — unit mode
     expect(res.status).toBe(200)
     expect((await res.json()).problem.score).toBe(50)
     expect((await getProblemById(f.db, problemId))?.score).toBe(50)
+  })
+})
+
+describe("GET /api/courses/[code]/[year]/[semester]/problems/[pid] — student view (#71)", () => {
+  let f: CourseFixture
+  let problemId: number
+
+  function get(email: string): Promise<Response> {
+    const r = new NextRequest(
+      `http://localhost/api/courses/${f.course.code}/${f.course.year}/${f.course.semester}/problems/${problemId}`
+    )
+    r.cookies.set("session", sessionFor(email))
+    return GET(r, {
+      params: Promise.resolve({
+        code: f.course.code,
+        year: String(f.course.year),
+        semester: String(f.course.semester),
+        pid: String(problemId),
+      }),
+    })
+  }
+
+  beforeEach(async () => {
+    f = await courseFixture()
+    setTestDb(f.db)
+    const student = await createUser(f.db, { email: "stu@kmitl.ac.th", name: "S" })
+    await assignRole(f.db, student.id, "Student")
+    await createEnrollment(f.db, {
+      courseCode: f.course.code,
+      courseYear: f.course.year,
+      courseSemester: f.course.semester,
+      userId: student.id,
+    })
+    const weekId = (await listWeeks(f.db, f.course))[0].id
+    problemId = (
+      await createProblem(f.db, {
+        courseCode: f.course.code,
+        courseYear: f.course.year,
+        courseSemester: f.course.semester,
+        weekId,
+        title: "P1",
+        unitTestCode: "assert solve() == 'UNIT-SECRET'",
+      })
+    ).id
+    await setTestCases(f.db, problemId, [
+      { input: "1", expectedOutput: "one", isHidden: false, score: 10, sortOrder: 0 },
+      { input: "HIDDEN-IN", expectedOutput: "HIDDEN-OUT", isHidden: true, score: 10, sortOrder: 1 },
+    ])
+  })
+
+  afterEach(() => setTestDb(null))
+
+  it("enrolled Student gets only visible test cases and no unit-test code", async () => {
+    const res = await get("stu@kmitl.ac.th")
+    expect(res.status).toBe(200)
+    const { problem } = await res.json()
+    expect(problem.testCases).toHaveLength(1)
+    expect(problem.testCases[0].expectedOutput).toBe("one")
+    expect(problem.unitTestCode).toBeUndefined()
+    const text = JSON.stringify(problem)
+    expect(text).not.toContain("HIDDEN")
+    expect(text).not.toContain("UNIT-SECRET")
+  })
+
+  it("teaching staff get the full problem", async () => {
+    for (const email of ["ins@kmitl.ac.th", "ta@kmitl.ac.th"]) {
+      const { problem } = await (await get(email)).json()
+      expect(problem.testCases).toHaveLength(2)
+      expect(problem.unitTestCode).toContain("UNIT-SECRET")
+    }
   })
 })

@@ -8,6 +8,8 @@ import {
   setTestCases,
 } from "@/lib/problems/repository"
 import { validateProblemInput } from "@/lib/problems/validation"
+import { studentProblemView } from "@/lib/problems/visibility"
+import { isTeachingStaff } from "@/lib/courses/access"
 import { problemMaxScore } from "@/lib/problems/score"
 import { safeLog } from "@/lib/logs"
 
@@ -23,7 +25,10 @@ export const GET = courseRoute<{ code: string; year: string; semester: string; p
     if (!problem) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
-    return NextResponse.json({ problem })
+    // Students never receive hidden test cases or the unit-test block (#71).
+    return NextResponse.json({
+      problem: isTeachingStaff(auth.user.roles) ? problem : studentProblemView(problem),
+    })
   }
 )
 

@@ -170,7 +170,9 @@ export async function runTestCases(
   // single compile-error result instead of recompiling N times.
   const first = await runOneCase(code, testCases[0], language)
   if (first.compileFailed) {
-    return [{ ...first.result, testCaseId: 0 }]
+    // Not tied to any test case — drop the first case's expected output,
+    // which may belong to a hidden case (#71).
+    return [{ ...first.result, testCaseId: 0, expectedOutput: "", actualOutput: "" }]
   }
 
   const rest = await Promise.all(

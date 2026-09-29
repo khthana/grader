@@ -278,4 +278,27 @@ describe("runTestCases — language-aware execution", () => {
     expect(results[0].passed).toBe(false)
     expect(results[0].error).toContain("boom: compile error")
   })
+
+  it("the compile-error result carries no test-case output (the first case may be hidden, #71)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            compile: { stdout: "", stderr: "main.c.c:1: error", code: 1 },
+            run: { stdout: "", stderr: "", code: 0 },
+          }),
+      })
+    )
+    const [r] = await runTestCases(
+      "int main(){bad}",
+      [{ id: 7, input: "HIDDEN-IN", expectedOutput: "HIDDEN-OUT", isHidden: true }],
+      "c"
+    )
+    expect(r.testCaseId).toBe(0)
+    expect(r.expectedOutput).toBe("")
+    expect(r.actualOutput).toBe("")
+    expect(r.error).toContain("error")
+  })
 })

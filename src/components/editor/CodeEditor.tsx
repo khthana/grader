@@ -286,7 +286,7 @@ export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode 
                 <p className="font-semibold">
                   {problemType === "unit"
                     ? `ผลการทดสอบ: ${r.passed ? "ผ่าน ✓" : "ไม่ผ่าน ✗"}`
-                    : `Test ${i + 1}: ${r.passed ? "ผ่าน ✓" : "ไม่ผ่าน ✗"}`}
+                    : `Test ${i + 1}${r.hidden ? " (ซ่อน)" : ""}: ${r.passed ? "ผ่าน ✓" : "ไม่ผ่าน ✗"}`}
                 </p>
                 {!r.passed && problemType === "unit" && (
                   <div className="mt-2 flex flex-col gap-1 font-mono text-xs">
@@ -295,7 +295,10 @@ export function CodeEditor({ problemId, draftKey, isClosed = false, starterCode 
                       : <p className="font-sans">มี test case ที่ไม่ผ่าน</p>}
                   </div>
                 )}
-                {!r.passed && problemType !== "unit" && (
+                {!r.passed && problemType !== "unit" && r.hidden && (
+                  <p className="mt-1 text-xs opacity-70">test case นี้ซ่อนอยู่ — ไม่แสดง input/output</p>
+                )}
+                {!r.passed && problemType !== "unit" && !r.hidden && (
                   <div className="mt-2 flex flex-col gap-1 font-mono text-xs">
                     <p><span className="font-sans font-semibold text-slate-500">Expected:</span></p>
                     <pre className="whitespace-pre-wrap rounded bg-white/60 px-2 py-1">{r.expectedOutput}</pre>

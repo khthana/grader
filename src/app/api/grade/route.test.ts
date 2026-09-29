@@ -404,3 +404,92 @@ describe("POST /api/grade", () => {
     expect(body.pointsMax).toBe(30)
   })
 })
+
+describe("POST /api/grade — hidden test cases are redacted for students (#71)", () => {
+  let db: Queryable
+  let problemId: number
+  let hiddenId: number
+  let visibleId: number
+
+  beforeEach(async () => {
+    db = freshDb()
+    setTestDb(db)
+    mockRun.mockReset()
+    const ins = await createUser(db, { email: "ins@kmitl.ac.th", name: "Ins" })
+    await assignRole(db, ins.id, "Instructor")
+    const student = await createUser(db, { email: "student@kmitl.ac.th", name: "S" })
+    await assignRole(db, student.id, "Student")
+    const course = await createCourse(db, { code: "C01", year: 2567, semester: 1, nameTh: "ก", nameEn: "A" })
+    await assignInstructor(db, course, ins.id)
+    await createEnrollment(db, {
+      courseCode: course.code,
+      courseYear: course.year,
+      courseSemester: course.semester,
+      userId: student.id,
+    })
+    await seedWeeks(db, course)
+    const weeks = await listWeeks(db, course)
+    problemId = (
+      await createProblem(db, {
+        courseCode: course.code,
+        courseYear: course.year,
+        courseSemester: course.semester,
+        weekId: weeks[0].id,
+        title: "Echo",
+      })
+    ).id
+    const cases = await setTestCases(db, problemId, [
+      { input: "a", expectedOutput: "A", isHidden: false, score: 10, sortOrder: 0 },
+      { input: "secret-in", expectedOutput: "SECRET-OUT", isHidden: true, score: 10, sortOrder: 1 },
+    ])
+    visibleId = cases[0].id
+    hiddenId = cases[1].id
+    mockRun.mockResolvedValue([
+      { testCaseId: visibleId, passed: false, actualOutput: "x", expectedOutput: "A", executionTime: 0 },
+      {
+        testCaseId: hiddenId,
+        passed: false,
+        actualOutput: "echo: secret-in",
+        expectedOutput: "SECRET-OUT",
+        executionTime: 0,
+        error: "stderr: secret-in",
+      },
+    ])
+  })
+
+  afterEach(() => setTestDb(null))
+
+  it("student submit: hidden case keeps pass/fail but loses expected/actual/error", async () => {
+    const res = await POST(
+      gradeReq({ problemId, code: "print(input())", mode: "submit" }, sessionFor("student@kmitl.ac.th"))
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    const text = JSON.stringify(body)
+    expect(text).not.toContain("SECRET-OUT")
+    expect(text).not.toContain("secret-in")
+
+    const hidden = body.results.find((r: { testCaseId: number }) => r.testCaseId === hiddenId)
+    expect(hidden).toMatchObject({ passed: false, hidden: true, expectedOutput: "", actualOutput: "" })
+    expect(hidden.error).toBeUndefined()
+
+    const visible = body.results.find((r: { testCaseId: number }) => r.testCaseId === visibleId)
+    expect(visible).toMatchObject({ expectedOutput: "A", actualOutput: "x" })
+    expect(visible.hidden).toBeUndefined()
+  })
+
+  it("the stored submission keeps full results for staff review", async () => {
+    await POST(
+      gradeReq({ problemId, code: "print(input())", mode: "submit" }, sessionFor("student@kmitl.ac.th"))
+    )
+    const [sub] = await listSubmissions(db, problemId)
+    expect(JSON.stringify(sub.results)).toContain("SECRET-OUT")
+  })
+
+  it("instructor gets unredacted results", async () => {
+    const res = await POST(
+      gradeReq({ problemId, code: "print(input())", mode: "submit" }, sessionFor("ins@kmitl.ac.th"))
+    )
+    expect(JSON.stringify(await res.json())).toContain("SECRET-OUT")
+  })
+})

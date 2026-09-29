@@ -5,7 +5,8 @@ import { getDb } from "@/lib/db"
 import { getProblemById } from "@/lib/problems/repository"
 import { findEnrollment } from "@/lib/enrollments/repository"
 import { createSubmission } from "@/lib/submissions/repository"
-import { gradeSubmission } from "@/lib/grading"
+import { gradeSubmission, redactHiddenResults } from "@/lib/grading"
+import { isTeachingStaff } from "@/lib/courses/access"
 
 export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request)
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
   }
 
   const runMode = mode === "run" ? "run" : "submit"
+  const teachingStaff = isTeachingStaff(user.roles)
 
   if (runMode === "submit") {
     // Deadline enforcement (ADR 0002): close_at checked first.
@@ -39,10 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Enrollment check: a student must be enrolled in this course.
-    const isPrivileged = user.roles.some((r) =>
-      ["Admin", "Instructor", "TA"].includes(r)
-    )
-    if (!isPrivileged) {
+    if (!teachingStaff) {
       const enrollment = await findEnrollment(
         db,
         { code: problem.courseCode, year: problem.courseYear, semester: problem.courseSemester },
@@ -77,5 +76,8 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  return NextResponse.json(result)
+  // Students see pass/fail only for hidden test cases (#71); the stored
+  // Submission above keeps the full results for staff review.
+  if (teachingStaff) return NextResponse.json(result)
+  return NextResponse.json(redactHiddenResults(result, problem.testCases))
 }

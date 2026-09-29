@@ -12,6 +12,9 @@ export interface TestResult {
   expectedOutput: string
   executionTime: number
   error?: string
+  // Set on a hidden Test Case's result sent to a Student: pass/fail only,
+  // expected/actual/error are blanked (#71).
+  hidden?: boolean
 }
 
 export interface GradeResult {

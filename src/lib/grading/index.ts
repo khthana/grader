@@ -104,3 +104,29 @@ export async function gradeSubmission(
   const pointsMax = cases.reduce((sum, tc) => sum + (scoreMap.get(tc.id) ?? 0), 0)
   return summarize(results, pointsEarned, pointsMax)
 }
+
+// A Student's view of a GradeResult (#71): results for hidden Test Cases keep
+// pass/fail but lose expected/actual output and error — any of those could
+// leak the hidden input or answer (a program can echo stdin to stderr).
+// Scores are untouched. The stored Submission keeps the full results.
+export function redactHiddenResults(
+  result: GradeResult,
+  testCases: Array<{ id: number; isHidden: boolean }>
+): GradeResult {
+  const hiddenIds = new Set(testCases.filter((tc) => tc.isHidden).map((tc) => tc.id))
+  return {
+    ...result,
+    results: result.results.map((r) =>
+      hiddenIds.has(r.testCaseId)
+        ? {
+            testCaseId: r.testCaseId,
+            passed: r.passed,
+            executionTime: r.executionTime,
+            expectedOutput: "",
+            actualOutput: "",
+            hidden: true,
+          }
+        : r
+    ),
+  }
+}
