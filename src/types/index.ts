@@ -12,6 +12,10 @@ export interface TestResult {
   expectedOutput: string
   executionTime: number
   error?: string
+  // The program didn't run cleanly — compile failure, non-zero exit, signal,
+  // or the runner itself failed — so its output was never compared. Lets
+  // Reference verification tell 🔴 error from ⚠️ mismatch (#85).
+  errored?: boolean
   // Set on a hidden Test Case's result sent to a Student: pass/fail only,
   // expected/actual/error are blanked (#71).
   hidden?: boolean

@@ -41,32 +41,6 @@ async function runCode(
   return res.json()
 }
 
-export async function runReferenceSolution(
-  code: string,
-  inputs: string[],
-  language: string = DEFAULT_LANGUAGE
-): Promise<Array<{ stdout: string; stderr: string; ok: boolean }>> {
-  return Promise.all(
-    inputs.map(async (input) => {
-      try {
-        const response = await runCode(code, input, language)
-        // Compiled languages (C) report a separate compile phase; a failed
-        // compile means nothing ran — surface the gcc diagnostics.
-        if (response.compile && response.compile.code !== 0) {
-          return { stdout: "", stderr: response.compile.stderr, ok: false }
-        }
-        const stdout = response.run.stdout.trim()
-        const stderr = response.run.stderr
-        const ok = response.run.code === 0 && stderr === ""
-        return { stdout, stderr, ok }
-      } catch (error) {
-        const stderr = error instanceof Error ? error.message : "Unknown error"
-        return { stdout: "", stderr, ok: false }
-      }
-    })
-  )
-}
-
 export async function runUnitTestBlock(
   studentCode: string,
   unitTestCode: string
@@ -141,6 +115,7 @@ async function runOneCase(
           ? response.compile!.stderr
           : response.run.stderr ||
             (runFailed ? describeRunFailure(response.run) : undefined),
+        errored: compileFailed || runFailed,
       } satisfies TestResult,
     }
   } catch (error) {
@@ -153,6 +128,7 @@ async function runOneCase(
         expectedOutput: tc.expectedOutput,
         executionTime: 0,
         error: error instanceof Error ? error.message : "Unknown error",
+        errored: true,
       } satisfies TestResult,
     }
   }

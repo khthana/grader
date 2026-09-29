@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { runReferenceSolution, runUnitTestBlock, runTestCases } from "./piston"
+import { runUnitTestBlock, runTestCases } from "./piston"
 
 function mockPiston(response: { stdout: string; stderr: string; code: number }) {
   vi.stubGlobal(
@@ -15,92 +15,49 @@ beforeEach(() => {
   vi.restoreAllMocks()
 })
 
-describe("runReferenceSolution", () => {
-  it("returns trimmed stdout with ok:true when piston exits cleanly", async () => {
-    mockPiston({ stdout: "42\n", stderr: "", code: 0 })
-    const results = await runReferenceSolution("print(42)", [""])
-    expect(results).toHaveLength(1)
-    expect(results[0].stdout).toBe("42")
-    expect(results[0].stderr).toBe("")
-    expect(results[0].ok).toBe(true)
+// `errored` (#85): the program didn't run cleanly, so its output was never
+// compared — what Reference verification reads to tell 🔴 from ⚠️.
+describe("runTestCases — errored", () => {
+  const tc = { id: 1, input: "", expectedOutput: "9", isHidden: false }
+
+  it("a clean run is not errored, even with stderr output", async () => {
+    mockPiston({ stdout: "9\n", stderr: "DeprecationWarning", code: 0 })
+    const [r] = await runTestCases("x", [tc])
+    expect(r).toMatchObject({ passed: true, errored: false, error: "DeprecationWarning" })
   })
 
-  it("ok:false when stderr is non-empty even if exit code is 0", async () => {
-    mockPiston({ stdout: "", stderr: "NameError: x", code: 0 })
-    const [r] = await runReferenceSolution("x", [""])
-    expect(r.ok).toBe(false)
-    expect(r.stderr).toBe("NameError: x")
+  it("a clean run with the wrong output fails but is not errored", async () => {
+    mockPiston({ stdout: "8\n", stderr: "", code: 0 })
+    const [r] = await runTestCases("x", [tc])
+    expect(r).toMatchObject({ passed: false, errored: false })
   })
 
-  it("ok:false when exit code is non-zero", async () => {
-    mockPiston({ stdout: "", stderr: "", code: 1 })
-    const [r] = await runReferenceSolution("raise SystemExit(1)", [""])
-    expect(r.ok).toBe(false)
+  it("a non-zero exit is errored", async () => {
+    mockPiston({ stdout: "9\n", stderr: "", code: 1 })
+    const [r] = await runTestCases("x", [tc])
+    expect(r).toMatchObject({ passed: false, errored: true })
   })
 
-  it("returns one result per input in order", async () => {
-    let call = 0
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockImplementation(() => {
-        const stdout = call === 0 ? "hello\n" : "world\n"
-        call++
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ run: { stdout, stderr: "", code: 0 } }),
-        })
-      })
-    )
-    const results = await runReferenceSolution("print('x')", ["a", "b"])
-    expect(results).toHaveLength(2)
-    expect(results[0].stdout).toBe("hello")
-    expect(results[1].stdout).toBe("world")
-  })
-
-  it("returns ok:false with error in stderr when piston fetch throws", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")))
-    const [r] = await runReferenceSolution("print(1)", [""])
-    expect(r.ok).toBe(false)
-    expect(r.stderr).toContain("network error")
-  })
-
-  it("runs a C reference solution through the gcc runtime", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          compile: { stdout: "", stderr: "", code: 0 },
-          run: { stdout: "7\n", stderr: "", code: 0 },
-        }),
-    })
-    vi.stubGlobal("fetch", fetchMock)
-
-    const [r] = await runReferenceSolution("int main(){...}", ["3 4"], "c")
-    expect(r.ok).toBe(true)
-    expect(r.stdout).toBe("7")
-
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
-    expect(body.language).toBe("c")
-    expect(body.version).toBe("10.2.0")
-    expect(body.files[0].name).toBe("main.c")
-  })
-
-  it("reports ok:false with the gcc compile error when a C reference does not compile", async () => {
+  it("a C compile failure is errored", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
         json: () =>
           Promise.resolve({
-            compile: { stdout: "", stderr: "main.c.c:1:1: error: expected ';'", code: 1 },
+            compile: { stdout: "", stderr: "error: expected ';'", code: 1 },
             run: { stdout: "", stderr: "", code: 0 },
           }),
       })
     )
+    const [r] = await runTestCases("bad", [tc], "c")
+    expect(r).toMatchObject({ testCaseId: 0, passed: false, errored: true })
+  })
 
-    const [r] = await runReferenceSolution("int main(){bad}", ["3 4"], "c")
-    expect(r.ok).toBe(false)
-    expect(r.stderr).toContain("error: expected ';'")
+  it("a runner failure (Piston unreachable) is errored", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")))
+    const [r] = await runTestCases("x", [tc])
+    expect(r).toMatchObject({ passed: false, errored: true, error: "network error" })
   })
 })
 

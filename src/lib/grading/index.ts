@@ -2,7 +2,7 @@ import type { GradeMode, GradeResult, TestCase, TestResult } from "@/types"
 import { checkCodePolicy } from "@/lib/code-policy"
 import { runTestCases, runUnitTestBlock } from "@/lib/piston"
 import { problemMaxScore, testCaseScore } from "@/lib/problems/score"
-import type { ProblemType } from "@/lib/problems/problem-type"
+import { isProblemTypeAllowed, type ProblemType } from "@/lib/problems/problem-type"
 
 // The Piston seam expressed as an interface. Grading depends on this contract,
 // not on the HTTP module directly — so tests inject a fake runner (no network)
@@ -14,6 +14,16 @@ export interface CodeRunner {
 
 // Default adapter: the real Piston-backed runner.
 export const pistonRunner: CodeRunner = { runTestCases, runUnitTestBlock }
+
+// Route-level seam, like setTestDb: route handlers take the runner from here so
+// route tests inject a fake one instead of mocking the Piston module.
+let testRunner: CodeRunner | null = null
+export function setTestRunner(runner: CodeRunner | null): void {
+  testRunner = runner
+}
+export function getCodeRunner(): CodeRunner {
+  return testRunner ?? pistonRunner
+}
 
 // The slice of a Problem that grading needs. ProblemDetail satisfies this
 // structurally; the narrow shape keeps grading decoupled from the repository.
@@ -60,7 +70,7 @@ export async function gradeSubmission(
   problem: GradableProblem,
   code: string,
   mode: GradeMode,
-  runner: CodeRunner = pistonRunner
+  runner: CodeRunner = getCodeRunner()
 ): Promise<GradeResult> {
   const isUnit = problem.problemType === "unit"
 
@@ -104,6 +114,61 @@ export async function gradeSubmission(
     .reduce((sum, r) => sum + (scoreMap.get(r.testCaseId) ?? 0), 0)
   const pointsMax = cases.reduce((sum, tc) => sum + (scoreMap.get(tc.id) ?? 0), 0)
   return summarize(results, pointsEarned, pointsMax)
+}
+
+// One Reference-verification output per input ("รันเฉลย"). `ok` = the program
+// ran cleanly (no compile failure / non-zero exit / signal) — grading's own
+// rule, so a stderr warning is still ok. The editor then shows ✅ when ok and
+// the trimmed stdout equals the case's expected output (grading compares the
+// same way), ⚠️ when ok but different, 🔴 when not ok.
+export interface ReferenceOutput {
+  stdout: string
+  stderr: string
+  ok: boolean
+}
+
+export type ReferenceDraft =
+  | { code: string; problemType: "io"; inputs: string[] }
+  | { code: string; problemType: "unit"; unitTestCode: string }
+
+// Run a Reference Solution against draft Test Cases through the same
+// CodeRunner as grading (#85), so verification can't disagree with grading.
+export async function verifyReferenceSolution(
+  draft: ReferenceDraft,
+  language: string,
+  runner: CodeRunner = getCodeRunner()
+): Promise<ReferenceOutput[]> {
+  const toOutput = (r: TestResult, ok: boolean): ReferenceOutput => ({
+    stdout: r.actualOutput,
+    stderr: r.error ?? "",
+    ok,
+  })
+
+  if (draft.problemType === "unit") {
+    // The harness is Python-only and takes no language — never hand it C (#85).
+    if (!isProblemTypeAllowed("unit", language)) {
+      throw new Error(`unit mode is not available for ${language}`)
+    }
+    const r = await runner.runUnitTestBlock(draft.code, draft.unitTestCode)
+    return [toOutput(r, r.passed)]
+  }
+
+  // Draft cases have no ids yet — number them 1..n; expected output is unknown
+  // (computing it is the point), so only `errored` is read, never `passed`.
+  const cases: TestCase[] = draft.inputs.map((input, i) => ({
+    id: i + 1,
+    input,
+    expectedOutput: "",
+    isHidden: false,
+  }))
+  const results = await runner.runTestCases(draft.code, cases, language)
+  const byId = new Map(results.map((r) => [r.testCaseId, r]))
+  // A compile failure comes back as one synthetic result (id 0) for all cases.
+  const compileFailure = byId.get(0)
+  return cases.map((tc) => {
+    const r = byId.get(tc.id) ?? compileFailure
+    return r ? toOutput(r, !r.errored) : { stdout: "", stderr: "ไม่มีผลลัพธ์", ok: false }
+  })
 }
 
 // A Student's view of a GradeResult. A redacted result keeps pass/fail but

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
 import { courseRoute } from "@/lib/courses/route"
-import { runReferenceSolution, runUnitTestBlock } from "@/lib/piston"
+import { verifyReferenceSolution } from "@/lib/grading"
+import { isProblemTypeAllowed } from "@/lib/problems/problem-type"
 
+// "รันเฉลย": run the Instructor's Reference Solution through the same
+// CodeRunner as grading, so the editor's verdict matches grading's (#85).
 export const POST = courseRoute<{ code: string; year: string; semester: string }>(
   { manage: true },
   async (request, auth) => {
@@ -10,36 +13,42 @@ export const POST = courseRoute<{ code: string; year: string; semester: string }
     if (!body || typeof body.code !== "string") {
       return NextResponse.json({ error: "code (string) is required" }, { status: 400 })
     }
+    const language = auth.course.language
 
     // Unit mode (#55): run reference solution + the unit test block once; report pass/fail.
     if (body.problemType === "unit") {
+      // The harness is Python-only — same rule as saving a Problem (#64, #86).
+      if (!isProblemTypeAllowed("unit", language)) {
+        return NextResponse.json(
+          { error: "unit mode is not available for this course language" },
+          { status: 400 }
+        )
+      }
       if (typeof body.unitTestCode !== "string") {
         return NextResponse.json(
           { error: "unitTestCode (string) is required for unit mode" },
           { status: 400 }
         )
       }
-      const result = await runUnitTestBlock(body.code as string, body.unitTestCode as string)
-      return NextResponse.json({
-        outputs: [
-          { stdout: result.actualOutput, stderr: result.error ?? "", ok: result.passed },
-        ],
-      })
+      const outputs = await verifyReferenceSolution(
+        { code: body.code, problemType: "unit", unitTestCode: body.unitTestCode },
+        language
+      )
+      return NextResponse.json({ outputs })
     }
 
-    if (!Array.isArray(body.inputs)) {
+    if (!Array.isArray(body.inputs) || !body.inputs.every((i: unknown) => typeof i === "string")) {
       return NextResponse.json(
-        { error: "inputs (array) is required for io mode" },
+        { error: "inputs (array of strings) is required for io mode" },
         { status: 400 }
       )
     }
 
-    // Compile + run the reference solution in the course's language (#64) so an
-    // Instructor can compute expected outputs for a C problem too.
-    const outputs = await runReferenceSolution(
-      body.code as string,
-      body.inputs as string[],
-      auth.course.language
+    // Compile + run in the course's language (#64) so an Instructor can compute
+    // expected outputs for a C problem too.
+    const outputs = await verifyReferenceSolution(
+      { code: body.code, problemType: "io", inputs: body.inputs },
+      language
     )
     return NextResponse.json({ outputs })
   }
