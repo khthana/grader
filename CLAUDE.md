@@ -61,7 +61,7 @@ Specs: `requirement/PRD.md` + `requirement/PRD-week-release.md` + `requirement/P
 
 ### Roles & landing
 - Four roles: **Admin / Instructor / TA / Student**, many-to-many (`user_roles`); **Admin is a superset**. Priority Admin > Instructor > TA > Student.
-- `src/lib/roles.ts` (pure, unit-tested) maps a role to its sidebar menu, default landing route, and assignable roles; `resolveActiveRole(roles, requested?)` picks the active role. Landing: Admin → `/users`, Instructor/TA → `/students`, Student → `/assignments`. `/dashboard` redirects to the active role's landing.
+- `src/lib/roles.ts` (pure, unit-tested) maps a role to its sidebar menu, default landing route, and assignable roles; `resolveActiveRole(roles, requested?)` picks the active role. Landing: Admin → `/users`, Instructor/TA → `/students`, Student → `/assignments`. TA's teaching menu has **no ตรวจงาน** — review is Admin/Instructor only (#70; menu fix #78). `/dashboard` redirects to the active role's landing.
 - `src/lib/breadcrumbs.ts` (pure, unit-tested) derives Thai-labelled crumbs from the pathname.
 
 ### Data layer (Postgres, raw `pg` + SQL)

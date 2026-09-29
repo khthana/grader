@@ -25,13 +25,17 @@ const TEACHING_MENU: MenuItem[] = [
   MENU.review,
   MENU.gradebook,
 ]
+// Review is Admin/Instructor only (#70 — it exposes students' code), so a TA
+// menu link would land on a 404 (#78).
+const TA_MENU = TEACHING_MENU.filter((item) => item !== MENU.review)
 
 const SIDEBAR_MENU: Record<Role, MenuItem[]> = {
   // Admin is the superset: User Management + activity log + course mgmt + teaching.
   Admin: [MENU.userManagement, MENU.logs, MENU.courses, ...TEACHING_MENU],
-  // Instructor manages courses; TA gets the teaching menu without course mgmt.
+  // Instructor manages courses; TA gets the teaching menu without course mgmt
+  // or review.
   Instructor: [MENU.courses, ...TEACHING_MENU],
-  TA: TEACHING_MENU,
+  TA: TA_MENU,
   Student: [MENU.assignments, MENU.scorebook],
 }
 
