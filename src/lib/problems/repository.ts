@@ -1,6 +1,7 @@
 import type { Queryable } from "@/lib/db"
 import type { CourseKey } from "@/lib/courses/types"
 import { canManageCourses } from "@/lib/courses/access"
+import { testCaseScore } from "@/lib/problems/score"
 export type { Queryable, CourseKey }
 
 export interface ProblemRecord {
@@ -403,7 +404,7 @@ export async function setTestCases(
       `INSERT INTO test_cases (problem_id, input, expected_output, is_hidden, score, sort_order)
        VALUES ($1::int, $2, $3, $4, $5::int, $6::int)
        RETURNING id, problem_id, input, expected_output, is_hidden, score, sort_order`,
-      [problemId, tc.input, tc.expectedOutput, tc.isHidden, tc.score ?? 10, tc.sortOrder]
+      [problemId, tc.input, tc.expectedOutput, tc.isHidden, testCaseScore(tc.score), tc.sortOrder]
     )
     result.push(toTestCaseRecord(rows[0]))
   }

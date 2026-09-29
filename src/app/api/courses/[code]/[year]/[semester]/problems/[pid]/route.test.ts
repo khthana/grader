@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { NextRequest } from "next/server"
 import { PUT } from "./route"
 import { updateCourse } from "@/lib/courses/repository"
-import { createProblem } from "@/lib/problems/repository"
+import { createProblem, getProblemById } from "@/lib/problems/repository"
 import { listWeeks } from "@/lib/weeks/repository"
 import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
 import type { CourseFixture } from "@/lib/test-support/db"
@@ -56,5 +56,24 @@ describe("PUT /api/courses/[code]/[year]/[semester]/problems/[pid] — unit mode
     )
     expect(res.status).toBe(400)
     expect((await res.json()).errors.problemType).toBeTruthy()
+  })
+
+  it("io mode: re-derives problem.score from the edited test-case scores (#66)", async () => {
+    const res = await PUT(
+      req({
+        title: "P1",
+        weekId,
+        score: 10,
+        testCases: [
+          { input: "1", expectedOutput: "1", isHidden: false, score: 15, sortOrder: 0 },
+          { input: "2", expectedOutput: "2", isHidden: false, score: 15, sortOrder: 1 },
+          { input: "3", expectedOutput: "3", isHidden: true, score: 20, sortOrder: 2 },
+        ],
+      }),
+      ctx()
+    )
+    expect(res.status).toBe(200)
+    expect((await res.json()).problem.score).toBe(50)
+    expect((await getProblemById(f.db, problemId))?.score).toBe(50)
   })
 })

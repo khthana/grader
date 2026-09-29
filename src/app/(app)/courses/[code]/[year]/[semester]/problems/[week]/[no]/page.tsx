@@ -6,6 +6,7 @@ import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { getDb } from "@/lib/db"
 import { parseCourseSlug, buildCoursePath } from "@/lib/courses/slug"
 import { getProblemByWeekAndNo } from "@/lib/problems/repository"
+import { problemMaxScore } from "@/lib/problems/score"
 import { getWeekByNo } from "@/lib/weeks/repository"
 import { getCurrentUser } from "@/lib/session"
 import { getLastSubmission } from "@/lib/submissions/repository"
@@ -73,10 +74,7 @@ export default async function CourseProblemPage({ params }: PageProps) {
   const now = new Date()
   const isClosed = problem.closeAt ? new Date(problem.closeAt) < now : false
   const isLateWindow = !isClosed && problem.dueAt ? new Date(problem.dueAt) < now : false
-  const pointsMax =
-    problem.problemType === "unit"
-      ? problem.score
-      : problem.testCases.reduce((s, tc) => s + (tc.score ?? 0), 0)
+  const pointsMax = problemMaxScore(problem)
   const effectiveScore = lastSubmission?.manualScore ?? lastSubmission?.pointsEarned ?? null
   const coursePath = buildCoursePath(slug)
 

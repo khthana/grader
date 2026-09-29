@@ -17,12 +17,14 @@ import { useToast } from "@/components/shell/ToastProvider"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { SolutionEditor } from "@/components/editor/SolutionEditor"
 import { getLanguageConfig } from "@/lib/languages"
+import { DEFAULT_TEST_CASE_SCORE, problemMaxScore, testCaseScore } from "@/lib/problems/score"
 
 interface TestCaseForm {
   id?: number
   input: string
   expectedOutput: string
   isHidden: boolean
+  score: number
   sortOrder: number
 }
 
@@ -57,12 +59,12 @@ interface Props {
     unitTestCode: string
     blacklist: string[]
     whitelist: string[]
-    testCases: TestCaseForm[]
+    testCases: Array<Omit<TestCaseForm, "score"> & { score?: number }>
   }
 }
 
 function emptyCase(sortOrder: number): TestCaseForm {
-  return { input: "", expectedOutput: "", isHidden: false, sortOrder }
+  return { input: "", expectedOutput: "", isHidden: false, score: DEFAULT_TEST_CASE_SCORE, sortOrder }
 }
 
 export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, mode, initialWeekId, referenceSolution: initialRefSolution, problem }: Props) {
@@ -86,7 +88,7 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
   const [closeAt, setCloseAt] = useState(problem?.closeAt ? toDatetimeLocal(problem.closeAt) : "")
   const [cases, setCases] = useState<TestCaseForm[]>(
     problem?.testCases.length
-      ? problem.testCases
+      ? problem.testCases.map((tc) => ({ ...tc, score: testCaseScore(tc.score) }))
       : [emptyCase(0)]
   )
   const [problemType, setProblemType] = useState<"io" | "unit">(
@@ -95,6 +97,8 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
   const [functionName, setFunctionName] = useState(problem?.functionName ?? "")
   const [starterCode, setStarterCode] = useState(problem?.starterCode ?? "")
   const [unitTestCode, setUnitTestCode] = useState(problem?.unitTestCode ?? "")
+  // io: the sum of test-case scores (read-only); unit: the editable score (#66).
+  const maxScore = problemMaxScore({ problemType, score: Number(score) || 0, testCases: cases })
   const [blacklist, setBlacklist] = useState<string[]>(problem?.blacklist ?? [])
   const [whitelist, setWhitelist] = useState<string[]>(problem?.whitelist ?? [])
   const [blacklistDraft, setBlacklistDraft] = useState("")
@@ -200,7 +204,7 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
         setRefResults(null)
         notify("success", "AI สร้าง Unit Test Code เรียบร้อย — กด 'รันเฉลย' เพื่อตรวจสอบ")
       } else {
-        setCases(data.inputs.map((input, i) => ({ input, expectedOutput: "", isHidden: false, sortOrder: i })))
+        setCases(data.inputs.map((input, i) => ({ ...emptyCase(i), input })))
         setRefResults(null)
         notify("success", "AI สร้าง test cases เรียบร้อย — กด 'รันเฉลย' เพื่อเติม output")
       }
@@ -230,7 +234,7 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
     const payload = {
       title: title.trim(),
       weekId,
-      score: Number(score) || 10,
+      score: maxScore,
       description: description.trim(),
       inputSpec: inputSpec.trim(),
       outputSpec: outputSpec.trim(),
@@ -251,6 +255,7 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
               input: c.input,
               expectedOutput: c.expectedOutput,
               isHidden: c.isHidden,
+              score: c.score,
               sortOrder: i,
             })),
     }
@@ -541,6 +546,10 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
               <p className="mb-3 text-xs text-red-500">{errors.testCases}</p>
             )}
 
+            <p className="mb-3 text-xs text-slate-500">
+              {cases.length} ชุด · รวม {maxScore} คะแนน
+            </p>
+
             <div className="flex flex-col gap-3">
               {cases.map((tc, idx) => (
                 <div
@@ -552,6 +561,20 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
                       Test Case {idx + 1}
                     </span>
                     <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={tc.score}
+                          onChange={(e) =>
+                            updateCase(idx, { score: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })
+                          }
+                          className="input-base w-16 py-0.5 text-right text-xs"
+                          aria-label={`คะแนน Test Case ${idx + 1}`}
+                        />
+                        คะแนน
+                      </label>
                       <label className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-500">
                         <input
                           type="checkbox"
@@ -657,16 +680,25 @@ export function ProblemEditor({ courseSlug, coursePath, courseLanguage, weeks, m
                 </div>
               </Field>
               <Field label="คะแนน *" error={errors.score}>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    value={score}
-                    onChange={(e) => setScore(Number(e.target.value))}
-                    className="input-base w-24 text-right"
-                  />
-                  <span className="text-sm text-slate-400">คะแนน</span>
-                </div>
+                {problemType === "unit" ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      value={score}
+                      onChange={(e) => setScore(Number(e.target.value))}
+                      className="input-base w-24 text-right"
+                    />
+                    <span className="text-sm text-slate-400">คะแนน</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="input-base w-24 bg-slate-50 text-right text-slate-500">
+                      {maxScore}
+                    </div>
+                    <p className="mt-1 text-xs text-slate-400">รวมจากคะแนนของแต่ละ test case</p>
+                  </>
+                )}
               </Field>
               <Field label="ภาษา">
                 <div className="input-base w-full bg-slate-50 text-slate-500">

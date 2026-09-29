@@ -135,3 +135,20 @@ describe("validateProblemInput", () => {
     expect(result.valid).toBe(true)
   })
 })
+
+describe("validateProblemInput — test-case scores (#66)", () => {
+  const base = { title: "T", weekId: 1 }
+  const tc = (score: unknown) => ({ input: "", expectedOutput: "", isHidden: false, score, sortOrder: 0 })
+
+  it("accepts zero and positive integer scores, and an unset score", () => {
+    expect(validateProblemInput({ ...base, testCases: [tc(0), tc(15), tc(undefined)] }).valid).toBe(true)
+  })
+
+  it("rejects negative, fractional, or non-numeric scores", () => {
+    for (const bad of [-1, 2.5, "10"]) {
+      const r = validateProblemInput({ ...base, testCases: [tc(bad)] })
+      expect(r.valid).toBe(false)
+      expect(r.errors.testCases).toBeTruthy()
+    }
+  })
+})

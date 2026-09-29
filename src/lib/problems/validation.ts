@@ -45,6 +45,13 @@ export function validateProblemInput(input: ProblemInput): {
     const cases = input.testCases ?? []
     if (cases.length === 0) {
       errors.testCases = "ต้องมีอย่างน้อย 1 test case"
+    } else if (
+      cases.some((tc) => {
+        const score = (tc as { score?: unknown } | null)?.score
+        return score != null && !(Number.isInteger(score) && (score as number) >= 0)
+      })
+    ) {
+      errors.testCases = "คะแนนของ test case ต้องเป็นจำนวนเต็มไม่ติดลบ"
     }
   }
 

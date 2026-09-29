@@ -81,3 +81,76 @@ describe("POST /api/courses/[code]/[year]/[semester]/problems — language inher
     expect(res.status).toBe(201)
   })
 })
+
+describe("POST /api/courses/[code]/[year]/[semester]/problems — max score (#66)", () => {
+  let f: CourseFixture
+  let weekId: number
+
+  function req(body: unknown): NextRequest {
+    const r = new NextRequest(
+      `http://localhost/api/courses/${f.course.code}/${f.course.year}/${f.course.semester}/problems`,
+      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }
+    )
+    r.cookies.set("session", sessionFor(f.ins.email))
+    return r
+  }
+
+  function ctx() {
+    return {
+      params: Promise.resolve({
+        code: f.course.code,
+        year: String(f.course.year),
+        semester: String(f.course.semester),
+      }),
+    }
+  }
+
+  beforeEach(async () => {
+    f = await courseFixture()
+    setTestDb(f.db)
+    weekId = (await listWeeks(f.db, f.course))[0].id
+  })
+
+  afterEach(() => setTestDb(null))
+
+  it("io mode: stores per-case scores and sets problem.score to their sum (client score ignored)", async () => {
+    const res = await POST(
+      req({
+        title: "Sum",
+        weekId,
+        score: 10,
+        testCases: [
+          { input: "1", expectedOutput: "1", isHidden: false, score: 5, sortOrder: 0 },
+          { input: "2", expectedOutput: "2", isHidden: true, score: 25, sortOrder: 1 },
+        ],
+      }),
+      ctx()
+    )
+    expect(res.status).toBe(201)
+    const stored = await getProblemById(f.db, (await res.json()).problem.id)
+    expect(stored?.score).toBe(30)
+    expect(stored?.testCases.map((tc) => tc.score)).toEqual([5, 25])
+  })
+
+  it("unit mode: keeps the problem's own score", async () => {
+    const res = await POST(
+      req({ title: "U", weekId, score: 40, problemType: "unit", unitTestCode: "assert f()", testCases: [] }),
+      ctx()
+    )
+    expect(res.status).toBe(201)
+    expect((await getProblemById(f.db, (await res.json()).problem.id))?.score).toBe(40)
+  })
+
+  it("rejects a negative or non-integer test-case score (400)", async () => {
+    const res = await POST(
+      req({
+        title: "Sum",
+        weekId,
+        testCases: [{ input: "1", expectedOutput: "1", isHidden: false, score: -1, sortOrder: 0 }],
+      }),
+      ctx()
+    )
+    expect(res.status).toBe(400)
+    expect((await res.json()).errors.testCases).toBeTruthy()
+  })
+})

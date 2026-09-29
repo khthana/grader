@@ -1,6 +1,7 @@
 import type { GradeResult, TestCase, TestResult } from "@/types"
 import { checkCodePolicy } from "@/lib/code-policy"
 import { runTestCases, runUnitTestBlock } from "@/lib/piston"
+import { problemMaxScore, testCaseScore } from "@/lib/problems/score"
 
 // The Piston seam expressed as an interface. Grading depends on this contract,
 // not on the HTTP module directly — so tests inject a fake runner (no network)
@@ -30,8 +31,6 @@ export interface GradableProblem {
     score?: number
   }>
 }
-
-const tcScore = (score?: number): number => score ?? 10
 
 function summarize(
   results: TestResult[],
@@ -67,9 +66,7 @@ export async function gradeSubmission(
   // Code policy is checked first; a violation scores zero without running code.
   const policy = checkCodePolicy(code, problem.blacklist ?? [], problem.whitelist ?? [])
   if (!policy.ok) {
-    const pointsMax = isUnit
-      ? problem.score
-      : problem.testCases.reduce((s, tc) => s + tcScore(tc.score), 0)
+    const pointsMax = problemMaxScore(problem)
     return {
       pointsEarned: 0,
       pointsMax,
@@ -84,7 +81,8 @@ export async function gradeSubmission(
   // Unit mode (#55): single test-code block, all-or-nothing scoring.
   if (isUnit) {
     const result = await runner.runUnitTestBlock(code, problem.unitTestCode)
-    return summarize([result], result.passed ? problem.score : 0, problem.score)
+    const pointsMax = problemMaxScore(problem)
+    return summarize([result], result.passed ? pointsMax : 0, pointsMax)
   }
 
   // io mode: run visible cases on `run`, all cases on `submit`; sum the scores
@@ -99,7 +97,7 @@ export async function gradeSubmission(
   }))
 
   const results = await runner.runTestCases(code, cases, problem.language)
-  const scoreMap = new Map(problem.testCases.map((tc) => [tc.id, tcScore(tc.score)]))
+  const scoreMap = new Map(problem.testCases.map((tc) => [tc.id, testCaseScore(tc.score)]))
   const pointsEarned = results
     .filter((r) => r.passed)
     .reduce((sum, r) => sum + (scoreMap.get(r.testCaseId) ?? 0), 0)

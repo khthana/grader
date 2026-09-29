@@ -128,7 +128,9 @@ export function ReviewWorkbench({ problems, courseSlug }: Props) {
 
   const auto = detail?.pointsEarned ?? 0
   const pointsMax = detail?.pointsMax ?? 0
-  const bonusMax = Math.max(0, pointsMax - auto)
+  // Cap the bonus at the problem's current max score — the same bound the
+  // manual-score PUT validates against (#66) — so a valid stepper value never 400s.
+  const bonusMax = Math.max(0, (activeProblem?.score ?? pointsMax) - auto)
   const total = auto + bonus
   const results = (detail?.results ?? []) as TestResult[]
   const alreadyReviewed = !!detail?.reviewedAt

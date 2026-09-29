@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db"
 import { courseRoute } from "@/lib/courses/route"
 import { createProblem, listProblems, setTestCases } from "@/lib/problems/repository"
 import { validateProblemInput } from "@/lib/problems/validation"
+import { problemMaxScore } from "@/lib/problems/score"
 import { countSubmitted, countPending } from "@/lib/submissions/repository"
 import { safeLog } from "@/lib/logs"
 
@@ -84,7 +85,12 @@ export const POST = courseRoute({ manage: true }, async (request, auth) => {
     courseSemester: auth.course.semester,
     weekId: body.weekId!,
     title: body.title!.trim(),
-    score: body.score,
+    // Max score is derived server-side (#66): io = sum of test-case scores.
+    score: problemMaxScore({
+      problemType: body.problemType ?? "io",
+      score: body.score ?? 10,
+      testCases: body.testCases ?? [],
+    }),
     description: body.description?.trim(),
     inputSpec: body.inputSpec?.trim(),
     outputSpec: body.outputSpec?.trim(),

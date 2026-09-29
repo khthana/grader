@@ -8,6 +8,7 @@ import {
   setTestCases,
 } from "@/lib/problems/repository"
 import { validateProblemInput } from "@/lib/problems/validation"
+import { problemMaxScore } from "@/lib/problems/score"
 import { safeLog } from "@/lib/logs"
 
 export const GET = courseRoute<{ code: string; year: string; semester: string; pid: string }>(
@@ -85,7 +86,12 @@ export const PUT = courseRoute<{ code: string; year: string; semester: string; p
 
     const updated = await updateProblem(db, problemId, {
       title: body.title?.trim(),
-      score: body.score,
+      // Max score is derived server-side (#66): io = sum of test-case scores.
+      score: problemMaxScore({
+        problemType: body.problemType ?? existing.problemType,
+        score: body.score ?? existing.score,
+        testCases: body.testCases ?? [],
+      }),
       description: body.description?.trim(),
       inputSpec: body.inputSpec?.trim(),
       outputSpec: body.outputSpec?.trim(),
