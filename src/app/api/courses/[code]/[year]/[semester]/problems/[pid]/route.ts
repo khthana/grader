@@ -7,13 +7,11 @@ import {
   deleteProblem,
   setTestCases,
 } from "@/lib/problems/repository"
-import { validateProblemInput } from "@/lib/problems/validation"
+import { buildProblemDraft, type ProblemBody } from "@/lib/problems/draft"
 import { studentProblemView } from "@/lib/problems/visibility"
 import { canSeeWeek } from "@/lib/problems/problem-access"
 import { getWeekForCourse } from "@/lib/weeks/repository"
-import { problemMaxScore } from "@/lib/problems/score"
 import { safeLog } from "@/lib/logs"
-import { toProblemType } from "@/lib/problems/problem-type"
 
 export const GET = courseRoute<{ code: string; year: string; semester: string; pid: string }>(
   {},
@@ -48,83 +46,22 @@ export const PUT = courseRoute<{ code: string; year: string; semester: string; p
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
-    const body = (await request.json().catch(() => ({}))) as {
-      title?: string
-      weekId?: number
-      score?: number
-      description?: string
-      inputSpec?: string
-      outputSpec?: string
-      dueAt?: string | null
-      closeAt?: string | null
-      language?: string
-      referenceSolution?: string
-      problemType?: string
-      functionName?: string
-      starterCode?: string
-      unitTestCode?: string
-      blacklist?: string[]
-      whitelist?: string[]
-      testCases?: Array<{
-        input: string
-        expectedOutput: string
-        isHidden: boolean
-        score?: number
-        sortOrder: number
-      }>
-    }
-
-    const { valid, errors } = validateProblemInput({
-      title: body.title,
-      weekId: body.weekId,
-      score: body.score,
-      dueAt: body.dueAt,
-      closeAt: body.closeAt,
-      testCases: body.testCases,
-      problemType: body.problemType,
-      functionName: body.functionName,
-      unitTestCode: body.unitTestCode,
-      blacklist: body.blacklist,
-      whitelist: body.whitelist,
-      // Validate against the course language so unit mode is rejected for C (#64).
-      language: auth.course.language,
-    })
-    if (!valid) return NextResponse.json({ errors }, { status: 400 })
-
+    const body = (await request.json().catch(() => ({}))) as ProblemBody
     const db = getDb()
     const existing = await getProblemForCourse(db, auth.course, problemId)
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
-    // Absent → keep the stored type (not rewritten below); otherwise normalise.
-    const requestedType = body.problemType === undefined ? undefined : toProblemType(body.problemType)
 
-    const updated = await updateProblem(db, problemId, {
-      title: body.title?.trim(),
-      // Max score is derived server-side (#66): io = sum of test-case scores.
-      score: problemMaxScore({
-        problemType: requestedType ?? existing.problemType,
-        score: body.score ?? existing.score,
-        testCases: body.testCases ?? [],
-      }),
-      description: body.description?.trim(),
-      inputSpec: body.inputSpec?.trim(),
-      outputSpec: body.outputSpec?.trim(),
-      dueAt: body.dueAt,
-      closeAt: body.closeAt,
-      // Language stays course-authoritative (#63) — re-sync to the course
-      // language on every edit; the client value is ignored.
-      language: auth.course.language,
-      referenceSolution: body.referenceSolution,
-      problemType: requestedType,
-      functionName: body.functionName,
-      starterCode: body.starterCode,
-      unitTestCode: body.unitTestCode,
-      blacklist: body.blacklist,
-      whitelist: body.whitelist,
-    })
+    // The body is merged over the stored Problem, and that merged Problem is
+    // both what's validated and what's written (#83).
+    const result = buildProblemDraft(body, { language: auth.course.language, existing })
+    if (!result.ok) return NextResponse.json({ errors: result.errors }, { status: 400 })
+    const { testCases: draftCases, ...draft } = result.draft
 
-    const testCases = await setTestCases(db, problemId, body.testCases ?? [])
+    // The draft keeps the stored weekId (updateProblem writes none anyway).
+    const updated = await updateProblem(db, problemId, draft)
+    const testCases = await setTestCases(db, problemId, draftCases)
 
     await safeLog(db, {
       actorId: auth.user.id,

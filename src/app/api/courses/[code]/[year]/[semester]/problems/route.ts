@@ -2,11 +2,9 @@ import { NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
 import { courseRoute } from "@/lib/courses/route"
 import { createProblem, listProblems, setTestCases } from "@/lib/problems/repository"
-import { validateProblemInput } from "@/lib/problems/validation"
-import { problemMaxScore } from "@/lib/problems/score"
+import { buildProblemDraft, type ProblemBody } from "@/lib/problems/draft"
 import { countSubmitted, countPending } from "@/lib/submissions/repository"
 import { safeLog } from "@/lib/logs"
-import { toProblemType } from "@/lib/problems/problem-type"
 
 export const GET = courseRoute({}, async (request, auth) => {
   const url = new URL(request.url)
@@ -38,81 +36,20 @@ export const GET = courseRoute({}, async (request, auth) => {
 })
 
 export const POST = courseRoute({ manage: true }, async (request, auth) => {
-  const body = (await request.json().catch(() => ({}))) as {
-    title?: string
-    weekId?: number
-    score?: number
-    description?: string
-    inputSpec?: string
-    outputSpec?: string
-    dueAt?: string | null
-    closeAt?: string | null
-    language?: string
-    referenceSolution?: string
-    problemType?: string
-    functionName?: string
-    starterCode?: string
-    unitTestCode?: string
-    blacklist?: string[]
-    whitelist?: string[]
-    testCases?: Array<{
-      input: string
-      expectedOutput: string
-      isHidden: boolean
-      score?: number
-      sortOrder: number
-    }>
-  }
+  const body = (await request.json().catch(() => ({}))) as ProblemBody
+  const result = buildProblemDraft(body, { language: auth.course.language })
+  if (!result.ok) return NextResponse.json({ errors: result.errors }, { status: 400 })
+  const { testCases: draftCases, ...draft } = result.draft
 
-  const { valid, errors } = validateProblemInput({
-    title: body.title,
-    weekId: body.weekId,
-    score: body.score,
-    dueAt: body.dueAt,
-    closeAt: body.closeAt,
-    testCases: body.testCases,
-    problemType: body.problemType,
-    functionName: body.functionName,
-    unitTestCode: body.unitTestCode,
-    blacklist: body.blacklist,
-    whitelist: body.whitelist,
-    // Validate against the course language so unit mode is rejected for C (#64).
-    language: auth.course.language,
-  })
-  if (!valid) return NextResponse.json({ errors }, { status: 400 })
-
-  const problemType = toProblemType(body.problemType)
   const db = getDb()
   const problem = await createProblem(db, {
     courseCode: auth.course.code,
     courseYear: auth.course.year,
     courseSemester: auth.course.semester,
-    weekId: body.weekId!,
-    title: body.title!.trim(),
-    // Max score is derived server-side (#66): io = sum of test-case scores.
-    score: problemMaxScore({
-      problemType,
-      score: body.score ?? 10,
-      testCases: body.testCases ?? [],
-    }),
-    description: body.description?.trim(),
-    inputSpec: body.inputSpec?.trim(),
-    outputSpec: body.outputSpec?.trim(),
-    dueAt: body.dueAt ?? null,
-    closeAt: body.closeAt ?? null,
-    // Language is course-authoritative (#63): every problem inherits the course
-    // language; the client value is ignored.
-    language: auth.course.language,
-    referenceSolution: body.referenceSolution,
-    problemType,
-    functionName: body.functionName,
-    starterCode: body.starterCode,
-    unitTestCode: body.unitTestCode,
-    blacklist: body.blacklist,
-    whitelist: body.whitelist,
+    ...draft,
   })
 
-  const testCases = await setTestCases(db, problem.id, body.testCases ?? [])
+  const testCases = await setTestCases(db, problem.id, draftCases)
 
   await safeLog(db, {
     actorId: auth.user.id,

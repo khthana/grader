@@ -79,6 +79,72 @@ describe("PUT /api/courses/[code]/[year]/[semester]/problems/[pid] — unit mode
     expect((await res.json()).problem.score).toBe(50)
     expect((await getProblemById(f.db, problemId))?.score).toBe(50)
   })
+
+  it("omitting problemType on a unit problem validates and saves it as unit (#83)", async () => {
+    // Was: validated as io (absent type → needs Test Cases → 400) while the
+    // write kept the stored unit type.
+    const unit = await createProblem(f.db, {
+      courseCode: f.course.code,
+      courseYear: f.course.year,
+      courseSemester: f.course.semester,
+      weekId,
+      title: "U",
+      score: 30,
+      problemType: "unit",
+      unitTestCode: "assert add(1, 2) == 3",
+    })
+    problemId = unit.id
+
+    const res = await PUT(req({ title: "U edited" }), ctx())
+    expect(res.status).toBe(200)
+    const saved = await getProblemById(f.db, problemId)
+    expect(saved).toMatchObject({
+      title: "U edited",
+      problemType: "unit",
+      unitTestCode: "assert add(1, 2) == 3",
+      score: 30,
+      testCases: [],
+    })
+  })
+
+  it("a unit problem never stores Test Cases, even when the body sends some (#83)", async () => {
+    const unit = await createProblem(f.db, {
+      courseCode: f.course.code,
+      courseYear: f.course.year,
+      courseSemester: f.course.semester,
+      weekId,
+      title: "U",
+      problemType: "unit",
+      unitTestCode: "assert f()",
+    })
+    problemId = unit.id
+
+    const res = await PUT(
+      req({ testCases: [{ input: "1", expectedOutput: "1", isHidden: false, sortOrder: 0 }] }),
+      ctx()
+    )
+    expect(res.status).toBe(200)
+    expect((await getProblemById(f.db, problemId))?.testCases).toEqual([])
+  })
+
+  it("an omitted deadline keeps its stored value (#83)", async () => {
+    await setTestCases(f.db, problemId, [{ input: "1", expectedOutput: "1", isHidden: false, sortOrder: 0 }])
+    await PUT(req({ dueAt: "2026-10-01T00:00:00.000Z", closeAt: "2026-10-02T00:00:00.000Z" }), ctx())
+
+    const res = await PUT(req({ title: "Renamed" }), ctx())
+    expect(res.status).toBe(200)
+    const saved = await getProblemById(f.db, problemId)
+    expect(saved?.title).toBe("Renamed")
+    expect(saved?.dueAt).not.toBeNull()
+    expect(saved?.closeAt).not.toBeNull()
+    expect(saved?.testCases).toHaveLength(1)
+  })
+
+  it("404s an unknown problem before validating the body", async () => {
+    problemId = 99999
+    const res = await PUT(req({}), ctx())
+    expect(res.status).toBe(404)
+  })
 })
 
 describe("GET /api/courses/[code]/[year]/[semester]/problems/[pid] — student view (#71)", () => {

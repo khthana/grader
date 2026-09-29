@@ -7,6 +7,7 @@ import {
   setCourseInstructors,
 } from "@/lib/courses/repository"
 import { listWeeks, createWeek } from "@/lib/weeks/repository"
+import { toTestCaseInput } from "@/lib/problems/draft"
 import {
   listProblems,
   getProblemById,
@@ -102,17 +103,7 @@ export async function duplicateCourseOffering(
       blacklist: detail.blacklist,
       whitelist: detail.whitelist,
     })
-    await setTestCases(
-      db,
-      created.id,
-      detail.testCases.map((tc) => ({
-        input: tc.input,
-        expectedOutput: tc.expectedOutput,
-        isHidden: tc.isHidden,
-        score: tc.score,
-        sortOrder: tc.sortOrder,
-      }))
-    )
+    await setTestCases(db, created.id, detail.testCases.map(toTestCaseInput))
   }
 
   return { ok: true, course }
