@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import type { SubmissionRequest } from "@/types"
 import { getUserFromRequest } from "@/lib/auth-guard"
 import { getDb } from "@/lib/db"
-import { getProblemById } from "@/lib/problems/repository"
 import { findEnrollment } from "@/lib/enrollments/repository"
 import { createSubmission } from "@/lib/submissions/repository"
 import { gradeSubmission, redactForStudent } from "@/lib/grading"
-import { resolveCourseAccess } from "@/lib/courses/course-access"
-import { getWeekForCourse } from "@/lib/weeks/repository"
+import { resolveProblemVisibility } from "@/lib/problems/problem-access"
 
 export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request)
@@ -30,20 +28,13 @@ export async function POST(request: NextRequest) {
   // can't be probed for existence (#80).
   const problemNotFound = () => NextResponse.json({ error: "Problem not found" }, { status: 404 })
 
-  const db = getDb()
-  const problem = await getProblemById(db, Number(problemId))
-  if (!problem) return problemNotFound()
-
   // Authorize against the problem's own course, for run as well as submit —
-  // running code costs a Piston job and reveals test behaviour (#74).
-  const courseKey = { code: problem.courseCode, year: problem.courseYear, semester: problem.courseSemester }
-  const access = await resolveCourseAccess(db, user, courseKey)
-  if (!access) return problemNotFound()
-  // access.staff = staff of *this* course, not a global TA/Instructor role.
-  if (!access.staff) {
-    const week = await getWeekForCourse(db, courseKey, problem.weekId)
-    if (!week?.isReleased) return problemNotFound()
-  }
+  // running code costs a Piston job and reveals test behaviour (#74). The
+  // shared gate (#82) also hides unreleased Weeks from non-staff.
+  const db = getDb()
+  const visibility = await resolveProblemVisibility(db, user, Number(problemId))
+  if (visibility.kind !== "visible") return problemNotFound()
+  const { problem, access } = visibility
 
   const runMode = mode === "run" ? "run" : "submit"
 
@@ -55,8 +46,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Enrollment check: a student must be enrolled in this course.
+    // access.staff = staff of *this* course, not a global TA/Instructor role.
     if (!access.staff) {
-      const enrollment = await findEnrollment(db, courseKey, user.id)
+      const enrollment = await findEnrollment(db, access.course, user.id)
       if (!enrollment) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
       }

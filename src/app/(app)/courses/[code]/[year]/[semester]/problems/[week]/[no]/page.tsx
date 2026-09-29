@@ -6,6 +6,7 @@ import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { getDb } from "@/lib/db"
 import { parseCourseSlug, buildCoursePath } from "@/lib/courses/slug"
 import { getProblemByWeekAndNo } from "@/lib/problems/repository"
+import { canSeeWeek } from "@/lib/problems/problem-access"
 import { problemMaxScore } from "@/lib/problems/score"
 import { getWeekByNo } from "@/lib/weeks/repository"
 import { getCourseAccess } from "@/lib/courses/server"
@@ -47,7 +48,9 @@ export default async function CourseProblemPage({ params }: PageProps) {
   const user = access.user
   const isPrivileged = access.staff
 
-  if (!isPrivileged && !weekRecord.isReleased) {
+  // Checked on the Week before the Problem is looked up, so the notice says
+  // nothing about whether a problem exists at this position (#80, #82).
+  if (!canSeeWeek(access, weekRecord)) {
     const coursePath = buildCoursePath(slug)
     return (
       <div className="flex flex-col gap-6 font-thai">

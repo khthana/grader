@@ -1,31 +1,23 @@
 import type { Queryable } from "@/lib/db"
-import { resolveCourseAccess } from "@/lib/courses/course-access"
 import { buildCoursePath } from "@/lib/courses/slug"
-import { getWeekForCourse } from "@/lib/weeks/repository"
-import { getProblemById } from "./repository"
+import { resolveProblemVisibility } from "./problem-access"
 
 export type LegacyProblemTarget = "" | "/edit" | "/submissions"
 
 // Where a legacy /problems/[id] URL redirects, or null for a 404. The redirect
 // itself reveals the problem's course, week and position, so it is only given
-// to users who may see the problem: linked to its course, and — unless they
-// are its staff — only in a released week (#80). Unknown and inaccessible ids
-// both return null, so ids can't be probed.
+// to users who may see the problem (#80) — the shared visibility gate (#82).
+// Unknown, inaccessible and hidden-week ids all return null, so ids can't be
+// probed.
 export async function resolveLegacyProblemPath(
   db: Queryable,
   user: { id: number; roles: string[] },
   problemId: number,
   target: LegacyProblemTarget
 ): Promise<string | null> {
-  const problem = await getProblemById(db, problemId)
-  if (!problem) return null
+  const visibility = await resolveProblemVisibility(db, user, problemId)
+  if (visibility.kind !== "visible") return null
 
-  const key = { code: problem.courseCode, year: problem.courseYear, semester: problem.courseSemester }
-  const access = await resolveCourseAccess(db, user, key)
-  if (!access) return null
-
-  const week = await getWeekForCourse(db, key, problem.weekId)
-  if (!week || (!access.staff && !week.isReleased)) return null
-
-  return `${buildCoursePath(key)}/problems/${week.weekNo}/${problem.problemNo}${target}`
+  const { problem, week, access } = visibility
+  return `${buildCoursePath(access.course)}/problems/${week.weekNo}/${problem.problemNo}${target}`
 }
