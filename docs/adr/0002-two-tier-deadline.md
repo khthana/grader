@@ -41,3 +41,14 @@ override a late submission's grade without changing the `is_late` flag.
 - Two deadline fields to fill in the Problem Editor (both optional, so UX impact is low).
 - Server must check both fields in `/api/grade`; order matters (`close_at` checked first).
 - No grace-period or per-student extension in v1 — a future extension if needed.
+
+## Amendment (2026-09-29, #87 — ADR 0010)
+
+The three states are computed by one function, `submissionWindow({ dueAt, closeAt },
+now)` → `"open" | "late" | "closed"` (`src/lib/problems/submission-window.ts`). It
+checks `close_at` first. A deadline is past only **strictly after** its instant, so a
+submission at exactly `close_at` is still accepted. A NULL deadline never passes.
+`now` is injected and read **once per request**: the grade route's 403 and `is_late`,
+the problem page's banners and editor lock, and the Assignments/Scorebook "closed"
+badge all agree. `is_late` is judged at request start, not after the Piston run, so
+a submission sent before `due_at` isn't marked late because grading was slow.

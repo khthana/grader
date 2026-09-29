@@ -531,7 +531,7 @@ Introduce a real **Problem** domain: course-scoped Problems organised by **Week*
 
 - Schema: `problems` ได้รับ columns ใหม่ (`problem_type`, `function_name`, `starter_code`, `blacklist TEXT[]`, `whitelist TEXT[]`) ผ่าน `migrate-005-unit-test-blacklist.sql`; `unit_test_code` ผ่าน `migrate-006-unit-test-code.sql` *(#55)*; `test_cases` ไม่เปลี่ยน
 - Pure module `checkCodePolicy(code, blacklist, whitelist)` → `{ ok, violations }` — whole-word regex, no server-side eval
-- Unit harness *(#55)*: `runUnitTestBlock(studentCode, unitTestCode)` — รัน `studentCode + block` ครั้งเดียว, exit 0 = pass; fail คืน stderr/traceback ใน `result.error` — route ตัดออกก่อนส่งให้นักศึกษา (`redactForStudent`, #79) (เดิม #53 ใช้ `PASS`/`FAIL`/`ERROR` per case — ยกเลิก)
+- Unit harness *(#55)*: `runUnitTestBlock(studentCode, unitTestCode)` — รัน `studentCode + block` ครั้งเดียว, exit 0 = pass; fail คืน stderr/traceback ใน `result.error` — Student View ตัดออกก่อนส่งให้นักศึกษา (`gradeResultFor`, #79/#84) (เดิม #53 ใช้ `PASS`/`FAIL`/`ERROR` per case — ยกเลิก)
 - AI generation: `generateTestPlan` รับ `problemType`; unit mode returns `{ solution, unitTestCode }` *(#55; เดิม `{ tests: [{args, expected_return}] }`)*
 
 ### Issues

@@ -118,6 +118,26 @@ run-reference endpoint runs the Instructor-supplied code from the request body a
 **not** read the stored reference solution. Stored in `problems.reference_solution`
 (empty string when not set).
 
+### Reference Verification (รันเฉลย)
+Running a draft **Reference Solution** against the Problem's Test Case inputs (or its
+**Unit Test Code**) at authoring time. It goes through the same code runner and pass
+rule as grading (#85): a case is 🔴 only when the program didn't run cleanly (compile
+failure, non-zero exit, signal). A stderr warning alone is fine, as in grading. ✅/⚠️
+then compare stdout with the expected output.
+
+### Problem Draft
+The Problem an Instructor's create/edit request would produce: the request body merged
+over defaults (create) or over the stored **Problem** (edit), then validated as a
+whole (#83). An omitted field keeps its stored value. The draft is exactly what gets
+written. `buildProblemDraft` is the one place this happens.
+
+### Student View (มุมมองนักศึกษา)
+What a viewer may see of a **Problem** or a grading result (#84). Course staff see
+everything. A Student never sees a hidden **Test Case**, the **Unit Test Code**, or
+anything of a unit run beyond pass/fail. Of an io result, they see output only for a
+visible case. `problemFor` / `gradeResultFor` in `student-view.ts` are the one
+definition; the stored **Submission** keeps full results for staff.
+
 ### Submission (การส่งงาน)
 A Student's attempt at a **Problem**. Records the code, `submitted_at`, `points_earned`
 (from Piston auto-grading), `points_max` (total at submission time), `is_late`, and

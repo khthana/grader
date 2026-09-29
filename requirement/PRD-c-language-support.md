@@ -56,7 +56,7 @@
 - Consumed by: the Piston runner, the course form language dropdown, course validation, and the code editors' CodeMirror mode selection. This is the only place that knows language facts; adding C++/Java later = one new entry (plus its CodeMirror grammar in `language-support.ts`, which is kept client-side — a test fails if a registry language lacks one).
 
 ### Piston runner (interface extension)
-- `runCode(code, input, language)`, `runReferenceSolution(code, inputs, language)`, `runTestCases(code, testCases, language)` all take a language; `runCode` builds `files: [{ name: filename, content }]` and passes the runtime/version from the registry.
+- `runCode(code, input, language)` and `runTestCases(code, testCases, language)` take a language (Reference verification goes through `runTestCases` via `verifyReferenceSolution` — `runReferenceSolution` was removed in #85); `runCode` builds `files: [{ name: filename, content }]` and passes the runtime/version from the registry.
 - **Compile phase:** the Piston response's `compile` block is honored. If `compile.code !== 0` the attempt fails and `compile.stderr` (the gcc compile error) becomes the error shown to the student. Overall success = compile ok AND run exit 0.
 - `runUnitTestBlock` stays Python-only (no language parameter).
 

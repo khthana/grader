@@ -90,3 +90,14 @@ duplication path can use it without threading roles through `duplicateCourseOffe
 passes unedited (behaviour-preservation proof), plus new tests for the grading module
 (fake runner), `getProblemForCourse`, `getReferenceSolutionForStaff`, the week-PUT
 cross-course 404, and the submit-violation no-persist case.
+
+## Later amendments (ADR 0010, 2026-09-29)
+
+- **Grading knows nothing about auth**, now for redaction too: the Student View
+  (`src/lib/problems/student-view.ts`, #84) owns every staff/student projection.
+  Grading returns full results only, and `redactForStudent` is gone.
+- **The `CodeRunner` seam has a second consumer:** `verifyReferenceSolution` (#85)
+  runs "รันเฉลย" through the same runner and pass rule as grading. Routes inject a fake
+  one with `setTestRunner` (`getCodeRunner()` is the default).
+- `getReferenceSolutionForStaff` now takes `{ problemId, course, user }` and gates on
+  the course-scoped `manager` right (#73), not global roles.

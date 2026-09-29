@@ -67,8 +67,8 @@ if a registry language has no grammar).
 ### Compiled-language execution
 
 `piston.ts` models the optional `compile` phase. `runTestCases(code, cases, language)`
-and `runReferenceSolution(code, inputs, language)` resolve the runtime from the
-registry; for a compiled language a non-zero `compile.code` means the source never ran
+resolves the runtime from the registry (Reference verification runs through it too,
+via `verifyReferenceSolution` — `runReferenceSolution` was removed in #85); for a compiled language a non-zero `compile.code` means the source never ran
 — the gcc diagnostics are surfaced as the error and, for `runTestCases`, the run
 **short-circuits to a single compile-error result** instead of recompiling once per
 test case. The grading module and grade route thread `problem.language` through.
