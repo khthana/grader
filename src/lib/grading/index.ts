@@ -170,34 +170,3 @@ export async function verifyReferenceSolution(
     return r ? toOutput(r, !r.errored) : { stdout: "", stderr: "ไม่มีผลลัพธ์", ok: false }
   })
 }
-
-// A Student's view of a GradeResult. A redacted result keeps pass/fail but
-// loses expected/actual output and error. Scores and feedback are untouched;
-// the stored Submission keeps the full results for staff.
-//  - io (#71): only hidden Test Cases — any output could leak the hidden input
-//    or answer (a program can echo stdin to stderr).
-//  - unit (#79): the single result. Student code runs in the same file as the
-//    Unit Test Code, so it can print the test block or raise it as the
-//    exception message — no filtering of stderr/stdout is safe.
-export function redactForStudent(
-  result: GradeResult,
-  problem: Pick<GradableProblem, "problemType"> & { testCases: Array<{ id: number; isHidden: boolean }> }
-): GradeResult {
-  const hiddenIds = new Set(problem.testCases.filter((tc) => tc.isHidden).map((tc) => tc.id))
-  const isWithheld = (r: TestResult) => problem.problemType === "unit" || hiddenIds.has(r.testCaseId)
-  return {
-    ...result,
-    results: result.results.map((r) =>
-      isWithheld(r)
-        ? {
-            testCaseId: r.testCaseId,
-            passed: r.passed,
-            executionTime: r.executionTime,
-            expectedOutput: "",
-            actualOutput: "",
-            hidden: true,
-          }
-        : r
-    ),
-  }
-}

@@ -8,7 +8,7 @@ import {
   setTestCases,
 } from "@/lib/problems/repository"
 import { buildProblemDraft, type ProblemBody } from "@/lib/problems/draft"
-import { studentProblemView } from "@/lib/problems/visibility"
+import { problemFor } from "@/lib/problems/student-view"
 import { canSeeWeek } from "@/lib/problems/problem-access"
 import { getWeekForCourse } from "@/lib/weeks/repository"
 import { safeLog } from "@/lib/logs"
@@ -31,10 +31,8 @@ export const GET = courseRoute<{ code: string; year: string; semester: string; p
     if (!week || !canSeeWeek(auth, week)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
-    if (auth.staff) return NextResponse.json({ problem })
-
-    // Students never receive hidden test cases or the unit-test block (#71).
-    return NextResponse.json({ problem: studentProblemView(problem) })
+    // Students never receive hidden test cases or the unit-test block (#71, #84).
+    return NextResponse.json({ problem: problemFor(auth, problem) })
   }
 )
 

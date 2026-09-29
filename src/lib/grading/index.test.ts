@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { gradeSubmission, redactForStudent, type CodeRunner, type GradableProblem } from "./index"
+import { gradeSubmission, type CodeRunner, type GradableProblem } from "./index"
 import type { TestResult } from "@/types"
 
 // A fake CodeRunner — the second adapter that earns the seam. Grading is
@@ -159,54 +159,5 @@ describe("gradeSubmission", () => {
     const runner = fakeRunner({ testCases: () => [pass(1, "A")] })
     const result = await gradeSubmission(ioProblem(), "print('A')", "run", runner)
     expect(result.feedback).toBe("ผ่านทุก test case!")
-  })
-})
-
-describe("redactForStudent (#71, #79)", () => {
-  const io = (testCases: Array<{ id: number; isHidden: boolean }>) => ({ problemType: "io" as const, testCases })
-
-  const base = {
-    pointsEarned: 10,
-    pointsMax: 20,
-    totalTests: 2,
-    passedTests: 1,
-    feedback: "f",
-    results: [
-      { testCaseId: 1, passed: true, actualOutput: "a", expectedOutput: "a", executionTime: 3 },
-      { testCaseId: 2, passed: false, actualOutput: "leak", expectedOutput: "ans", executionTime: 4, error: "boom" },
-    ],
-  }
-
-  it("blanks hidden results but keeps pass/fail and scores", () => {
-    const out = redactForStudent(base, io([{ id: 1, isHidden: false }, { id: 2, isHidden: true }]))
-    expect(out.results[0]).toEqual(base.results[0])
-    expect(out.results[1]).toEqual({
-      testCaseId: 2,
-      passed: false,
-      executionTime: 4,
-      expectedOutput: "",
-      actualOutput: "",
-      hidden: true,
-    })
-    expect(out.pointsEarned).toBe(10)
-    expect(out.passedTests).toBe(1)
-  })
-
-  it("io: leaves results for ids that are not hidden (e.g. synthetic compile result 0)", () => {
-    const withCompile = { ...base, results: [{ ...base.results[1], testCaseId: 0 }] }
-    expect(redactForStudent(withCompile, io([{ id: 2, isHidden: true }])).results[0].error).toBe("boom")
-  })
-
-  it("unit: blanks the traceback and stdout — the student controls both (#79)", () => {
-    const unit = {
-      ...base,
-      results: [{ testCaseId: 0, passed: false, actualOutput: "assert add(1, 2) == 3", expectedOutput: "", executionTime: 5, error: "Traceback ... assert add(1, 2) == 3" }],
-    }
-    const out = redactForStudent(unit, { problemType: "unit", testCases: [] })
-    expect(out.results).toEqual([
-      { testCaseId: 0, passed: false, executionTime: 5, expectedOutput: "", actualOutput: "", hidden: true },
-    ])
-    expect(out.pointsEarned).toBe(10)
-    expect(out.feedback).toBe("f")
   })
 })

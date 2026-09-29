@@ -1,4 +1,4 @@
-import { TestCase, TestResult } from "@/types"
+import { PROGRAM_RESULT_ID, TestCase, TestResult } from "@/types"
 import { DEFAULT_LANGUAGE, getLanguageConfig } from "@/lib/languages"
 
 const PISTON_API = process.env.PISTON_URL ?? "https://emkc.org/api/v2/piston"
@@ -54,7 +54,7 @@ ${unitTestCode}`
     const stderr = response.run.stderr
     const passed = response.run.code === 0
     return {
-      testCaseId: 0,
+      testCaseId: PROGRAM_RESULT_ID,
       passed,
       actualOutput: stdout,
       expectedOutput: "",
@@ -64,7 +64,7 @@ ${unitTestCode}`
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error"
     return {
-      testCaseId: 0,
+      testCaseId: PROGRAM_RESULT_ID,
       passed: false,
       actualOutput: "",
       expectedOutput: "",
@@ -146,9 +146,10 @@ export async function runTestCases(
   // single compile-error result instead of recompiling N times.
   const first = await runOneCase(code, testCases[0], language)
   if (first.compileFailed) {
-    // Not tied to any test case — drop the first case's expected output,
-    // which may belong to a hidden case (#71).
-    return [{ ...first.result, testCaseId: 0, expectedOutput: "", actualOutput: "" }]
+    // One result for the whole program, not for any test case — so it carries
+    // no case's expected/actual output. (What a Student may see of it is the
+    // Student View's call — src/lib/problems/student-view.ts.)
+    return [{ ...first.result, testCaseId: PROGRAM_RESULT_ID, expectedOutput: "", actualOutput: "" }]
   }
 
   const rest = await Promise.all(

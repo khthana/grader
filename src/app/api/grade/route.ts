@@ -4,7 +4,8 @@ import { getUserFromRequest } from "@/lib/auth-guard"
 import { getDb } from "@/lib/db"
 import { findEnrollment } from "@/lib/enrollments/repository"
 import { createSubmission } from "@/lib/submissions/repository"
-import { gradeSubmission, redactForStudent } from "@/lib/grading"
+import { gradeSubmission } from "@/lib/grading"
+import { gradeResultFor } from "@/lib/problems/student-view"
 import { resolveProblemVisibility } from "@/lib/problems/problem-access"
 
 export async function POST(request: NextRequest) {
@@ -78,8 +79,7 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // Students see pass/fail only for hidden test cases (#71) and for a unit
-  // block (#79); the stored Submission above keeps the full results for staff.
-  if (access.staff) return NextResponse.json(result)
-  return NextResponse.json(redactForStudent(result, problem))
+  // The stored Submission above keeps the full results; the viewer gets
+  // their Student View of them (#71, #79, #84).
+  return NextResponse.json(gradeResultFor(access, result, problem))
 }

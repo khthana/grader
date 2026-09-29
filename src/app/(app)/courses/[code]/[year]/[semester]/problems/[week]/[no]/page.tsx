@@ -8,6 +8,7 @@ import { parseCourseSlug, buildCoursePath } from "@/lib/courses/slug"
 import { getProblemByWeekAndNo } from "@/lib/problems/repository"
 import { canSeeWeek } from "@/lib/problems/problem-access"
 import { problemMaxScore } from "@/lib/problems/score"
+import { sampleTestCases } from "@/lib/problems/student-view"
 import { getWeekByNo } from "@/lib/weeks/repository"
 import { getCourseAccess } from "@/lib/courses/server"
 import { getLastSubmission } from "@/lib/submissions/repository"
@@ -77,7 +78,7 @@ export default async function CourseProblemPage({ params }: PageProps) {
   const lastSubmission =
     !isPrivileged ? await getLastSubmission(db, problem.id, user.id) : null
 
-  const visibleCases = problem.testCases.filter((tc) => !tc.isHidden)
+  const visibleCases = sampleTestCases(problem)
   const dueDate = formatDate(problem.dueAt)
   const now = new Date()
   const isClosed = problem.closeAt ? new Date(problem.closeAt) < now : false
