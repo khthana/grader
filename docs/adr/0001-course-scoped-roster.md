@@ -55,6 +55,12 @@ Build the course-scoped model, and go further than the roster page alone:
   and APIs are scoped to entitled courses; selection persists in an `active_course`
   cookie (mirroring `active_role`), with a friendly empty state when a user has no
   courses.
+- **Amendment (#73 pages, #74 API):** the global role only says *which* capacity a
+  user has; it applies **only in courses where they hold a `course_instructors` row**.
+  Pages and APIs derive rights from `resolveCourseAccess` — staff = assigned here +
+  TA/Instructor role, manager = assigned here + Instructor role (roster mutation and
+  course management are the same right); Admin everywhere. A TA or Instructor who is
+  merely *enrolled* in another course has plain Student rights there.
 
 ## Consequences
 

@@ -23,11 +23,19 @@ export async function resolveCourseAccess(
   key: CourseKey
 ): Promise<CourseAccess | null> {
   const course = await getCourseByKey(db, key)
-  if (!course) return null
+  return course ? resolveAccessToCourse(db, user, course) : null
+}
 
+// Same gate for a course record already loaded (authorizeCourse loads it first
+// to tell 404 from 403).
+export async function resolveAccessToCourse(
+  db: Queryable,
+  user: { id: number; roles: string[] },
+  course: CourseRecord
+): Promise<CourseAccess | null> {
   if (user.roles.includes("Admin")) return { course, staff: true, manager: true }
 
-  const membership = await getCourseMembership(db, key, user.id)
+  const membership = await getCourseMembership(db, course, user.id)
   if (!membership.staff && !membership.enrolled) return null
 
   return {

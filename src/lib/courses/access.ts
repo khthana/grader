@@ -2,14 +2,6 @@ import type { CourseRecord } from "./types"
 
 // Pure course-access helpers (mirrors src/lib/roles.ts — no I/O, unit-tested).
 
-// Who may mutate a course roster: Admin and Instructor. TA is view-only
-// (per ADR 0001), Student has no access.
-const ROSTER_MUTATORS = ["Admin", "Instructor"]
-
-export function canMutateRoster(roles: string[]): boolean {
-  return roles.some((r) => ROSTER_MUTATORS.includes(r))
-}
-
 // Who may create/edit/delete courses: Admin and Instructor. TA and Student
 // have no course-management access.
 const COURSE_MANAGERS = ["Admin", "Instructor"]

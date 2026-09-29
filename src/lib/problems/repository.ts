@@ -290,14 +290,17 @@ export async function getProblemByWeekAndNo(
   return getProblemById(db, rows[0].id)
 }
 
+// `releasedOnly` hides problems in unreleased Weeks — set it for anyone who
+// isn't staff of the course (PRD-week-release, #74).
 export async function listProblems(
   db: Queryable,
   key: CourseKey,
-  weekId?: number
+  opts: { weekId?: number; releasedOnly?: boolean } = {}
 ): Promise<ProblemListItem[]> {
   const params: unknown[] = [key.code, key.year, key.semester]
-  const weekFilter = weekId != null ? `AND p.week_id = $4::int` : ""
-  if (weekId != null) params.push(weekId)
+  const weekFilter = opts.weekId != null ? `AND p.week_id = $4::int` : ""
+  if (opts.weekId != null) params.push(opts.weekId)
+  const releaseFilter = opts.releasedOnly ? `AND w.is_released = TRUE` : ""
 
   const { rows } = await db.query<{
     id: number
@@ -320,7 +323,7 @@ export async function listProblems(
      FROM problems p
      JOIN weeks w ON w.id = p.week_id
      WHERE p.course_code = $1 AND p.course_year = $2::int AND p.course_semester = $3::int
-     ${weekFilter}
+     ${weekFilter} ${releaseFilter}
      ORDER BY w.week_no, p.problem_no`,
     params
   )

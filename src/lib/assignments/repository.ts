@@ -41,17 +41,21 @@ interface SubmissionRow {
   reviewed_at: string | null
 }
 
+// `releasedOnly` hides problems in unreleased Weeks (#74) — set for non-staff.
 export async function getStudentAssignments(
   db: Queryable,
   key: CourseKey,
-  userId: number
+  userId: number,
+  opts: { releasedOnly?: boolean } = {}
 ): Promise<AssignmentItem[]> {
+  const releaseFilter = opts.releasedOnly ? `AND w.is_released = TRUE` : ""
   const { rows: problemRows } = await db.query<ProblemRow>(
     `SELECT p.id AS problem_id, p.problem_no, p.title, w.week_no, p.due_at, p.close_at,
             p.score::text AS points_max
      FROM problems p
      JOIN weeks w ON w.id = p.week_id
      WHERE p.course_code = $1 AND p.course_year = $2::int AND p.course_semester = $3::int
+       ${releaseFilter}
      ORDER BY w.week_no, p.problem_no`,
     [key.code, key.year, key.semester]
   )

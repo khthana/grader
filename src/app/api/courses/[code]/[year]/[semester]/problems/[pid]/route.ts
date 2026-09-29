@@ -9,7 +9,7 @@ import {
 } from "@/lib/problems/repository"
 import { validateProblemInput } from "@/lib/problems/validation"
 import { studentProblemView } from "@/lib/problems/visibility"
-import { isTeachingStaff } from "@/lib/courses/access"
+import { getWeekForCourse } from "@/lib/weeks/repository"
 import { problemMaxScore } from "@/lib/problems/score"
 import { safeLog } from "@/lib/logs"
 import { toProblemType } from "@/lib/problems/problem-type"
@@ -22,14 +22,20 @@ export const GET = courseRoute<{ code: string; year: string; semester: string; p
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
-    const problem = await getProblemForCourse(getDb(), auth.course, problemId)
+    const db = getDb()
+    const problem = await getProblemForCourse(db, auth.course, problemId)
     if (!problem) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
+    if (auth.staff) return NextResponse.json({ problem })
+
+    // A problem in an unreleased Week doesn't exist for non-staff (#74).
+    const week = await getWeekForCourse(db, auth.course, problem.weekId)
+    if (!week?.isReleased) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
     // Students never receive hidden test cases or the unit-test block (#71).
-    return NextResponse.json({
-      problem: isTeachingStaff(auth.user.roles) ? problem : studentProblemView(problem),
-    })
+    return NextResponse.json({ problem: studentProblemView(problem) })
   }
 )
 

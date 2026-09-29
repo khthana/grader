@@ -1,20 +1,31 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { getUserFromRequest } from "@/lib/auth-guard"
 import { getDb } from "@/lib/db"
-import { getCourseByKey, listCoursesForUser } from "./repository"
+import { getCourseByKey } from "./repository"
 import { parseCourseSlug } from "./slug"
-import { canMutateRoster, canManageCourses, isTeachingStaff } from "./access"
+import { resolveAccessToCourse } from "./course-access"
 import type { UserWithRoles } from "@/lib/users/repository"
 import type { CourseRecord } from "./types"
 
+// `staff` / `manager` are rights in *this* course (#74) — from staffing it,
+// not from a global role — so handlers branch on these, never on user.roles.
 export type CourseAuth =
-  | { ok: true; user: UserWithRoles; course: CourseRecord }
+  | { ok: true; user: UserWithRoles; course: CourseRecord; staff: boolean; manager: boolean }
   | { ok: false; response: NextResponse }
+
+const notFound = (): CourseAuth => ({
+  ok: false,
+  response: NextResponse.json({ error: "Not found" }, { status: 404 }),
+})
+const forbidden = (): CourseAuth => ({
+  ok: false,
+  response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+})
 
 // Resolve + authorize a course-scoped request:
 //   401 unauthenticated · 404 bad slug or unknown course · 403 not entitled
-//   403 (staff) for an enrolled Student · 403 (mutate) for TA read-only
-//   403 (manage) for a non course-manager (TA/Student).
+//   403 (staff) for a non-staff member · 403 (mutate/manage) for a member who
+//   doesn't manage this course (TA read-only, Student, or staff elsewhere).
 export async function authorizeCourse(
   request: NextRequest,
   slug: { code: string; year: string; semester: string },
@@ -26,29 +37,18 @@ export async function authorizeCourse(
   }
 
   const key = parseCourseSlug(slug.code, slug.year, slug.semester)
-  if (!key) {
-    return { ok: false, response: NextResponse.json({ error: "Not found" }, { status: 404 }) }
-  }
+  if (!key) return notFound()
 
   const db = getDb()
   const course = await getCourseByKey(db, key)
-  if (!course) {
-    return { ok: false, response: NextResponse.json({ error: "Not found" }, { status: 404 }) }
-  }
+  if (!course) return notFound()
 
-  const entitled = await listCoursesForUser(db, user.id, user.roles)
-  if (!entitled.some((c) => c.code === key.code && c.year === key.year && c.semester === key.semester)) {
-    return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
-  }
-  if (options.staff && !isTeachingStaff(user.roles)) {
-    return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
-  }
-  if (options.mutate && !canMutateRoster(user.roles)) {
-    return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
-  }
-  if (options.manage && !canManageCourses(user.roles)) {
-    return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
-  }
+  const access = await resolveAccessToCourse(db, user, course)
+  if (!access) return forbidden()
+  if (options.staff && !access.staff) return forbidden()
+  // Roster mutation and course management are the same right (Admin or an
+  // Instructor staffing this course) — ADR 0001.
+  if ((options.mutate || options.manage) && !access.manager) return forbidden()
 
-  return { ok: true, user, course }
+  return { ok: true, user, course, staff: access.staff, manager: access.manager }
 }

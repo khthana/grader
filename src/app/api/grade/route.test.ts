@@ -3,7 +3,7 @@ import { NextRequest } from "next/server"
 import { POST } from "./route"
 import { createUser, assignRole } from "@/lib/users/repository"
 import { createCourse, assignInstructor } from "@/lib/courses/repository"
-import { seedWeeks, listWeeks } from "@/lib/weeks/repository"
+import { seedWeeks, listWeeks, setWeekReleased } from "@/lib/weeks/repository"
 import { createProblem, setTestCases } from "@/lib/problems/repository"
 import { createEnrollment } from "@/lib/enrollments/repository"
 import { listSubmissions } from "@/lib/submissions/repository"
@@ -62,6 +62,7 @@ describe("POST /api/grade", () => {
 
     await seedWeeks(db, course)
     const weeks = await listWeeks(db, course)
+    await setWeekReleased(db, weeks[0].id, true)
     const problem = await createProblem(db, {
       courseCode: course.code,
       courseYear: course.year,
@@ -158,8 +159,10 @@ describe("POST /api/grade", () => {
 
   it("mode:submit past close_at → 403, no submission stored", async () => {
     const course = await createCourse(db, { code: "C02", year: 2567, semester: 1, nameTh: "ข", nameEn: "B" })
+    await createEnrollment(db, { courseCode: course.code, courseYear: course.year, courseSemester: course.semester, userId: studentId })
     await seedWeeks(db, course)
     const weeks = await listWeeks(db, course)
+    await setWeekReleased(db, weeks[0].id, true)
     const p = await createProblem(db, {
       courseCode: course.code, courseYear: course.year, courseSemester: course.semester,
       weekId: weeks[0].id, title: "Closed",
@@ -179,6 +182,7 @@ describe("POST /api/grade", () => {
     await createEnrollment(db, { courseCode: course.code, courseYear: course.year, courseSemester: course.semester, userId: student.id })
     await seedWeeks(db, course)
     const weeks = await listWeeks(db, course)
+    await setWeekReleased(db, weeks[0].id, true)
     const p = await createProblem(db, {
       courseCode: course.code, courseYear: course.year, courseSemester: course.semester,
       weekId: weeks[0].id, title: "Late",
@@ -379,6 +383,7 @@ describe("POST /api/grade", () => {
     const course = await createCourse(db, { code: "C10", year: 2567, semester: 1, nameTh: "ก", nameEn: "A" })
     await seedWeeks(db, course)
     const weeks = await listWeeks(db, course)
+    await setWeekReleased(db, weeks[0].id, true)
     const student = await createUser(db, { email: "s10@kmitl.ac.th", name: "S10", idCode: "10" })
     await assignRole(db, student.id, "Student")
     await createEnrollment(db, { courseCode: course.code, courseYear: course.year, courseSemester: course.semester, userId: student.id })
@@ -429,6 +434,7 @@ describe("POST /api/grade — hidden test cases are redacted for students (#71)"
     })
     await seedWeeks(db, course)
     const weeks = await listWeeks(db, course)
+    await setWeekReleased(db, weeks[0].id, true)
     problemId = (
       await createProblem(db, {
         courseCode: course.code,

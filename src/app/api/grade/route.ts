@@ -6,7 +6,8 @@ import { getProblemById } from "@/lib/problems/repository"
 import { findEnrollment } from "@/lib/enrollments/repository"
 import { createSubmission } from "@/lib/submissions/repository"
 import { gradeSubmission, redactHiddenResults } from "@/lib/grading"
-import { isTeachingStaff } from "@/lib/courses/access"
+import { resolveCourseAccess } from "@/lib/courses/course-access"
+import { getWeekForCourse } from "@/lib/weeks/repository"
 
 export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request)
@@ -30,8 +31,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Problem not found" }, { status: 404 })
   }
 
+  // Authorize against the problem's own course, for run as well as submit —
+  // running code costs a Piston job and reveals test behaviour (#74).
+  const courseKey = { code: problem.courseCode, year: problem.courseYear, semester: problem.courseSemester }
+  const access = await resolveCourseAccess(db, user, courseKey)
+  if (!access) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+  // access.staff = staff of *this* course, not a global TA/Instructor role.
+  if (!access.staff) {
+    const week = await getWeekForCourse(db, courseKey, problem.weekId)
+    if (!week?.isReleased) {
+      return NextResponse.json({ error: "ยังไม่เปิดรับ" }, { status: 403 })
+    }
+  }
+
   const runMode = mode === "run" ? "run" : "submit"
-  const teachingStaff = isTeachingStaff(user.roles)
 
   if (runMode === "submit") {
     // Deadline enforcement (ADR 0002): close_at checked first.
@@ -41,12 +56,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Enrollment check: a student must be enrolled in this course.
-    if (!teachingStaff) {
-      const enrollment = await findEnrollment(
-        db,
-        { code: problem.courseCode, year: problem.courseYear, semester: problem.courseSemester },
-        user.id
-      )
+    if (!access.staff) {
+      const enrollment = await findEnrollment(db, courseKey, user.id)
       if (!enrollment) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
       }
@@ -78,6 +89,6 @@ export async function POST(request: NextRequest) {
 
   // Students see pass/fail only for hidden test cases (#71); the stored
   // Submission above keeps the full results for staff review.
-  if (teachingStaff) return NextResponse.json(result)
+  if (access.staff) return NextResponse.json(result)
   return NextResponse.json(redactHiddenResults(result, problem.testCases))
 }

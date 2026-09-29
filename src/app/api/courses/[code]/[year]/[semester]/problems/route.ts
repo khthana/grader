@@ -14,7 +14,7 @@ export const GET = courseRoute({}, async (request, auth) => {
   const weekId = weekParam ? Number.parseInt(weekParam, 10) : undefined
 
   const db = getDb()
-  const problems = await listProblems(db, auth.course, weekId)
+  const problems = await listProblems(db, auth.course, { weekId, releasedOnly: !auth.staff })
 
   const { rows: enrollRows } = await db.query<{ count: string }>(
     `SELECT COUNT(*)::text AS count FROM enrollments

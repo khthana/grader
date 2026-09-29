@@ -5,7 +5,7 @@ import { createUser, assignRole } from "@/lib/users/repository"
 import { createProblem, setTestCases } from "@/lib/problems/repository"
 import { createEnrollment } from "@/lib/enrollments/repository"
 import { createSubmission, reviewSubmission } from "@/lib/submissions/repository"
-import { listWeeks } from "@/lib/weeks/repository"
+import { listWeeks, setWeekReleased } from "@/lib/weeks/repository"
 import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
 import type { CourseFixture } from "@/lib/test-support/db"
 
@@ -66,6 +66,7 @@ describe("GET /api/courses/[code]/[year]/[semester]/assignments", () => {
 
   it("returns reviewedAt null for an unreviewed submission", async () => {
     const weeks = await listWeeks(f.db, f.course)
+    await setWeekReleased(f.db, weeks[0].id, true)
     const problem = await createProblem(f.db, {
       courseCode: f.course.code,
       courseYear: f.course.year,
@@ -107,6 +108,7 @@ describe("GET /api/courses/[code]/[year]/[semester]/assignments", () => {
 
   it("returns non-null reviewedAt after instructor review", async () => {
     const weeks = await listWeeks(f.db, f.course)
+    await setWeekReleased(f.db, weeks[0].id, true)
     const problem = await createProblem(f.db, {
       courseCode: f.course.code,
       courseYear: f.course.year,

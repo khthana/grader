@@ -160,7 +160,7 @@ describe("problem repository", () => {
     const week2Id = weeks[1].id
     await createProblem(db, { courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester, weekId, title: "Week1 Q" })
     await createProblem(db, { courseCode: courseKey.code, courseYear: courseKey.year, courseSemester: courseKey.semester, weekId: week2Id, title: "Week2 Q" })
-    const list = await listProblems(db, courseKey, weekId)
+    const list = await listProblems(db, courseKey, { weekId })
     expect(list).toHaveLength(1)
     expect(list[0].weekNo).toBe(1)
   })

@@ -5,7 +5,7 @@ import { updateCourse } from "@/lib/courses/repository"
 import { createUser, assignRole } from "@/lib/users/repository"
 import { createEnrollment } from "@/lib/enrollments/repository"
 import { createProblem, getProblemById, setTestCases } from "@/lib/problems/repository"
-import { listWeeks } from "@/lib/weeks/repository"
+import { listWeeks, setWeekReleased } from "@/lib/weeks/repository"
 import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
 import type { CourseFixture } from "@/lib/test-support/db"
 
@@ -38,6 +38,7 @@ describe("PUT /api/courses/[code]/[year]/[semester]/problems/[pid] — unit mode
     f = await courseFixture()
     setTestDb(f.db)
     weekId = (await listWeeks(f.db, f.course))[0].id
+    await setWeekReleased(f.db, weekId, true)
     const p = await createProblem(f.db, {
       courseCode: f.course.code,
       courseYear: f.course.year,
@@ -111,6 +112,7 @@ describe("GET /api/courses/[code]/[year]/[semester]/problems/[pid] — student v
       userId: student.id,
     })
     const weekId = (await listWeeks(f.db, f.course))[0].id
+    await setWeekReleased(f.db, weekId, true)
     problemId = (
       await createProblem(f.db, {
         courseCode: f.course.code,
