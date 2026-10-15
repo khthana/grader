@@ -4,7 +4,7 @@ import { courseRoute } from "@/lib/courses/route"
 import { safeLog } from "@/lib/logs"
 import { parseQuizImport } from "@/lib/quizzes/import"
 import { mergeQuizMeta } from "@/lib/quizzes/meta"
-import { checkQuizWeek, readJsonObject } from "@/lib/quizzes/route-helpers"
+import { checkQuizWeek, importErrorResponse, readJsonObject } from "@/lib/quizzes/route-helpers"
 import {
   deleteQuiz,
   getQuizForCourse,
@@ -53,7 +53,7 @@ export const PUT = courseRoute<Params>({ manage: true }, async (req, auth, { qid
   if (body.data !== undefined) {
     const parsed = parseQuizImport(body.data)
     if (!parsed.ok) {
-      return NextResponse.json({ error: "นำเข้าไม่สำเร็จ", errors: parsed.errors }, { status: 400 })
+      return importErrorResponse(parsed.errors)
     }
     questions = parsed.draft.questions
   }

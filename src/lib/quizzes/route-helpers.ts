@@ -24,3 +24,8 @@ export async function checkQuizWeek(
   if (await getWeekForCourse(db, course, weekId)) return null
   return NextResponse.json({ error: "ไม่พบสัปดาห์นี้ในรายวิชา" }, { status: 400 })
 }
+
+/** The 400 for a failed import — every per-question error, for the editor. */
+export function importErrorResponse(errors: string[]): NextResponse {
+  return NextResponse.json({ error: "นำเข้าไม่สำเร็จ", errors }, { status: 400 })
+}

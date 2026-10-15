@@ -1,6 +1,7 @@
 import type { Queryable } from "@/lib/db"
 import type { CourseKey } from "@/lib/courses/types"
 import type { QuizChoice, QuizQuestionDraft } from "./import"
+import type { QuizMeta } from "./meta"
 
 export interface QuizRecord {
   id: number
@@ -129,13 +130,7 @@ export async function getQuizForCourse(
 export async function createQuiz(
   db: Queryable,
   key: CourseKey,
-  data: {
-    title: string
-    description: string
-    weekId: number | null
-    dontKnowEnabled: boolean
-    questions: QuizQuestionDraft[]
-  }
+  data: QuizMeta & { questions: QuizQuestionDraft[] }
 ): Promise<QuizDetail> {
   const { rows } = await db.query<{ id: number }>(
     `INSERT INTO quizzes (course_code, course_year, course_semester, week_id, title, description, dont_know_enabled)
@@ -151,7 +146,7 @@ export async function createQuiz(
 export async function updateQuizMeta(
   db: Queryable,
   id: number,
-  data: { title: string; description: string; weekId: number | null; dontKnowEnabled: boolean }
+  data: QuizMeta
 ): Promise<void> {
   await db.query(
     `UPDATE quizzes

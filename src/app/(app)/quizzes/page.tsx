@@ -1,23 +1,21 @@
-import { redirect } from "next/navigation"
-import { getCourseContext } from "@/lib/courses/server"
-import { buildCoursePath } from "@/lib/courses/slug"
-import { PageTitle } from "@/components/shell/ComingSoon"
+import { redirect, notFound } from "next/navigation"
+import { getCourseAccess, getCourseContext } from "@/lib/courses/server"
+import { resolveLegacyRedirect } from "@/lib/courses/legacy-redirect"
 
+// Staff-only until students get their own quiz list (#92).
 export default async function QuizzesPage() {
   const { activeCourse } = await getCourseContext()
-  if (!activeCourse) {
-    return (
-      <div className="font-thai">
-        <PageTitle icon="quizzes">แบบทดสอบ</PageTitle>
-        <div className="mt-6 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white py-20 text-center">
-          <p className="text-lg font-medium text-slate-500">ยังไม่มีรายวิชา</p>
-          <p className="text-sm text-slate-400">
-            คุณยังไม่ได้รับมอบหมายให้ดูแลรายวิชาใด ๆ — สร้างรายวิชาที่หน้า &quot;รายวิชา&quot;
-            หรือติดต่อผู้ดูแลระบบ
-          </p>
-        </div>
+  const access = activeCourse ? await getCourseAccess(activeCourse) : null
+  const next = resolveLegacyRedirect(activeCourse, access, { section: "quizzes", requires: "staff" })
+  if (next.kind === "not-found") notFound()
+  if (next.kind === "redirect") redirect(next.path)
+
+  return (
+    <div className="flex flex-col gap-6 font-thai">
+      <h1 className="text-2xl font-semibold text-primary">แบบทดสอบ</h1>
+      <div className="rounded-xl border border-gray-200 bg-white py-16 text-center text-sm text-slate-400">
+        กรุณาเลือกรายวิชาก่อน
       </div>
-    )
-  }
-  redirect(`${buildCoursePath(activeCourse)}/quizzes`)
+    </div>
+  )
 }

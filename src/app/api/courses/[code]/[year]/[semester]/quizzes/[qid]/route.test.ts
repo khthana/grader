@@ -64,6 +64,18 @@ describe("/api/courses/[code]/[year]/[semester]/quizzes/[qid]", () => {
     })
   }
 
+  async function enrolledStudent() {
+    const s = await createUser(f.db, { email: "s@kmitl.ac.th", name: "S" })
+    await assignRole(f.db, s.id, "Student")
+    await createEnrollment(f.db, {
+      courseCode: f.course.code,
+      courseYear: f.course.year,
+      courseSemester: f.course.semester,
+      userId: s.id,
+    })
+    return s
+  }
+
   async function logged(action: string) {
     return (await listLogs(f.db, { action, page: 1, pageSize: 50 })).logs.length
   }
@@ -94,16 +106,12 @@ describe("/api/courses/[code]/[year]/[semester]/quizzes/[qid]", () => {
       expect((await GET(req("GET"), ctx(foreign.id))).status).toBe(404)
     })
 
-    it("rejects an enrolled student (until the student slice)", async () => {
-      const s = await createUser(f.db, { email: "s@kmitl.ac.th", name: "S" })
-      await assignRole(f.db, s.id, "Student")
-      await createEnrollment(f.db, {
-        courseCode: f.course.code,
-        courseYear: f.course.year,
-        courseSemester: f.course.semester,
-        userId: s.id,
-      })
+    it("rejects an enrolled student (until the student slice) and an unlinked instructor", async () => {
+      const s = await enrolledStudent()
       expect((await GET(req("GET", undefined, s.email), ctx())).status).toBe(403)
+      const stranger = await createUser(f.db, { email: "x@kmitl.ac.th", name: "X" })
+      await assignRole(f.db, stranger.id, "Instructor")
+      expect((await GET(req("GET", undefined, stranger.email), ctx())).status).toBe(403)
     })
   })
 
@@ -194,9 +202,11 @@ describe("/api/courses/[code]/[year]/[semester]/quizzes/[qid]", () => {
       expect(await logged("quiz.delete")).toBe(1)
     })
 
-    it("404s an unknown id; TA 403", async () => {
+    it("404s an unknown id; TA and Student 403", async () => {
       expect((await DELETE(req("DELETE"), ctx(99999))).status).toBe(404)
       expect((await DELETE(req("DELETE", undefined, f.ta.email), ctx())).status).toBe(403)
+      const s = await enrolledStudent()
+      expect((await DELETE(req("DELETE", undefined, s.email), ctx())).status).toBe(403)
     })
   })
 })
