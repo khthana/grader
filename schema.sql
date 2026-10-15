@@ -204,3 +204,15 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
   correct_letter TEXT NOT NULL,
   feedback       TEXT NOT NULL DEFAULT ''
 );
+
+-- Round Window (#91, ADR 0011): when one Quiz Round accepts answers for one
+-- Group. group_key '' = students with no Group (ไม่ระบุกลุ่ม). Half-open
+-- [opens_at, closes_at); a null opens_at = not opened yet, null closes_at = no close.
+CREATE TABLE IF NOT EXISTS quiz_windows (
+  quiz_id    INTEGER NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+  round      TEXT NOT NULL CHECK (round IN ('pre', 'post')),
+  group_key  TEXT NOT NULL,
+  opens_at   TIMESTAMPTZ,
+  closes_at  TIMESTAMPTZ,
+  PRIMARY KEY (quiz_id, round, group_key)
+);

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { FaTrash, FaFileImport } from "react-icons/fa"
 import { QuizQuestionList } from "./QuizQuestionList"
 import { QuizImportForm, type WeekOption } from "./QuizImportForm"
+import { QuizWindowsGrid } from "./QuizWindowsGrid"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
 import { useToast } from "@/components/shell/ToastProvider"
 import type { QuizDetail as QuizData } from "@/lib/quizzes/repository"
@@ -166,6 +167,8 @@ export function QuizDetail({
           onSaved={reload}
         />
       )}
+
+      <QuizWindowsGrid courseSlug={courseSlug} quizId={quiz.id} canManage={canManage} />
 
       <h2 className="mt-2 text-sm font-medium text-slate-600">ข้อสอบ {quiz.questions.length} ข้อ (พร้อมเฉลย)</h2>
       <QuizQuestionList questions={quiz.questions} dontKnowEnabled={quiz.dontKnowEnabled} />

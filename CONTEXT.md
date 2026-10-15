@@ -236,7 +236,8 @@ When a **Quiz Round** accepts answers, set **per Group**: an optional open insta
 optional close instant, from which the state follows — **not yet open** → **open** →
 **closed**. Opening or closing "manually" just sets that instant to now; there is no
 separate open flag. Students with no Group share one "ไม่ระบุกลุ่ม" window. Within one
-Group, the Pre and Post windows of a Quiz must not overlap. A Student is governed by the
+Group, the Pre and Post windows of a Quiz must not overlap — the close instant is the
+first moment it is closed, so a Post may open exactly when its Pre closes. A Student is governed by the
 window of their current Group; there are no per-student overrides.
 
 ### Quiz Question (ข้อสอบ)

@@ -128,7 +128,7 @@ Test external behaviour with pg-mem and `courseFixture()`, following the existin
 
 - **Pure modules** use table-driven tests:
   - `parseQuizImport`: the real `W01` `DATA` imports to 15 questions, and every error case is covered.
-  - `roundWindow` boundaries: strictly after the instant counts as past, and null never passes.
+  - `roundWindow` boundaries: a window is half-open [open, close) — open from its open instant, closed from its close instant, so a Post may open exactly when its Pre closes; a null open never opens and a null close never closes.
   - `windowsOverlap`.
   - Attempt scoring and outcomes, including don't-know and unanswered.
   - `quizResultFor` over staff/student × Post not-open / open / closed. The key must never appear for a student before Post closes.

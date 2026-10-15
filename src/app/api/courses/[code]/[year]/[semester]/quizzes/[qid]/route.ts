@@ -4,7 +4,13 @@ import { courseRoute } from "@/lib/courses/route"
 import { safeLog } from "@/lib/logs"
 import { parseQuizImport } from "@/lib/quizzes/import"
 import { mergeQuizMeta } from "@/lib/quizzes/meta"
-import { checkQuizWeek, importErrorResponse, readJsonObject } from "@/lib/quizzes/route-helpers"
+import {
+  checkQuizWeek,
+  findQuizForCourse,
+  importErrorResponse,
+  quizNotFound as notFound,
+  readJsonObject,
+} from "@/lib/quizzes/route-helpers"
 import {
   deleteQuiz,
   getQuizForCourse,
@@ -14,17 +20,9 @@ import {
 
 type Params = { code: string; year: string; semester: string; qid: string }
 
-const notFound = () => NextResponse.json({ error: "Not found" }, { status: 404 })
-
-function parseId(qid: string): number | null {
-  const id = Number(qid)
-  return Number.isInteger(id) && id > 0 ? id : null
-}
-
 // Staff-only until students get their own (key-free) view (#92).
 export const GET = courseRoute<Params>({ staff: true }, async (_req, auth, { qid }) => {
-  const id = parseId(qid)
-  const quiz = id && (await getQuizForCourse(getDb(), auth.course, id))
+  const quiz = await findQuizForCourse(getDb(), auth.course, qid)
   if (!quiz) return notFound()
   return NextResponse.json({ quiz })
 })
@@ -35,9 +33,8 @@ export const GET = courseRoute<Params>({ staff: true }, async (_req, auth, { qid
  * the file's title doesn't overwrite the Quiz's).
  */
 export const PUT = courseRoute<Params>({ manage: true }, async (req, auth, { qid }) => {
-  const id = parseId(qid)
   const db = getDb()
-  const existing = id && (await getQuizForCourse(db, auth.course, id))
+  const existing = await findQuizForCourse(db, auth.course, qid)
   if (!existing) return notFound()
 
   const body = await readJsonObject(req)
@@ -73,9 +70,8 @@ export const PUT = courseRoute<Params>({ manage: true }, async (req, auth, { qid
 })
 
 export const DELETE = courseRoute<Params>({ manage: true }, async (_req, auth, { qid }) => {
-  const id = parseId(qid)
   const db = getDb()
-  const existing = id && (await getQuizForCourse(db, auth.course, id))
+  const existing = await findQuizForCourse(db, auth.course, qid)
   if (!existing) return notFound()
 
   await deleteQuiz(db, existing.id)

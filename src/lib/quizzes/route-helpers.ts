@@ -2,6 +2,16 @@ import { type NextRequest, NextResponse } from "next/server"
 import type { Queryable } from "@/lib/db"
 import type { CourseKey } from "@/lib/courses/types"
 import { getWeekForCourse } from "@/lib/weeks/repository"
+import { getQuizForCourse } from "./repository"
+
+export const quizNotFound = () => NextResponse.json({ error: "Not found" }, { status: 404 })
+
+/** The Quiz named by the `qid` route param, if it is this course's. */
+export async function findQuizForCourse(db: Queryable, course: CourseKey, qid: string) {
+  const id = Number(qid)
+  if (!Number.isInteger(id) || id <= 0) return null
+  return getQuizForCourse(db, course, id)
+}
 
 /** The request body as a plain object, or null when it isn't one. */
 export async function readJsonObject(req: NextRequest): Promise<Record<string, unknown> | null> {
