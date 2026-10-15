@@ -10,6 +10,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   users: "จัดการผู้ใช้",
   logs: "บันทึกกิจกรรม",
   students: "รายชื่อนักศึกษา",
+  quizzes: "แบบทดสอบ",
   problems: "โจทย์ปัญหา",
   review: "ตรวจงาน",
   gradebook: "สมุดคะแนน",

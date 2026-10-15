@@ -27,6 +27,13 @@ describe("deriveBreadcrumbs", () => {
     ])
   })
 
+  it("labels the quizzes section แบบทดสอบ", () => {
+    expect(deriveBreadcrumbs("/quizzes")).toEqual([
+      { label: "หน้าหลัก", href: "/dashboard" },
+      { label: "แบบทดสอบ", href: "/quizzes" },
+    ])
+  })
+
   it("falls back to the decoded segment for unknown labels", () => {
     expect(deriveBreadcrumbs("/students/%E0%B8%81%E0%B8%81")).toEqual([
       { label: "หน้าหลัก", href: "/dashboard" },

@@ -26,6 +26,7 @@ describe("getSidebarMenu", () => {
       "/logs",
       "/courses",
       "/students",
+      "/quizzes",
       "/problems",
       "/review",
       "/gradebook",
@@ -36,6 +37,7 @@ describe("getSidebarMenu", () => {
     expect(hrefs("Instructor")).toEqual([
       "/courses",
       "/students",
+      "/quizzes",
       "/problems",
       "/review",
       "/gradebook",
@@ -43,7 +45,7 @@ describe("getSidebarMenu", () => {
   })
 
   it("gives TA the teaching menu without course management or review (#70/#78)", () => {
-    expect(hrefs("TA")).toEqual(["/students", "/problems", "/gradebook"])
+    expect(hrefs("TA")).toEqual(["/students", "/quizzes", "/problems", "/gradebook"])
   })
 
   it("gives Student their assignments and their own scorebook", () => {

@@ -12,6 +12,7 @@ const MENU = {
   logs: { label: "บันทึกกิจกรรม", href: "/logs", icon: "logs" },
   courses: { label: "รายวิชา", href: "/courses", icon: "courses" },
   students: { label: "รายชื่อนักศึกษา", href: "/students", icon: "students", courseScoped: true },
+  quizzes: { label: "แบบทดสอบ", href: "/quizzes", icon: "quizzes", courseScoped: true },
   problems: { label: "โจทย์ปัญหา", href: "/problems", icon: "problems", courseScoped: true },
   review: { label: "ตรวจงาน", href: "/review", icon: "review", courseScoped: true },
   gradebook: { label: "สมุดคะแนน", href: "/gradebook", icon: "gradebook", courseScoped: true },
@@ -21,6 +22,7 @@ const MENU = {
 
 const TEACHING_MENU: MenuItem[] = [
   MENU.students,
+  MENU.quizzes,
   MENU.problems,
   MENU.review,
   MENU.gradebook,

@@ -18,6 +18,9 @@ export type LogAction =
   | "problem.create"
   | "problem.update"
   | "problem.delete"
+  | "quiz.create"
+  | "quiz.update"
+  | "quiz.delete"
 
 export interface LogInput {
   actorId?: number | null

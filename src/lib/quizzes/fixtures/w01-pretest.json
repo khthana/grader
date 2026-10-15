@@ -1,0 +1,478 @@
+{
+  "title": "Pre-test: พื้นฐานภาษา C ก่อนเรียน OOP ด้วย C++",
+  "description": "วิชา Object-Oriented Programming (C++) สำหรับนักศึกษา Cybersecurity ชั้นปีที่ 1\n\nเวลา 20 นาที\n\nแบบทดสอบนี้ใช้สำรวจพื้นฐานก่อนเรียน ไม่นำไปคิดคะแนน ถ้าไม่ทราบคำตอบให้เลือกข้อ E แทนการเดา เพื่อให้ผู้สอนเห็นว่าควรทบทวนเรื่องใด\n\nห้ามใช้ AI หรือค้นข้อมูลระหว่างทำแบบทดสอบ\n\nทุกข้อสมมติว่ามี #include <stdio.h>, <stdlib.h> และ <string.h> แล้ว และรันบน Linux 64 บิต ที่ int มีขนาด 4 ไบต์และ pointer มีขนาด 8 ไบต์",
+  "dontKnow": "ไม่ทราบ / ยังไม่เคยเรียนเรื่องนี้",
+  "background": [
+    {
+      "type": "checkbox",
+      "title": "เคยเขียนโปรแกรมด้วยภาษาใดมาบ้าง (เลือกได้หลายข้อ)",
+      "options": [
+        "C",
+        "C++",
+        "Python",
+        "Java",
+        "JavaScript",
+        "อื่น ๆ"
+      ]
+    },
+    {
+      "type": "choice",
+      "title": "เคยเขียน class / object ในภาษาใดมาก่อนหรือไม่",
+      "options": [
+        "ไม่เคย",
+        "เคย ใน Python",
+        "เคย ใน Java หรือ C++",
+        "เคย ในภาษาอื่น"
+      ]
+    },
+    {
+      "type": "scale",
+      "title": "ความมั่นใจในการใช้ pointer ในภาษา C",
+      "low": "ไม่มั่นใจเลย",
+      "high": "มั่นใจมาก"
+    },
+    {
+      "type": "scale",
+      "title": "ความมั่นใจในการใช้ malloc และ free",
+      "low": "ไม่มั่นใจเลย",
+      "high": "มั่นใจมาก"
+    }
+  ],
+  "questions": [
+    {
+      "no": 1,
+      "topic": "Pointer พื้นฐาน",
+      "prompt": "โปรแกรมต่อไปนี้พิมพ์ค่าอะไร",
+      "code": "int main(void) {\n    int x = 5;\n    int *p = &x;\n    *p = 10;\n    printf(\"%d\\n\", x);\n}",
+      "choices": [
+        {
+          "letter": "A",
+          "text": "5",
+          "correct": false
+        },
+        {
+          "letter": "B",
+          "text": "address ของ x",
+          "correct": false
+        },
+        {
+          "letter": "C",
+          "text": "compile ไม่ผ่าน",
+          "correct": false
+        },
+        {
+          "letter": "D",
+          "text": "10",
+          "correct": true
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ D: p เก็บ address ของ x คำสั่ง *p = 10 จึงเขียนค่าลงในตัวแปร x โดยตรง"
+    },
+    {
+      "no": 2,
+      "topic": "การส่งค่าเข้าฟังก์ชัน",
+      "prompt": "โปรแกรมต่อไปนี้พิมพ์ค่าอะไร",
+      "code": "void inc(int n) { n++; }\n\nint main(void) {\n    int a = 3;\n    inc(a);\n    printf(\"%d\\n\", a);\n}",
+      "choices": [
+        {
+          "letter": "A",
+          "text": "3",
+          "correct": true
+        },
+        {
+          "letter": "B",
+          "text": "4",
+          "correct": false
+        },
+        {
+          "letter": "C",
+          "text": "0",
+          "correct": false
+        },
+        {
+          "letter": "D",
+          "text": "ผลลัพธ์ไม่แน่นอน (Undefined Behavior)",
+          "correct": false
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ A: C ส่งค่าแบบ pass by value ฟังก์ชัน inc เพิ่มค่าเฉพาะสำเนา n ส่วน a ไม่เปลี่ยน"
+    },
+    {
+      "no": 3,
+      "topic": "การส่ง pointer เข้าฟังก์ชัน",
+      "prompt": "ถ้าต้องการสลับค่าของ x และ y ใน main ด้วยการเรียก swap(&x, &y) ฟังก์ชันใดทำงานถูกต้อง",
+      "code": null,
+      "choices": [
+        {
+          "letter": "A",
+          "text": "void swap(int *a, int *b) { int *t = a; a = b; b = t; }",
+          "correct": false
+        },
+        {
+          "letter": "B",
+          "text": "void swap(int *a, int *b) { *a = *b; *b = *a; }",
+          "correct": false
+        },
+        {
+          "letter": "C",
+          "text": "void swap(int *a, int *b) { int t = *a; *a = *b; *b = t; }",
+          "correct": true
+        },
+        {
+          "letter": "D",
+          "text": "void swap(int a, int b) { int t = a; a = b; b = t; }",
+          "correct": false
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ C: ต้องสลับ ค่าที่ pointer ชี้ไป (*a, *b) และต้องมีตัวแปรพักค่า"
+    },
+    {
+      "no": 4,
+      "topic": "Array และ pointer arithmetic",
+      "prompt": "โปรแกรมต่อไปนี้พิมพ์ค่าอะไร",
+      "code": "int main(void) {\n    int arr[] = {10, 20, 30, 40};\n    int *p = arr;\n    p += 2;\n    printf(\"%d %d\\n\", *p, *(p - 1));\n}",
+      "choices": [
+        {
+          "letter": "A",
+          "text": "30 10",
+          "correct": false
+        },
+        {
+          "letter": "B",
+          "text": "30 20",
+          "correct": true
+        },
+        {
+          "letter": "C",
+          "text": "20 10",
+          "correct": false
+        },
+        {
+          "letter": "D",
+          "text": "12 11",
+          "correct": false
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ B: p += 2 เลื่อน pointer ไป 2 สมาชิก (ไม่ใช่ 2 ไบต์) จึงชี้ arr[2] = 30 และ *(p - 1) คือ arr[1] = 20"
+    },
+    {
+      "no": 5,
+      "topic": "Array เมื่อส่งเข้าฟังก์ชัน",
+      "prompt": "บนระบบ 64 บิต (int 4 ไบต์, pointer 8 ไบต์) โปรแกรมต่อไปนี้พิมพ์ค่าอะไร",
+      "code": "void f(int a[]) {\n    printf(\"%zu\\n\", sizeof(a));\n}\n\nint main(void) {\n    int arr[10];\n    printf(\"%zu \", sizeof(arr));\n    f(arr);\n}",
+      "choices": [
+        {
+          "letter": "A",
+          "text": "40 40",
+          "correct": false
+        },
+        {
+          "letter": "B",
+          "text": "10 10",
+          "correct": false
+        },
+        {
+          "letter": "C",
+          "text": "40 8",
+          "correct": true
+        },
+        {
+          "letter": "D",
+          "text": "10 8",
+          "correct": false
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ C: ใน main ค่า sizeof(arr) = 10 × 4 = 40 ไบต์ แต่เมื่อส่งเข้าฟังก์ชัน array จะกลายเป็น pointer (array decay) sizeof(a) จึงได้ขนาดของ pointer = 8"
+    },
+    {
+      "no": 6,
+      "topic": "String ในภาษา C",
+      "prompt": "โปรแกรมต่อไปนี้พิมพ์ค่าอะไร",
+      "code": "int main(void) {\n    char s[] = \"Hi\";\n    printf(\"%zu %zu\\n\", sizeof(s), strlen(s));\n}",
+      "choices": [
+        {
+          "letter": "A",
+          "text": "2 2",
+          "correct": false
+        },
+        {
+          "letter": "B",
+          "text": "3 2",
+          "correct": true
+        },
+        {
+          "letter": "C",
+          "text": "2 3",
+          "correct": false
+        },
+        {
+          "letter": "D",
+          "text": "3 3",
+          "correct": false
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ B: string literal มีตัวปิดท้าย '\\0' อีก 1 ไบต์ sizeof จึงได้ 3 ส่วน strlen นับเฉพาะตัวอักษรก่อน '\\0' จึงได้ 2"
+    },
+    {
+      "no": 7,
+      "topic": "Buffer overflow",
+      "prompt": "เมื่อรันโค้ดต่อไปนี้ ข้อใดอธิบายสิ่งที่เกิดขึ้นได้ถูกต้องที่สุด",
+      "code": "struct Account {\n    char name[8];\n    int  isAdmin;\n};\n\nint main(void) {\n    struct Account acc = { \"\", 0 };\n    const char *input = \"CyberSecurity\";   /* 13 ตัวอักษร */\n    strcpy(acc.name, input);\n    printf(\"%d\\n\", acc.isAdmin);\n}",
+      "choices": [
+        {
+          "letter": "A",
+          "text": "strcpy คัดลอกเพียง 7 ตัวอักษรแรกแล้วปิดท้ายด้วย '\\0' ให้อัตโนมัติ",
+          "correct": false
+        },
+        {
+          "letter": "B",
+          "text": "strcpy คืนค่า error และไม่คัดลอกข้อมูล",
+          "correct": false
+        },
+        {
+          "letter": "C",
+          "text": "compile ไม่ผ่าน เพราะ input ยาวเกินขนาดของ name",
+          "correct": false
+        },
+        {
+          "letter": "D",
+          "text": "ข้อมูลถูกเขียนเกินขนาดของ name ไปทับ isAdmin และหน่วยความจำข้างเคียง ซึ่งเป็น Undefined Behavior",
+          "correct": true
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ D: strcpy ไม่ตรวจขนาดปลายทาง จึงเขียน 14 ไบต์ (รวม '\\0') ลงพื้นที่ 8 ไบต์ ทับ isAdmin และเกินขอบเขตของ struct ไปอีก นี่คือ buffer overflow (CWE-120) ซึ่งเป็นรากของช่องโหว่จำนวนมาก"
+    },
+    {
+      "no": 8,
+      "topic": "Struct และ pointer to struct",
+      "prompt": "กำหนดโค้ดต่อไปนี้ นิพจน์ใดให้ค่า y ของ pt โดยเข้าถึงผ่าน pp",
+      "code": "struct Point { int x; int y; };\n\n/* ภายใน main */\nstruct Point pt = {1, 2};\nstruct Point *pp = &pt;",
+      "choices": [
+        {
+          "letter": "A",
+          "text": "pp.y",
+          "correct": false
+        },
+        {
+          "letter": "B",
+          "text": "pp->y",
+          "correct": true
+        },
+        {
+          "letter": "C",
+          "text": "*pp.y",
+          "correct": false
+        },
+        {
+          "letter": "D",
+          "text": "&pp->y",
+          "correct": false
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ B: pp->y มีความหมายเดียวกับ (*pp).y ส่วน *pp.y ผิดเพราะ . มี precedence สูงกว่า * จึงกลายเป็น *(pp.y)"
+    },
+    {
+      "no": 9,
+      "topic": "การคัดลอก struct",
+      "prompt": "โปรแกรมต่อไปนี้พิมพ์ค่าอะไร",
+      "code": "struct Point { int x; int y; };\n\nint main(void) {\n    struct Point a = {1, 2};\n    struct Point b = a;\n    b.x = 99;\n    printf(\"%d\\n\", a.x);\n}",
+      "choices": [
+        {
+          "letter": "A",
+          "text": "1",
+          "correct": true
+        },
+        {
+          "letter": "B",
+          "text": "99",
+          "correct": false
+        },
+        {
+          "letter": "C",
+          "text": "2",
+          "correct": false
+        },
+        {
+          "letter": "D",
+          "text": "ผลลัพธ์ไม่แน่นอน (Undefined Behavior)",
+          "correct": false
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ A: การกำหนด b = a คัดลอกค่าของทุกสมาชิกไปยัง b ซึ่งเป็น object แยกต่างหาก การแก้ b.x จึงไม่กระทบ a"
+    },
+    {
+      "no": 10,
+      "topic": "Struct ที่มี pointer เป็นสมาชิก (shallow copy)",
+      "prompt": "โปรแกรมต่อไปนี้พิมพ์ค่าอะไร",
+      "code": "struct Buffer { char *data; };\n\nint main(void) {\n    struct Buffer a;\n    a.data = malloc(4);\n    strcpy(a.data, \"abc\");\n\n    struct Buffer b = a;\n    b.data[0] = 'X';\n    printf(\"%s\\n\", a.data);\n    free(a.data);\n}",
+      "choices": [
+        {
+          "letter": "A",
+          "text": "abc",
+          "correct": false
+        },
+        {
+          "letter": "B",
+          "text": "X",
+          "correct": false
+        },
+        {
+          "letter": "C",
+          "text": "compile ไม่ผ่าน",
+          "correct": false
+        },
+        {
+          "letter": "D",
+          "text": "Xbc",
+          "correct": true
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ D: b = a คัดลอกเฉพาะค่า pointer (shallow copy) a.data และ b.data จึงชี้หน่วยความจำก้อนเดียวกัน การแก้ผ่าน b จึงเห็นผ่าน a ด้วย ข้อนี้เป็นพื้นฐานของเรื่อง copy constructor และ double free ในสัปดาห์ 8"
+    },
+    {
+      "no": 11,
+      "topic": "malloc และ free",
+      "prompt": "โค้ดต่อไปนี้มีปัญหาใด",
+      "code": "int *make(void) {\n    int *p = malloc(100 * sizeof(int));\n    return p;\n}\n\nint main(void) {\n    for (int i = 0; i < 1000; i++) {\n        int *q = make();\n        q[0] = i;\n    }\n    return 0;\n}",
+      "choices": [
+        {
+          "letter": "A",
+          "text": "ไม่มีปัญหา เพราะหน่วยความจำถูกคืนเองเมื่อ q ออกจาก scope",
+          "correct": false
+        },
+        {
+          "letter": "B",
+          "text": "Memory leak เพราะไม่มีการเรียก free",
+          "correct": true
+        },
+        {
+          "letter": "C",
+          "text": "Double free",
+          "correct": false
+        },
+        {
+          "letter": "D",
+          "text": "Stack overflow เพราะจองหน่วยความจำในลูป",
+          "correct": false
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ B: หน่วยความจำจาก malloc อยู่จนกว่าจะเรียก free เมื่อ q ออกจาก scope เราเสียแค่ตัวแปร pointer แต่หน่วยความจำยังถูกจองอยู่ (memory leak, CWE-401) ปัญหานี้คือสิ่งที่ RAII ในสัปดาห์ 9 แก้"
+    },
+    {
+      "no": 12,
+      "topic": "Use-after-free",
+      "prompt": "ข้อใดอธิบายผลของโค้ดต่อไปนี้ได้ถูกต้องที่สุด",
+      "code": "int main(void) {\n    int *p = malloc(sizeof(int));\n    *p = 42;\n    free(p);\n    printf(\"%d\\n\", *p);\n}",
+      "choices": [
+        {
+          "letter": "A",
+          "text": "พิมพ์ 42 เสมอ เพราะ free ไม่ได้ลบข้อมูล",
+          "correct": false
+        },
+        {
+          "letter": "B",
+          "text": "พิมพ์ 0 เสมอ เพราะ free ล้างค่าเป็นศูนย์",
+          "correct": false
+        },
+        {
+          "letter": "C",
+          "text": "เป็น Undefined Behavior (use-after-free) อาจพิมพ์ค่าใดก็ได้หรือโปรแกรมหยุดทำงาน",
+          "correct": true
+        },
+        {
+          "letter": "D",
+          "text": "compile ไม่ผ่าน",
+          "correct": false
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ C: หลัง free หน่วยความจำก้อนนั้นไม่เป็นของเราแล้ว การอ่านผ่าน p เป็น use-after-free (CWE-416) ผลลัพธ์จึงคาดเดาไม่ได้"
+    },
+    {
+      "no": 13,
+      "topic": "Lifetime ของตัวแปร local",
+      "prompt": "ข้อใดกล่าวถึงฟังก์ชันต่อไปนี้ได้ถูกต้อง",
+      "code": "int *getValue(void) {\n    int v = 7;\n    return &v;\n}",
+      "choices": [
+        {
+          "letter": "A",
+          "text": "v หมดอายุเมื่อฟังก์ชันจบ pointer ที่คืนออกไปจึงเป็น dangling pointer และการ dereference เป็น Undefined Behavior",
+          "correct": true
+        },
+        {
+          "letter": "B",
+          "text": "ใช้งานได้ปกติ เพราะ v ยังอยู่ในหน่วยความจำจนกว่าโปรแกรมจะจบ",
+          "correct": false
+        },
+        {
+          "letter": "C",
+          "text": "compiler ย้าย v ไปไว้บน heap ให้อัตโนมัติ",
+          "correct": false
+        },
+        {
+          "letter": "D",
+          "text": "compile ไม่ผ่าน",
+          "correct": false
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ A: ตัวแปร local มี lifetime เท่ากับการทำงานของฟังก์ชัน address ที่คืนออกไปจึงชี้ไปยังหน่วยความจำที่หมดอายุแล้ว"
+    },
+    {
+      "no": 14,
+      "topic": "ตัวแปรที่ไม่ได้กำหนดค่าเริ่มต้น",
+      "prompt": "โปรแกรมต่อไปนี้พิมพ์ค่าอะไร (count เป็นตัวแปร local ใน main)",
+      "code": "int main(void) {\n    int count;\n    count++;\n    printf(\"%d\\n\", count);\n}",
+      "choices": [
+        {
+          "letter": "A",
+          "text": "1 เสมอ",
+          "correct": false
+        },
+        {
+          "letter": "B",
+          "text": "0 เสมอ",
+          "correct": false
+        },
+        {
+          "letter": "C",
+          "text": "compile ไม่ผ่าน",
+          "correct": false
+        },
+        {
+          "letter": "D",
+          "text": "ค่าไม่แน่นอน เพราะ count ไม่ได้กำหนดค่าเริ่มต้น",
+          "correct": true
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ D: ตัวแปร local ที่ไม่ได้กำหนดค่าเริ่มต้นมีค่าเป็นอะไรก็ได้ที่ค้างอยู่ใน memory (ต่างจากตัวแปร global/static ที่เริ่มต้นเป็น 0) ถ้าค่านี้ใช้ตัดสินสิทธิ์จะเป็นช่องโหว่ได้ (CWE-457)"
+    },
+    {
+      "no": 15,
+      "topic": "Array of struct บน heap",
+      "prompt": "กำหนดโค้ดต่อไปนี้ นิพจน์ใดเข้าถึง y ของสมาชิกตัวที่สาม",
+      "code": "struct Point { int x; int y; };\n\n/* ภายใน main */\nstruct Point *pts = malloc(3 * sizeof(struct Point));",
+      "choices": [
+        {
+          "letter": "A",
+          "text": "pts[3].y",
+          "correct": false
+        },
+        {
+          "letter": "B",
+          "text": "pts->y[2]",
+          "correct": false
+        },
+        {
+          "letter": "C",
+          "text": "pts[2].y",
+          "correct": true
+        },
+        {
+          "letter": "D",
+          "text": "pts.y[2]",
+          "correct": false
+        }
+      ],
+      "feedback": "คำตอบที่ถูกคือ C: สมาชิกตัวที่สามคือ index 2 (pts[2]) ซึ่งเป็น struct ไม่ใช่ pointer จึงใช้ .y"
+    }
+  ]
+}

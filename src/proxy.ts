@@ -43,6 +43,7 @@ export const config = {
     "/logs/:path*",
     "/courses/:path*",
     "/students/:path*",
+    "/quizzes/:path*",
     "/problems/:path*",
     "/review/:path*",
     "/gradebook/:path*",
