@@ -268,4 +268,5 @@ their score and each question's outcome (correct / wrong / don't know) with its 
 **never** the correct choice or the explanation. The correct choices, explanations and the
 Pre-vs-Post comparison are released only once the **Post** **Round Window** of the
 Student's Group has closed (whether or not they took it), because both rounds ask the same
-questions and an early key would leak into a still-open Post.
+questions and an early key would leak into a still-open Post — and never while that Group's
+Pre is open (e.g. reopened for a make-up sitting).

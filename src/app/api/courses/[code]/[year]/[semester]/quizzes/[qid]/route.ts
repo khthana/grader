@@ -19,7 +19,7 @@ import {
   type QuizDetail,
 } from "@/lib/quizzes/repository"
 import { isQuizLocked } from "@/lib/quizzes/attempt-repository"
-import { resolveStudentQuiz, studentRoundsWithAttempts } from "@/lib/quizzes/quiz-access"
+import { resolveStudentQuiz, studentQuizView } from "@/lib/quizzes/quiz-access"
 import { quizForStudent } from "@/lib/quizzes/result-view"
 import type { Queryable } from "@/lib/db"
 
@@ -37,7 +37,7 @@ export const GET = courseRoute<Params>({}, async (_req, auth, { qid }) => {
     if (!access) return notFound()
     return NextResponse.json({
       quiz: quizForStudent(access.quiz),
-      rounds: await studentRoundsWithAttempts(db, access, auth.user.id),
+      ...(await studentQuizView(db, access, auth.user.id)),
     })
   }
   const quiz = await findQuizForCourse(db, auth.course, qid)

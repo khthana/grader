@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { attemptForStudent, quizForStudent, roundSummaryForStudent } from "./result-view"
+import { attemptForStudent, quizForStudent, quizResultFor, roundSummaryForStudent } from "./result-view"
 import type { AttemptRecord } from "./attempt-repository"
 import type { QuizDetail } from "./repository"
 import type { WindowSlot } from "./windows"
@@ -82,5 +82,68 @@ describe("attemptForStudent / roundSummaryForStudent", () => {
 
   it("a round with no attempt has no attempt summary", () => {
     expect(roundSummaryForStudent(slot("closed"), null, QUIZ)).toEqual({ ...slot("closed"), attempt: null })
+  })
+})
+
+describe("quizResultFor (Answer Key Release)", () => {
+  const submittedPre = attemptForStudent(attempt("2026-10-20T09:10:00.000Z"), QUIZ, "closed")
+  const postAttempt = attemptForStudent(
+    { ...attempt("2026-10-27T09:10:00.000Z"), round: "post", answers: { "11": "A", "12": "B" } },
+    QUIZ,
+    "closed"
+  )
+  const attempts = { pre: submittedPre, post: postAttempt }
+
+  it.each([
+    ["staff", true, "closed", "not-open", true],
+    ["staff", true, "closed", "open", true],
+    ["staff", true, "closed", "closed", true],
+    ["student", false, "closed", "not-open", false],
+    ["student", false, "closed", "open", false],
+    ["student", false, "closed", "closed", true],
+    ["student, Pre never opened", false, "not-open", "closed", true],
+    ["student, Pre reopened after Post closed", false, "open", "closed", false],
+    ["student, Post state unknown (fails closed)", false, "closed", undefined, false],
+    ["student, Pre state unknown (fails closed)", false, undefined, "closed", false],
+  ] as const)("%s: Pre %s, Post %s → released %s", (_label, staff, pre, post, released) => {
+    const result = quizResultFor({ staff }, QUIZ, attempts, { pre, post })
+    expect(result.released).toBe(released)
+    const raw = JSON.stringify(result)
+    if (!released) {
+      expect(result).toEqual({ released: false })
+      expect(raw).not.toContain("correctLetter")
+      expect(raw).not.toContain("เพราะ")
+    }
+  })
+
+  it("once released: the key, explanation and Pre vs Post per question", () => {
+    const result = quizResultFor({ staff: false }, QUIZ, attempts, { pre: "closed", post: "closed" })
+    expect(result).toEqual({
+      released: true,
+      pre: { score: 1, max: 2 },
+      post: { score: 2, max: 2 },
+      questions: [
+        {
+          id: 11, topic: "Loop", prompt: "p1", code: "x",
+          choices: QUIZ.questions[0].choices, correctLetter: "A", feedback: "เพราะ A",
+          pre: { answer: "A", outcome: "correct" }, post: { answer: "A", outcome: "correct" },
+        },
+        {
+          id: 12, topic: "Array", prompt: "p2", code: null,
+          choices: QUIZ.questions[1].choices, correctLetter: "B", feedback: "เพราะ B",
+          pre: { answer: "dont-know", outcome: "dont-know" }, post: { answer: "B", outcome: "correct" },
+        },
+      ],
+    })
+  })
+
+  it("a round the Student didn't take — or hasn't submitted — compares as absent", () => {
+    const inProgress = attemptForStudent({ ...attempt(null), round: "post" }, QUIZ, "open")
+    for (const post of [null, inProgress]) {
+      const result = quizResultFor({ staff: false }, QUIZ, { pre: submittedPre, post }, { pre: "closed", post: "closed" })
+      if (!result.released) throw new Error("expected released")
+      expect(result.post).toBeNull()
+      expect(result.questions[0].post).toBeNull()
+    }
   })
 })

@@ -13,7 +13,7 @@ import type { CourseFixture } from "@/lib/test-support/db"
 import type { CourseKey } from "@/lib/courses/types"
 import w01 from "@/lib/quizzes/fixtures/w01-pretest.json"
 import { seedStudent, setWindow } from "@/lib/test-support/quiz"
-import { getOrStartAttempt } from "@/lib/quizzes/attempt-repository"
+import { getOrStartAttempt, saveAnswers } from "@/lib/quizzes/attempt-repository"
 
 const W01 = (() => {
   const r = parseQuizImport(w01)
@@ -153,6 +153,57 @@ describe("/api/courses/[code]/[year]/[semester]/quizzes/[qid]", () => {
       const { rounds } = await (await GET(req("GET", undefined, s.email), ctx())).json()
       expect(rounds.pre.attempt).toEqual({ submitted: true, score: 0, max: 15 })
       expect(rounds.post.attempt).toBeNull()
+    })
+
+    describe("Answer Key Release", () => {
+      const leaksKey = (body: unknown) => {
+        const raw = JSON.stringify(body)
+        return raw.includes("correctLetter") || raw.includes("feedback")
+      }
+
+      async function preTaken() {
+        const s = await seedStudent(f.db, f.course, "1")
+        await setWindow(f.db, quizId, "pre", "1", "open")
+        const a = await getOrStartAttempt(f.db, quizId, "pre", s.id)
+        const { quiz } = await (await GET(req("GET"), ctx())).json()
+        await saveAnswers(f.db, a.id, { [quiz.questions[0].id]: quiz.questions[0].correctLetter })
+        await setWindow(f.db, quizId, "pre", "1", "closed")
+        return s
+      }
+      const view = async (email: string) => (await GET(req("GET", undefined, email), ctx())).json()
+
+      it("withholds the key while the Group's Post isn't set, not open yet, or open", async () => {
+        const s = await preTaken()
+        for (const phase of [null, "not-open", "open"] as const) {
+          if (phase) await setWindow(f.db, quizId, "post", "1", phase)
+          const body = await view(s.email)
+          expect(body.result).toEqual({ released: false })
+          expect(leaksKey(body)).toBe(false)
+        }
+      })
+
+      it("withholds it when only another Group's Post has closed", async () => {
+        const s = await preTaken()
+        await setWindow(f.db, quizId, "post", "2", "closed")
+        await setWindow(f.db, quizId, "post", "1", "open")
+        expect(leaksKey(await view(s.email))).toBe(false)
+      })
+
+      it("releases key, explanations and Pre vs Post once the Group's Post closes — taken or not", async () => {
+        const s = await preTaken()
+        await setWindow(f.db, quizId, "post", "1", "closed")
+        const { result } = await view(s.email)
+        expect(result.released).toBe(true)
+        expect(result.pre).toEqual({ score: 1, max: 15 })
+        expect(result.post).toBeNull()
+        expect(result.questions[0]).toMatchObject({
+          correctLetter: W01.questions[0].correctLetter,
+          feedback: W01.questions[0].feedback,
+          pre: { outcome: "correct" },
+          post: null,
+        })
+        expect(result.questions[1].pre).toEqual({ answer: null, outcome: "unanswered" })
+      })
     })
 
     it("403s a student who isn't linked to this course", async () => {

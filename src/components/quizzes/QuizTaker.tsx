@@ -3,23 +3,17 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useToast } from "@/components/shell/ToastProvider"
-import { DONT_KNOW, type QuestionOutcome, type QuizAnswers } from "@/lib/quizzes/attempt"
+import { DONT_KNOW, type QuizAnswers } from "@/lib/quizzes/attempt"
 import { DONT_KNOW_TEXT, dontKnowLetter } from "@/lib/quizzes/import"
 import { QUIZ_ROUND_LABEL, type QuizRound, type RoundWindowState } from "@/lib/quizzes/round-window"
 import type { StudentAttempt, StudentQuiz } from "@/lib/quizzes/result-view"
 import { RoundStateBadge } from "./RoundStateBadge"
+import { OutcomeBadge } from "./OutcomeBadge"
 
 interface AttemptPayload {
   state: RoundWindowState
   quiz: StudentQuiz
   attempt: StudentAttempt | null
-}
-
-const OUTCOME: Record<QuestionOutcome, { label: string; className: string }> = {
-  correct: { label: "ถูก", className: "bg-green-100 text-green-700" },
-  wrong: { label: "ผิด", className: "bg-red-100 text-red-700" },
-  "dont-know": { label: "ไม่ทราบ", className: "bg-amber-100 text-amber-700" },
-  unanswered: { label: "ไม่ได้ตอบ", className: "bg-slate-100 text-slate-500" },
 }
 
 /**
@@ -178,11 +172,7 @@ export function QuizTaker({
                   {q.topic && (
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{q.topic}</span>
                   )}
-                  {outcome && (
-                    <span className={`ml-auto rounded-full px-2 py-0.5 text-xs ${OUTCOME[outcome].className}`}>
-                      {OUTCOME[outcome].label}
-                    </span>
-                  )}
+                  {outcome && <OutcomeBadge outcome={outcome} className="ml-auto" />}
                 </div>
                 <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{q.prompt}</p>
                 {q.code && (

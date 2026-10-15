@@ -5,7 +5,8 @@ import { getDb } from "@/lib/db"
 import { listWeeks } from "@/lib/weeks/repository"
 import { getQuizForCourse } from "@/lib/quizzes/repository"
 import { isQuizLocked } from "@/lib/quizzes/attempt-repository"
-import { resolveStudentQuiz, studentRoundsWithAttempts } from "@/lib/quizzes/quiz-access"
+import { resolveStudentQuiz, studentQuizView } from "@/lib/quizzes/quiz-access"
+import { QuizReview } from "@/components/quizzes/QuizReview"
 import { QuizDetail } from "@/components/quizzes/QuizDetail"
 import { StudentRoundCards } from "@/components/quizzes/StudentRoundCards"
 
@@ -29,7 +30,7 @@ export default async function QuizPage({ params }: PageProps) {
     const visible = await resolveStudentQuiz(db, slug, access.user.id, qid, new Date())
     if (!visible) notFound()
     const { quiz } = visible
-    const rounds = await studentRoundsWithAttempts(db, visible, access.user.id)
+    const { rounds, result } = await studentQuizView(db, visible, access.user.id)
     return (
       <div className="font-thai">
         <div className="mb-6">
@@ -47,6 +48,9 @@ export default async function QuizPage({ params }: PageProps) {
           rounds={rounds}
           quizPath={`${coursePath}/quizzes/${quiz.id}`}
         />
+        <div className="mt-6">
+          <QuizReview result={result} />
+        </div>
       </div>
     )
   }

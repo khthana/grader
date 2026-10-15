@@ -9,7 +9,14 @@ import { QUIZ_ROUNDS, type QuizRound } from "./round-window"
 import { groupKeyOf, groupRoundWindows, listGroupWindows, listWindows, type WindowSlot } from "./windows"
 import { getQuizForCourse, listQuizzes, type QuizDetail } from "./repository"
 import { getAttempt, listAttemptsForUser, type AttemptRecord } from "./attempt-repository"
-import { roundSummaryForStudent, type StudentRoundSummary } from "./result-view"
+import {
+  attemptForStudent,
+  quizResultFor,
+  roundSummaryForStudent,
+  type QuizResult,
+  type StudentAttempt,
+  type StudentRoundSummary,
+} from "./result-view"
 
 export type StudentRounds = Record<QuizRound, WindowSlot>
 
@@ -92,18 +99,35 @@ export async function listQuizzesForStudent(
   return items
 }
 
-/** A visible Quiz's rounds for this Student, each with their own attempt. */
-export async function studentRoundsWithAttempts(
+/**
+ * A visible Quiz as this Student's Quiz page shows it: each round with their own
+ * attempt, and the Answer Key Release result (withheld until their Group's Post
+ * window closes).
+ */
+export async function studentQuizView(
   db: Queryable,
   access: StudentQuizAccess,
   userId: number
-): Promise<Record<QuizRound, StudentRoundSummary>> {
-  const attempts = new Map(
+): Promise<{ rounds: Record<QuizRound, StudentRoundSummary>; result: QuizResult }> {
+  const records = new Map(
     await Promise.all(
       QUIZ_ROUNDS.map(async (r) => [r, await getAttempt(db, access.quiz.id, r, userId)] as const)
     )
   )
-  return studentRoundSummaries(access.rounds, access.quiz, (r) => attempts.get(r) ?? null)
+  const record = (r: QuizRound) => records.get(r) ?? null
+  const attempts = Object.fromEntries(
+    QUIZ_ROUNDS.map((r) => {
+      const a = record(r)
+      return [r, a && attemptForStudent(a, access.quiz, access.rounds[r].state)]
+    })
+  ) as Record<QuizRound, StudentAttempt | null>
+  return {
+    rounds: studentRoundSummaries(access.rounds, access.quiz, record),
+    result: quizResultFor({ staff: false }, access.quiz, attempts, {
+      pre: access.rounds.pre.state,
+      post: access.rounds.post.state,
+    }),
+  }
 }
 
 export function studentRoundSummaries(
