@@ -61,9 +61,11 @@ Copying a whole **Course** offering to another academic term — same course `co
 **creates** the target offering (it must not already exist) and copies everything that
 defines the course content: the **Course Language**, **Course staff** (plus the acting
 user), every **Week** (`week_no` + `topic`), every **Problem** (all fields including the
-**Reference Solution**), and every **Test Case**. Term-specific state is deliberately reset: **Due Date** / **Close
-Date** are cleared and every Week starts as an unreleased (hidden) **Released Week**.
-**Enrollments** and **Submissions** are never copied — a new term has a new roster and a
+**Reference Solution**), every **Test Case**, and every **Quiz** (questions, answer key,
+Don't Know setting, Week by `week_no`). Term-specific state is deliberately reset: **Due Date** / **Close
+Date** are cleared, every Week starts as an unreleased (hidden) **Released Week**, and no
+**Round Window** is copied (a copied Quiz is unlocked).
+**Enrollments**, **Submissions** and **Quiz Attempts** are never copied — a new term has a new roster and a
 clean gradebook. The copy is atomic (all-or-nothing).
 
 ### Roster (รายชื่อนักศึกษา)
@@ -212,3 +214,56 @@ A single **Student's** own scores across all **Problems** in a Course — one ro
 Problem, plus a course total and progress ring. Read-only and strictly self-scoped: a
 Student sees only their own **Effective Scores**, never another student's. The
 single-student counterpart to the **Gradebook**.
+
+### Quiz (แบบทดสอบ)
+A set of multiple-choice **Quiz Questions** in a Course, optionally tied to one **Week**,
+used to measure learning — not a **Problem** (no code is run). One Quiz is taken in two
+**Quiz Rounds**, **Pre** and **Post**, over the **same** questions, so results compare
+question-by-question. Editing the Quiz changes what both rounds ask. Questions arrive by JSON import, and a Quiz
+is **locked** once any Student has answered either round — its questions can no longer be
+changed, so Pre and Post stay comparable.
+Its **Week** is only a label for grouping — a Quiz ignores **Released Week**: a Student sees
+it once one of its rounds has opened for their Group (a Pre-test runs before its Week is
+released). Quiz scores never enter the **Gradebook** or **Scorebook**.
+_Avoid_: "Pre-test" / "Post-test" as separate things — they are rounds of one Quiz.
+
+### Quiz Round (รอบ Pre-test / Post-test)
+One of the two sittings of a **Quiz**: **Pre** (before teaching) or **Post** (after).
+Each round opens and closes independently, and a Student answers each round separately.
+
+### Round Window (ช่วงเปิดสอบ)
+When a **Quiz Round** accepts answers, set **per Group**: an optional open instant and an
+optional close instant, from which the state follows — **not yet open** → **open** →
+**closed**. Opening or closing "manually" just sets that instant to now; there is no
+separate open flag. Students with no Group share one "ไม่ระบุกลุ่ม" window. Within one
+Group, the Pre and Post windows of a Quiz must not overlap. A Student is governed by the
+window of their current Group; there are no per-student overrides.
+
+### Quiz Question (ข้อสอบ)
+One single-answer multiple-choice item in a **Quiz**: a prompt, an optional code snippet,
+lettered choices of which exactly one is correct, and an explanation (feedback). Worth one
+point. Ungraded survey items (checkbox / scale "background" questions) are not Quiz
+Questions and are out of scope.
+
+### Don't Know answer (ไม่ทราบ)
+A built-in extra answer the system appends to every **Quiz Question** when the Quiz enables
+it (on by default). Scores zero like a wrong answer, but is reported separately: each
+question's outcome is **correct / wrong / don't know**, so "never learned it" is told apart
+from "misunderstood it".
+
+### Quiz Attempt (การทำแบบทดสอบ)
+One Student's answers to one **Quiz Round** — at most one per Student per round. Answers
+are saved as the Student goes; the attempt is **submitted** either by the Student (only
+once every question is answered, "ไม่ทราบ" counting as an answer) or automatically when the
+**Round Window** closes, in which case unanswered questions score zero. A submitted attempt
+cannot be changed. There is no per-attempt timer — the Round Window is the only limit.
+Only Students enrolled in the Course make attempts; staff can preview a Quiz without one.
+Questions and choices appear in their authored order (no shuffling), Don't Know last.
+
+### Answer Key Release (การเปิดเฉลย)
+What a Student sees of their own **Quiz Attempts**. Right after submitting either round:
+their score and each question's outcome (correct / wrong / don't know) with its topic —
+**never** the correct choice or the explanation. The correct choices, explanations and the
+Pre-vs-Post comparison are released only once the **Post** **Round Window** of the
+Student's Group has closed (whether or not they took it), because both rounds ask the same
+questions and an early key would leak into a still-open Post.
