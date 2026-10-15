@@ -2,16 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { useToast } from "@/components/shell/ToastProvider"
-import { QUIZ_ROUNDS, QUIZ_ROUND_LABEL, type QuizRound, type RoundWindowState } from "@/lib/quizzes/round-window"
+import { QUIZ_ROUNDS, QUIZ_ROUND_LABEL, type QuizRound } from "@/lib/quizzes/round-window"
+import { RoundStateBadge } from "./RoundStateBadge"
 import type { WindowGridRow, WindowSlot } from "@/lib/quizzes/windows"
 
 const ROUNDS = QUIZ_ROUNDS.map((round) => ({ round, label: QUIZ_ROUND_LABEL[round] }))
-
-const STATE_BADGE: Record<RoundWindowState, { label: string; className: string }> = {
-  "not-open": { label: "ยังไม่เปิด", className: "bg-slate-100 text-slate-600" },
-  open: { label: "เปิดอยู่", className: "bg-green-100 text-green-700" },
-  closed: { label: "ปิดแล้ว", className: "bg-red-100 text-red-700" },
-}
 
 type Draft = { opensAt: string; closesAt: string }
 type WindowChange = { round: QuizRound; groupKey: string; opensAt?: string | null; closesAt?: string | null }
@@ -182,12 +177,11 @@ function WindowCell({
   onCloseNow: () => void
   onApplyAll: () => void
 }) {
-  const badge = STATE_BADGE[slot.state]
   const button =
     "rounded-md border border-gray-300 px-2 py-1 text-xs text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
   return (
     <div className="flex flex-col gap-2">
-      <span className={`w-fit rounded-full px-2 py-0.5 text-xs ${badge.className}`}>{badge.label}</span>
+      <RoundStateBadge state={slot.state} />
       {canManage ? (
         <>
           <label className="flex items-center gap-2 text-xs text-slate-500">

@@ -220,7 +220,8 @@ A set of multiple-choice **Quiz Questions** in a Course, optionally tied to one 
 used to measure learning — not a **Problem** (no code is run). One Quiz is taken in two
 **Quiz Rounds**, **Pre** and **Post**, over the **same** questions, so results compare
 question-by-question. Editing the Quiz changes what both rounds ask. Questions arrive by JSON import, and a Quiz
-is **locked** once any Student has answered either round — its questions can no longer be
+is **locked** once any Student has started an attempt at either round (opening an open
+round starts one) — its questions can no longer be
 changed, so Pre and Post stay comparable.
 Its **Week** is only a label for grouping — a Quiz ignores **Released Week**: a Student sees
 it once one of its rounds has opened for their Group (a Pre-test runs before its Week is
@@ -257,7 +258,7 @@ One Student's answers to one **Quiz Round** — at most one per Student per roun
 are saved as the Student goes; the attempt is **submitted** either by the Student (only
 once every question is answered, "ไม่ทราบ" counting as an answer) or automatically when the
 **Round Window** closes, in which case unanswered questions score zero. A submitted attempt
-cannot be changed. There is no per-attempt timer — the Round Window is the only limit.
+cannot be changed — even if staff later reopen or clear that window. There is no per-attempt timer — the Round Window is the only limit.
 Only Students enrolled in the Course make attempts; staff can preview a Quiz without one.
 Questions and choices appear in their authored order (no shuffling), Don't Know last.
 

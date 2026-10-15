@@ -2,13 +2,16 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { FaTrash, FaFileImport } from "react-icons/fa"
+import Link from "next/link"
+import { FaTrash, FaFileImport, FaEye } from "react-icons/fa"
 import { QuizQuestionList } from "./QuizQuestionList"
 import { QuizImportForm, type WeekOption } from "./QuizImportForm"
 import { QuizWindowsGrid } from "./QuizWindowsGrid"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
 import { useToast } from "@/components/shell/ToastProvider"
 import type { QuizDetail as QuizData } from "@/lib/quizzes/repository"
+
+type StaffQuiz = QuizData & { locked: boolean }
 
 export function QuizDetail({
   initialQuiz,
@@ -17,7 +20,7 @@ export function QuizDetail({
   weeks,
   canManage,
 }: {
-  initialQuiz: QuizData
+  initialQuiz: StaffQuiz
   courseSlug: string
   coursePath: string
   weeks: WeekOption[]
@@ -122,10 +125,12 @@ export function QuizDetail({
             </label>
           </div>
           <div className="mt-4 flex flex-wrap justify-between gap-3">
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => setShowImport((v) => !v)}
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
+                disabled={quiz.locked}
+                title={quiz.locked ? "มีนักศึกษาเริ่มทำแล้ว นำเข้าข้อสอบใหม่ไม่ได้" : undefined}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <FaFileImport className="h-3.5 w-3.5" />
                 นำเข้าข้อสอบใหม่
@@ -156,7 +161,7 @@ export function QuizDetail({
         </div>
       )}
 
-      {canManage && showImport && (
+      {canManage && showImport && !quiz.locked && (
         <QuizImportForm
           courseSlug={courseSlug}
           coursePath={coursePath}
@@ -170,7 +175,16 @@ export function QuizDetail({
 
       <QuizWindowsGrid courseSlug={courseSlug} quizId={quiz.id} canManage={canManage} />
 
-      <h2 className="mt-2 text-sm font-medium text-slate-600">ข้อสอบ {quiz.questions.length} ข้อ (พร้อมเฉลย)</h2>
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-medium text-slate-600">ข้อสอบ {quiz.questions.length} ข้อ (พร้อมเฉลย)</h2>
+        <Link
+          href={`${coursePath}/quizzes/${quiz.id}/pre`}
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-50"
+        >
+          <FaEye className="h-3.5 w-3.5" />
+          ดูตัวอย่าง (มุมมองนักศึกษา)
+        </Link>
+      </div>
       <QuizQuestionList questions={quiz.questions} dontKnowEnabled={quiz.dontKnowEnabled} />
 
       {confirmDelete && (
@@ -181,6 +195,7 @@ export function QuizDetail({
           onConfirm={handleDelete}
           onCancel={() => setConfirmDelete(false)}
           busy={deleting}
+          confirmText={quiz.locked ? quiz.title : undefined}
         />
       )}
     </div>

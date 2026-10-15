@@ -12,6 +12,8 @@ import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
 import type { CourseFixture } from "@/lib/test-support/db"
 import type { CourseKey } from "@/lib/courses/types"
 import w01 from "@/lib/quizzes/fixtures/w01-pretest.json"
+import { seedStudent, setWindow } from "@/lib/test-support/quiz"
+import { getOrStartAttempt } from "@/lib/quizzes/attempt-repository"
 
 const W01 = (() => {
   const r = parseQuizImport(w01)
@@ -106,12 +108,57 @@ describe("/api/courses/[code]/[year]/[semester]/quizzes/[qid]", () => {
       expect((await GET(req("GET"), ctx(foreign.id))).status).toBe(404)
     })
 
-    it("rejects an enrolled student (until the student slice) and an unlinked instructor", async () => {
-      const s = await enrolledStudent()
-      expect((await GET(req("GET", undefined, s.email), ctx())).status).toBe(403)
+    it("tells staff whether the Quiz is locked", async () => {
+      expect((await (await GET(req("GET"), ctx())).json()).quiz.locked).toBe(false)
+      const s = await seedStudent(f.db, f.course, null)
+      await getOrStartAttempt(f.db, quizId, "pre", s.id)
+      expect((await (await GET(req("GET"), ctx())).json()).quiz.locked).toBe(true)
+    })
+
+    it("rejects an unlinked instructor", async () => {
       const stranger = await createUser(f.db, { email: "x@kmitl.ac.th", name: "X" })
       await assignRole(f.db, stranger.id, "Instructor")
       expect((await GET(req("GET", undefined, stranger.email), ctx())).status).toBe(403)
+    })
+  })
+
+  describe("GET — Students", () => {
+    it("404s, like an unknown id, until a round opens for the Student's Group", async () => {
+      const s = await seedStudent(f.db, f.course, "1")
+      await setWindow(f.db, quizId, "pre", "2", "open")
+      expect((await GET(req("GET", undefined, s.email), ctx())).status).toBe(404)
+      await setWindow(f.db, quizId, "pre", "1", "not-open")
+      expect((await GET(req("GET", undefined, s.email), ctx())).status).toBe(404)
+    })
+
+    it("returns the questions without the key, and each round's state and own attempt", async () => {
+      const s = await seedStudent(f.db, f.course, "1")
+      await setWindow(f.db, quizId, "pre", "1", "open")
+      const res = await GET(req("GET", undefined, s.email), ctx())
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.quiz.questions).toHaveLength(15)
+      expect(body.rounds.pre).toMatchObject({ state: "open", attempt: null })
+      expect(body.rounds.post).toMatchObject({ state: "not-open", attempt: null })
+      const raw = JSON.stringify(body)
+      expect(raw).not.toContain("correctLetter")
+      expect(raw).not.toContain("feedback")
+      expect(body.quiz).not.toHaveProperty("locked")
+    })
+
+    it("reports the Student's own attempt per round", async () => {
+      const s = await seedStudent(f.db, f.course, "1")
+      await setWindow(f.db, quizId, "pre", "1", "closed")
+      await getOrStartAttempt(f.db, quizId, "pre", s.id)
+      const { rounds } = await (await GET(req("GET", undefined, s.email), ctx())).json()
+      expect(rounds.pre.attempt).toEqual({ submitted: true, score: 0, max: 15 })
+      expect(rounds.post.attempt).toBeNull()
+    })
+
+    it("403s a student who isn't linked to this course", async () => {
+      const outsider = await createUser(f.db, { email: "o@kmitl.ac.th", name: "O" })
+      await assignRole(f.db, outsider.id, "Student")
+      expect((await GET(req("GET", undefined, outsider.email), ctx())).status).toBe(403)
     })
   })
 
@@ -191,6 +238,19 @@ describe("/api/courses/[code]/[year]/[semester]/quizzes/[qid]", () => {
 
     it("is manage-only: TA 403", async () => {
       expect((await PUT(req("PUT", { title: "x" }, f.ta.email), ctx())).status).toBe(403)
+    })
+
+    it("once locked, refuses a re-import (409) but still edits the metadata", async () => {
+      const s = await seedStudent(f.db, f.course, null)
+      await getOrStartAttempt(f.db, quizId, "pre", s.id)
+      const data = { title: "T", questions: [{ no: 1, prompt: "p", choices: [{ letter: "A", text: "x", correct: true }, { letter: "B", text: "y" }] }] }
+      expect((await PUT(req("PUT", { data }), ctx())).status).toBe(409)
+      const { quiz } = await (await GET(req("GET"), ctx())).json()
+      expect(quiz.questions).toHaveLength(15)
+
+      const res = await PUT(req("PUT", { title: "ชื่อใหม่" }), ctx())
+      expect(res.status).toBe(200)
+      expect((await res.json()).quiz).toMatchObject({ title: "ชื่อใหม่", locked: true })
     })
   })
 

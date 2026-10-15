@@ -24,12 +24,14 @@ describe("resolveLegacyRedirect (#81)", () => {
     })
   })
 
-  it("routes staff to the quizzes section and 404s a student there (staff-only until #92)", () => {
-    expect(resolveLegacyRedirect(course, ta, { section: "quizzes", requires: "staff" })).toEqual({
-      kind: "redirect",
-      path: "/courses/C01/2567/1/quizzes",
-    })
-    expect(resolveLegacyRedirect(course, student, { section: "quizzes", requires: "staff" }).kind).toBe("not-found")
+  it("routes anyone linked to the active course to its quizzes — students too", () => {
+    for (const access of [ta, student]) {
+      expect(resolveLegacyRedirect(course, access, { section: "quizzes", requires: "linked" })).toEqual({
+        kind: "redirect",
+        path: "/courses/C01/2567/1/quizzes",
+      })
+    }
+    expect(resolveLegacyRedirect(course, null, { section: "quizzes", requires: "linked" }).kind).toBe("not-found")
   })
 
   it("404s a user who is only a student in the active course — whatever their global role", () => {

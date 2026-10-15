@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { getDb, withTransaction } from "@/lib/db"
 import { courseRoute } from "@/lib/courses/route"
 import { safeLog } from "@/lib/logs"
+import { sealAttempts } from "@/lib/quizzes/attempt-repository"
+import { roundWindow } from "@/lib/quizzes/round-window"
 import { findQuizForCourse, quizNotFound, readJsonObject } from "@/lib/quizzes/route-helpers"
 import { listWindows, mergeWindowChanges, quizGroups, saveWindows, windowGrid } from "@/lib/quizzes/windows"
 import type { Queryable } from "@/lib/db"
@@ -42,7 +44,17 @@ export const PUT = courseRoute<Params>({ manage: true }, async (req, auth, { qid
   const merged = mergeWindowChanges(body.windows, { stored, groups, now })
   if (!merged.ok) return NextResponse.json({ error: merged.error }, { status: 400 })
 
-  await withTransaction((tx) => saveWindows(tx, quiz.id, merged.windows))
+  await withTransaction(async (tx) => {
+    // A closed window has auto-submitted its attempts — make that permanent
+    // before the change can reopen it.
+    for (const w of merged.windows) {
+      const before = stored.find((x) => x.round === w.round && x.groupKey === w.groupKey)
+      if (before?.closesAt && roundWindow(before, now) === "closed") {
+        await sealAttempts(tx, auth.course, quiz.id, w.round, w.groupKey, before.closesAt)
+      }
+    }
+    await saveWindows(tx, quiz.id, merged.windows)
+  })
   await safeLog(db, {
     actorId: auth.user.id,
     actorEmail: auth.user.email,

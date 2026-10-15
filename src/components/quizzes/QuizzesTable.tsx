@@ -13,6 +13,7 @@ interface QuizItem {
   weekNo: number | null
   questionCount: number
   dontKnowEnabled: boolean
+  locked: boolean
 }
 
 export function QuizzesTable({
@@ -94,6 +95,9 @@ export function QuizzesTable({
                   <Link href={`${coursePath}/quizzes/${q.id}`} className="font-medium text-slate-700 hover:text-secondary">
                     {q.title}
                   </Link>
+                  {q.locked && (
+                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700">มีผู้ทำแล้ว</span>
+                  )}
                   {q.description && <p className="mt-0.5 line-clamp-1 text-xs text-slate-400">{q.description}</p>}
                 </td>
                 <td className="px-5 py-4 text-slate-500">{q.weekNo ?? "–"}</td>
@@ -123,6 +127,7 @@ export function QuizzesTable({
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
           busy={deleting}
+          confirmText={deleteTarget.locked ? deleteTarget.title : undefined}
         />
       )}
     </div>

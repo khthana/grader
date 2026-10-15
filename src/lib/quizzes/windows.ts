@@ -17,6 +17,9 @@ import {
 /** The Group key for students with no Group — they share one window. */
 export const NO_GROUP = ""
 
+/** An Enrollment's study group as a window key — blank or missing = ไม่ระบุกลุ่ม. */
+export const groupKeyOf = (studyGroup: string | null | undefined) => studyGroup?.trim() || NO_GROUP
+
 export const groupLabel = (groupKey: string) => (groupKey === NO_GROUP ? "ไม่ระบุกลุ่ม" : `กลุ่ม ${groupKey}`)
 
 export interface RoundWindow extends WindowTimes {
@@ -38,23 +41,55 @@ export interface WindowGridRow {
 
 const slotKey = (round: string, groupKey: string) => `${round}\u0000${groupKey}`
 
+interface WindowRow {
+  quiz_id: number
+  round: QuizRound
+  group_key: string
+  opens_at: Date | string | null
+  closes_at: Date | string | null
+}
+
+const date = (v: Date | string | null) => (v === null ? null : new Date(v))
+const toWindow = (r: WindowRow): RoundWindow => ({
+  round: r.round,
+  groupKey: r.group_key,
+  opensAt: date(r.opens_at),
+  closesAt: date(r.closes_at),
+})
+
 export async function listWindows(db: Queryable, quizId: number): Promise<RoundWindow[]> {
-  const { rows } = await db.query<{
-    round: QuizRound
-    group_key: string
-    opens_at: Date | string | null
-    closes_at: Date | string | null
-  }>(
-    `SELECT round, group_key, opens_at, closes_at FROM quiz_windows WHERE quiz_id = $1::int`,
+  const { rows } = await db.query<WindowRow>(
+    `SELECT quiz_id, round, group_key, opens_at, closes_at FROM quiz_windows WHERE quiz_id = $1::int`,
     [quizId]
   )
-  const date = (v: Date | string | null) => (v === null ? null : new Date(v))
-  return rows.map((r) => ({
-    round: r.round,
-    groupKey: r.group_key,
-    opensAt: date(r.opens_at),
-    closesAt: date(r.closes_at),
-  }))
+  return rows.map(toWindow)
+}
+
+/** One Group's windows for every Quiz of a course, by Quiz id. */
+export async function listGroupWindows(
+  db: Queryable,
+  key: CourseKey,
+  groupKey: string
+): Promise<Map<number, RoundWindow[]>> {
+  const { rows } = await db.query<WindowRow>(
+    `SELECT w.quiz_id, w.round, w.group_key, w.opens_at, w.closes_at
+     FROM quiz_windows w JOIN quizzes q ON q.id = w.quiz_id
+     WHERE q.course_code = $1 AND q.course_year = $2::int AND q.course_semester = $3::int
+       AND w.group_key = $4`,
+    [key.code, key.year, key.semester, groupKey]
+  )
+  const byQuiz = new Map<number, RoundWindow[]>()
+  for (const r of rows) byQuiz.set(r.quiz_id, [...(byQuiz.get(r.quiz_id) ?? []), toWindow(r)])
+  return byQuiz
+}
+
+/** A Group's Pre and Post window (absent = never opened) — state judged at `now`. */
+export function groupRoundWindows(
+  windows: RoundWindow[],
+  groupKey: string,
+  now: Date
+): Record<QuizRound, WindowSlot> {
+  return windowGrid([groupKey], windows, now)[0].windows
 }
 
 /** Replace the given slots (delete + insert — no upsert, for pg-mem). */
@@ -78,7 +113,7 @@ export async function saveWindows(db: Queryable, quizId: number, windows: RoundW
  * students all left keeps its row rather than vanishing).
  */
 export async function quizGroups(db: Queryable, key: CourseKey, stored: RoundWindow[]): Promise<string[]> {
-  const named = new Set((await listGroups(db, key)).filter((g) => g !== NO_GROUP))
+  const named = new Set((await listGroups(db, key)).map(groupKeyOf).filter((g) => g !== NO_GROUP))
   for (const w of stored) if (w.groupKey !== NO_GROUP) named.add(w.groupKey)
   const sorted = [...named].sort((a, b) => a.localeCompare(b, "th", { numeric: true }))
   return [...sorted, NO_GROUP]

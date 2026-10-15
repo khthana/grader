@@ -216,3 +216,19 @@ CREATE TABLE IF NOT EXISTS quiz_windows (
   closes_at  TIMESTAMPTZ,
   PRIMARY KEY (quiz_id, round, group_key)
 );
+
+-- Quiz Attempt (#92, ADR 0011): one Student's answers to one Quiz Round.
+-- answers: { "<questionId>": "<letter>" | "dont-know" }. Submitted when
+-- submitted_at is set OR the Student's Group window has closed (derived on read).
+-- A Quiz with any attempt is locked (questions can't be re-imported).
+CREATE TABLE IF NOT EXISTS quiz_attempts (
+  id           SERIAL PRIMARY KEY,
+  quiz_id      INTEGER NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+  round        TEXT NOT NULL CHECK (round IN ('pre', 'post')),
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  answers      JSONB NOT NULL DEFAULT '{}',
+  started_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  submitted_at TIMESTAMPTZ,
+  UNIQUE (quiz_id, round, user_id)
+);

@@ -10,6 +10,8 @@ import { listLogs } from "@/lib/logs"
 import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
 import type { CourseFixture } from "@/lib/test-support/db"
 import w01 from "@/lib/quizzes/fixtures/w01-pretest.json"
+import { seedQuiz, seedStudent, setWindow } from "@/lib/test-support/quiz"
+import { getOrStartAttempt, saveAnswers } from "@/lib/quizzes/attempt-repository"
 
 const small = {
   title: "Pre-test สัปดาห์ 2",
@@ -173,12 +175,59 @@ describe("/api/courses/[code]/[year]/[semester]/quizzes", () => {
       expect((await res.json()).quizzes).toEqual([])
     })
 
-    it("rejects students (until the student slice) and unlinked users", async () => {
-      const s = await student()
-      expect((await GET(req("GET", undefined, s.email), ctx())).status).toBe(403)
+    it("tells staff whether each Quiz is locked (any Student attempt)", async () => {
+      const quiz = await seedQuiz(f.db, f.course)
+      const s = await seedStudent(f.db, f.course, null)
+      await setWindow(f.db, quiz.id, "pre", "", "open")
+      expect((await (await GET(req("GET"), ctx())).json()).quizzes[0].locked).toBe(false)
+      await getOrStartAttempt(f.db, quiz.id, "pre", s.id)
+      expect((await (await GET(req("GET"), ctx())).json()).quizzes[0].locked).toBe(true)
+    })
+
+    it("rejects unlinked users", async () => {
       const stranger = await createUser(f.db, { email: "x@kmitl.ac.th", name: "X" })
       await assignRole(f.db, stranger.id, "Instructor")
       expect((await GET(req("GET", undefined, stranger.email), ctx())).status).toBe(403)
+    })
+  })
+
+  describe("GET (list) — Students", () => {
+    it("lists only Quizzes opened for the Student's own Group, ignoring Week release", async () => {
+      const [week1] = await listWeeks(f.db, f.course) // unreleased
+      const opened = await seedQuiz(f.db, f.course)
+      await (await import("@/lib/quizzes/repository")).updateQuizMeta(f.db, opened.id, {
+        title: "เปิดแล้ว", description: "", weekId: week1.id, dontKnowEnabled: true,
+      })
+      const later = await seedQuiz(f.db, f.course)
+      const otherGroup = await seedQuiz(f.db, f.course)
+      await setWindow(f.db, opened.id, "pre", "1", "open")
+      await setWindow(f.db, later.id, "pre", "1", "not-open")
+      await setWindow(f.db, otherGroup.id, "pre", "2", "open")
+
+      const s = await seedStudent(f.db, f.course, "1")
+      const res = await GET(req("GET", undefined, s.email), ctx())
+      expect(res.status).toBe(200)
+      const { quizzes } = await res.json()
+      expect(quizzes.map((q: { id: number }) => q.id)).toEqual([opened.id])
+      expect(quizzes[0].rounds.pre).toMatchObject({ state: "open", attempt: null })
+      expect(quizzes[0].rounds.post).toMatchObject({ state: "not-open", attempt: null })
+      expect(quizzes[0]).not.toHaveProperty("locked")
+    })
+
+    it("shows the Student's own score per round once submitted", async () => {
+      const quiz = await seedQuiz(f.db, f.course)
+      const s = await seedStudent(f.db, f.course, null)
+      await setWindow(f.db, quiz.id, "pre", "", "open")
+      const attempt = await getOrStartAttempt(f.db, quiz.id, "pre", s.id)
+      const [q1, q2] = quiz.questions
+      await saveAnswers(f.db, attempt.id, { [q1.id]: "A", [q2.id]: "A" })
+
+      const before = (await (await GET(req("GET", undefined, s.email), ctx())).json()).quizzes[0]
+      expect(before.rounds.pre.attempt).toEqual({ submitted: false, score: null, max: 3 })
+
+      await setWindow(f.db, quiz.id, "pre", "", "closed") // auto-submits
+      const after = (await (await GET(req("GET", undefined, s.email), ctx())).json()).quizzes[0]
+      expect(after.rounds.pre).toMatchObject({ state: "closed", attempt: { submitted: true, score: 1, max: 3 } })
     })
 
     it("401 without a session", async () => {

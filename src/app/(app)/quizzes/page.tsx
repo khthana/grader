@@ -2,11 +2,11 @@ import { redirect, notFound } from "next/navigation"
 import { getCourseAccess, getCourseContext } from "@/lib/courses/server"
 import { resolveLegacyRedirect } from "@/lib/courses/legacy-redirect"
 
-// Staff-only until students get their own quiz list (#92).
+// Staff and Students alike — each sees their own quiz list (#92).
 export default async function QuizzesPage() {
   const { activeCourse } = await getCourseContext()
   const access = activeCourse ? await getCourseAccess(activeCourse) : null
-  const next = resolveLegacyRedirect(activeCourse, access, { section: "quizzes", requires: "staff" })
+  const next = resolveLegacyRedirect(activeCourse, access, { section: "quizzes", requires: "linked" })
   if (next.kind === "not-found") notFound()
   if (next.kind === "redirect") redirect(next.path)
 

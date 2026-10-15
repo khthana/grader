@@ -16,16 +16,38 @@ import {
   getQuizForCourse,
   replaceQuestions,
   updateQuizMeta,
+  type QuizDetail,
 } from "@/lib/quizzes/repository"
+import { isQuizLocked } from "@/lib/quizzes/attempt-repository"
+import { resolveStudentQuiz, studentRoundsWithAttempts } from "@/lib/quizzes/quiz-access"
+import { quizForStudent } from "@/lib/quizzes/result-view"
+import type { Queryable } from "@/lib/db"
 
 type Params = { code: string; year: string; semester: string; qid: string }
 
-// Staff-only until students get their own (key-free) view (#92).
-export const GET = courseRoute<Params>({ staff: true }, async (_req, auth, { qid }) => {
-  const quiz = await findQuizForCourse(getDb(), auth.course, qid)
+/**
+ * Staff: the whole Quiz with its key, plus `locked`. Students: the questions
+ * without the key and each round's state + their own attempt — 404 (like an
+ * unknown id) until a round has opened for their Group.
+ */
+export const GET = courseRoute<Params>({}, async (_req, auth, { qid }) => {
+  const db = getDb()
+  if (!auth.staff) {
+    const access = await resolveStudentQuiz(db, auth.course, auth.user.id, qid, new Date())
+    if (!access) return notFound()
+    return NextResponse.json({
+      quiz: quizForStudent(access.quiz),
+      rounds: await studentRoundsWithAttempts(db, access, auth.user.id),
+    })
+  }
+  const quiz = await findQuizForCourse(db, auth.course, qid)
   if (!quiz) return notFound()
-  return NextResponse.json({ quiz })
+  return NextResponse.json({ quiz: await withLock(db, quiz) })
 })
+
+async function withLock(db: Queryable, quiz: QuizDetail) {
+  return { ...quiz, locked: await isQuizLocked(db, quiz.id) }
+}
 
 /**
  * Edit metadata (`title`, `description`, `weekId`, `dontKnowEnabled` — omitted
@@ -48,6 +70,12 @@ export const PUT = courseRoute<Params>({ manage: true }, async (req, auth, { qid
 
   let questions = null
   if (body.data !== undefined) {
+    if (await isQuizLocked(db, existing.id)) {
+      return NextResponse.json(
+        { error: "มีนักศึกษาเริ่มทำแบบทดสอบนี้แล้ว นำเข้าข้อสอบใหม่ไม่ได้" },
+        { status: 409 }
+      )
+    }
     const parsed = parseQuizImport(body.data)
     if (!parsed.ok) {
       return importErrorResponse(parsed.errors)
@@ -66,7 +94,7 @@ export const PUT = courseRoute<Params>({ manage: true }, async (req, auth, { qid
     action: "quiz.update",
     targetId: existing.id,
   })
-  return NextResponse.json({ quiz: await getQuizForCourse(db, auth.course, existing.id) })
+  return NextResponse.json({ quiz: await withLock(db, (await getQuizForCourse(db, auth.course, existing.id))!) })
 })
 
 export const DELETE = courseRoute<Params>({ manage: true }, async (_req, auth, { qid }) => {

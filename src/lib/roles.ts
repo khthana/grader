@@ -38,7 +38,7 @@ const SIDEBAR_MENU: Record<Role, MenuItem[]> = {
   // or review.
   Instructor: [MENU.courses, ...TEACHING_MENU],
   TA: TA_MENU,
-  Student: [MENU.assignments, MENU.scorebook],
+  Student: [MENU.assignments, MENU.quizzes, MENU.scorebook],
 }
 
 export function getSidebarMenu(role: Role): MenuItem[] {

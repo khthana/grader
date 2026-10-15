@@ -14,9 +14,9 @@ export type LegacyRedirect =
 export function resolveLegacyRedirect(
   activeCourse: CourseKey | null,
   access: Pick<CourseAccess, "staff" | "manager"> | null,
-  opts: { section: "gradebook" | "review" | "quizzes"; requires: "staff" | "manager" }
+  opts: { section: "gradebook" | "review" | "quizzes"; requires: "linked" | "staff" | "manager" }
 ): LegacyRedirect {
   if (!activeCourse) return { kind: "pick-course" }
-  if (!access?.[opts.requires]) return { kind: "not-found" }
+  if (!access || (opts.requires !== "linked" && !access[opts.requires])) return { kind: "not-found" }
   return { kind: "redirect", path: `${buildCoursePath(activeCourse)}/${opts.section}` }
 }

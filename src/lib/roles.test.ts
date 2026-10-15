@@ -48,8 +48,8 @@ describe("getSidebarMenu", () => {
     expect(hrefs("TA")).toEqual(["/students", "/quizzes", "/problems", "/gradebook"])
   })
 
-  it("gives Student their assignments and their own scorebook", () => {
-    expect(hrefs("Student")).toEqual(["/assignments", "/scorebook"])
+  it("gives Student their assignments, quizzes and their own scorebook", () => {
+    expect(hrefs("Student")).toEqual(["/assignments", "/quizzes", "/scorebook"])
   })
 
   it("labels each item in Thai", () => {

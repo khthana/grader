@@ -6,11 +6,20 @@ import { parseQuizImport } from "@/lib/quizzes/import"
 import { mergeQuizMeta } from "@/lib/quizzes/meta"
 import { checkQuizWeek, importErrorResponse, readJsonObject } from "@/lib/quizzes/route-helpers"
 import { createQuiz, listQuizzes } from "@/lib/quizzes/repository"
+import { lockedQuizIds } from "@/lib/quizzes/attempt-repository"
+import { listQuizzesForStudent } from "@/lib/quizzes/quiz-access"
 
-// Staff-only until students get their own view (#92).
-export const GET = courseRoute({ staff: true }, async (_req, auth) => {
-  const quizzes = await listQuizzes(getDb(), auth.course)
-  return NextResponse.json({ quizzes })
+/**
+ * Staff: every Quiz, with `locked` (any Student attempt). Students: only the
+ * Quizzes opened for their Group, each round with their own attempt summary.
+ */
+export const GET = courseRoute({}, async (_req, auth) => {
+  const db = getDb()
+  if (!auth.staff) {
+    return NextResponse.json({ quizzes: await listQuizzesForStudent(db, auth.course, auth.user.id, new Date()) })
+  }
+  const [quizzes, locked] = await Promise.all([listQuizzes(db, auth.course), lockedQuizIds(db, auth.course)])
+  return NextResponse.json({ quizzes: quizzes.map((q) => ({ ...q, locked: locked.has(q.id) })) })
 })
 
 /** Create a Quiz from the instructor's import JSON: `{ data, weekId?, dontKnowEnabled? }`. */
