@@ -15,6 +15,8 @@ import {
   createProblem,
   setTestCases,
 } from "@/lib/problems/repository"
+import { createQuiz, getQuizForCourse, listQuizzes } from "@/lib/quizzes/repository"
+import { toQuestionDraft } from "@/lib/quizzes/import"
 
 export type DuplicateResult =
   | { ok: true; course: CourseRecord }
@@ -104,6 +106,24 @@ export async function duplicateCourseOffering(
       whitelist: detail.whitelist,
     })
     await setTestCases(db, created.id, detail.testCases.map(toTestCaseInput))
+  }
+
+  // Quizzes (#95, ADR 0011): questions, key, explanations and the ไม่ทราบ setting;
+  // Week matched by number (unbound stays unbound). Every source Week is mirrored
+  // above, so the lookup can't miss for a Quiz whose Week is this course's (#88
+  // checks that on write); were it to, the Quiz is kept unbound rather than
+  // skipped, since a Quiz's Week is only a label. Round Windows and Attempts are
+  // never copied, so every copy starts unlocked.
+  for (const record of await listQuizzes(db, source)) {
+    const quiz = await getQuizForCourse(db, source, record.id)
+    if (!quiz) continue
+    await createQuiz(db, course, {
+      title: quiz.title,
+      description: quiz.description,
+      weekId: quiz.weekId === null ? null : (weekIdMap.get(quiz.weekId) ?? null),
+      dontKnowEnabled: quiz.dontKnowEnabled,
+      questions: quiz.questions.map(toQuestionDraft),
+    })
   }
 
   return { ok: true, course }

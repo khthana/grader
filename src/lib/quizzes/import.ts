@@ -17,6 +17,18 @@ export interface QuizQuestionDraft {
   feedback: string
 }
 
+/** A stored question as a draft to write again (its id dropped) — used by Course Duplication. */
+export function toQuestionDraft(q: QuizQuestionDraft): QuizQuestionDraft {
+  return {
+    topic: q.topic,
+    prompt: q.prompt,
+    code: q.code,
+    choices: q.choices.map((c) => ({ letter: c.letter, text: c.text })),
+    correctLetter: q.correctLetter,
+    feedback: q.feedback,
+  }
+}
+
 export interface QuizDraft {
   title: string
   description: string

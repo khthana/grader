@@ -6,7 +6,9 @@ import { createEnrollment } from "@/lib/enrollments/repository"
 import { listWeeks } from "@/lib/weeks/repository"
 import { listCourseInstructors, createCourse } from "@/lib/courses/repository"
 import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
-import type { CourseFixture } from "@/lib/test-support/db"
+import type { PoolLike } from "@/lib/db"
+import type { CourseFixture, Queryable } from "@/lib/test-support/db"
+import { seedQuiz } from "@/lib/test-support/quiz"
 
 describe("POST /api/courses/[code]/[year]/[semester]/duplicate", () => {
   let f: CourseFixture
@@ -97,5 +99,43 @@ describe("POST /api/courses/[code]/[year]/[semester]/duplicate", () => {
       ctx()
     )
     expect(res.status).toBe(400)
+  })
+
+  it("copies inside one transaction — a failure part-way (copying Quiz questions) rolls back", async () => {
+    // pg-mem accepts BEGIN / ROLLBACK but doesn't undo writes, so "nothing left
+    // behind" can't be read back from the DB. Instead: every write must run on the
+    // transaction's connection, and the failure must end it with ROLLBACK.
+    await seedQuiz(f.db, f.course)
+    const real = f.db as Queryable & PoolLike
+    const log: [via: "pool" | "tx", sql: string][] = []
+    const recording = {
+      query: (text: string, params?: unknown[]) => {
+        log.push(["pool", text])
+        return real.query(text, params)
+      },
+      connect: async () => {
+        const client = await real.connect()
+        return {
+          query: (text: string, params?: unknown[]) => {
+            log.push(["tx", text])
+            if (/INSERT INTO quiz_questions/.test(text)) throw new Error("boom")
+            return client.query(text, params)
+          },
+          release: () => client.release(),
+        }
+      },
+    }
+    setTestDb(recording as unknown as Queryable)
+
+    await expect(POST(req({ year: 2568, semester: 1 }, sessionFor(f.ins.email)), ctx())).rejects.toThrow("boom")
+
+    const tx = log.filter(([via]) => via === "tx").map(([, sql]) => sql.trim().split(/\s+/).slice(0, 3).join(" "))
+    expect(tx[0]).toBe("BEGIN")
+    expect(tx).toContain("INSERT INTO courses")
+    expect(tx).toContain("INSERT INTO quizzes")
+    expect(tx.at(-1)).toBe("ROLLBACK")
+    expect(tx).not.toContain("COMMIT")
+    // Every write went through the transaction's connection, none through the pool.
+    expect(log.filter(([via, sql]) => via === "pool" && /^\s*(INSERT|UPDATE|DELETE)/i.test(sql))).toEqual([])
   })
 })

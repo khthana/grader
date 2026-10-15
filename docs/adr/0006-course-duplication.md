@@ -42,6 +42,10 @@ mapping is unambiguous (no merge).
 | Test Case | `input`, `expected_output`, `is_hidden`, `score`, `sort_order` | — |
 | Enrollment | — | never copied |
 | Submission | — | never copied |
+| Quiz *(#95, ADR 0011)* | `title`, `description`, `dont_know_enabled`; Week mapped by `week_no` (unbound stays unbound) | starts **unlocked** |
+| Quiz question | `topic`, `prompt`, `code`, `choices`, `correct_letter`, `feedback`, order | — |
+| Round Window | — | never copied (staff set the new term's windows) |
+| Quiz Attempt | — | never copied |
 
 Problems are copied in `(week_no, problem_no)` order so `createProblem`'s auto-assign
 reproduces the source `problem_no`. The Reference Solution is read through the raw

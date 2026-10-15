@@ -25,7 +25,7 @@ export function setTestDb(testDb: Queryable | null): void {
   db = testDb
 }
 
-interface PoolLike {
+export interface PoolLike {
   connect: () => Promise<Queryable & { release: () => void }>
 }
 
