@@ -149,3 +149,9 @@ export async function sealAttempts(
     [quizId, round, closedAt, ...userIds]
   )
 }
+
+/** Every attempt at one Quiz (both rounds, all Students). */
+export async function listAttemptsForQuiz(db: Queryable, quizId: number): Promise<AttemptRecord[]> {
+  const { rows } = await db.query<AttemptRow>(`SELECT ${COLS} FROM quiz_attempts WHERE quiz_id = $1::int`, [quizId])
+  return rows.map(toRecord)
+}

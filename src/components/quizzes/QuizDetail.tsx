@@ -7,6 +7,7 @@ import { FaTrash, FaFileImport, FaEye } from "react-icons/fa"
 import { QuizQuestionList } from "./QuizQuestionList"
 import { QuizImportForm, type WeekOption } from "./QuizImportForm"
 import { QuizWindowsGrid } from "./QuizWindowsGrid"
+import { QuizReportPanel } from "./QuizReportPanel"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
 import { useToast } from "@/components/shell/ToastProvider"
 import type { QuizDetail as QuizData } from "@/lib/quizzes/repository"
@@ -37,6 +38,7 @@ export function QuizDetail({
   const [showImport, setShowImport] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [view, setView] = useState<"quiz" | "report">("quiz")
 
   const api = `/api/courses/${courseSlug}/quizzes/${quiz.id}`
 
@@ -77,8 +79,39 @@ export function QuizDetail({
     }
   }
 
+  const tabs = (
+    <div className="flex gap-1 border-b border-gray-200">
+      {(
+        [
+          ["quiz", "แบบทดสอบ"],
+          ["report", "รายงานผล"],
+        ] as const
+      ).map(([key, label]) => (
+        <button
+          key={key}
+          onClick={() => setView(key)}
+          className={`-mb-px border-b-2 px-4 py-2 text-sm transition ${
+            view === key ? "border-primary font-medium text-primary" : "border-transparent text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+
+  if (view === "report") {
+    return (
+      <div className="flex flex-col gap-4 font-thai">
+        {tabs}
+        <QuizReportPanel courseSlug={courseSlug} quizId={quiz.id} />
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-4 font-thai">
+      {tabs}
       {canManage ? (
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <div className="grid gap-4 md:grid-cols-2">

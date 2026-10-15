@@ -115,19 +115,26 @@ export async function studentQuizView(
     )
   )
   const record = (r: QuizRound) => records.get(r) ?? null
+  return {
+    rounds: studentRoundSummaries(access.rounds, access.quiz, record),
+    result: quizResultForRounds({ staff: false }, access.quiz, access.rounds, record),
+  }
+}
+
+/** The Answer Key Release result from a Student's Group rounds and their attempt records. */
+export function quizResultForRounds(
+  viewer: { staff: boolean },
+  quiz: QuizDetail,
+  rounds: StudentRounds,
+  record: (round: QuizRound) => AttemptRecord | null
+): QuizResult {
   const attempts = Object.fromEntries(
     QUIZ_ROUNDS.map((r) => {
       const a = record(r)
-      return [r, a && attemptForStudent(a, access.quiz, access.rounds[r].state)]
+      return [r, a && attemptForStudent(a, quiz, rounds[r].state)]
     })
   ) as Record<QuizRound, StudentAttempt | null>
-  return {
-    rounds: studentRoundSummaries(access.rounds, access.quiz, record),
-    result: quizResultFor({ staff: false }, access.quiz, attempts, {
-      pre: access.rounds.pre.state,
-      post: access.rounds.post.state,
-    }),
-  }
+  return quizResultFor(viewer, quiz, attempts, { pre: rounds.pre.state, post: rounds.post.state })
 }
 
 export function studentRoundSummaries(
