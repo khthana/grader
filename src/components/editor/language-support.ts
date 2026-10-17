@@ -7,10 +7,11 @@ type LanguageSupport = ReturnType<typeof python>
 // CodeMirror grammar per registry language. Kept out of the pure registry
 // (`@/lib/languages`) so server code never pulls in CodeMirror; the
 // language-support test fails if a registry language is missing here (#68).
-// C reuses the cpp() grammar (covers C).
+// C and C++ share the cpp() grammar (it covers C).
 const GRAMMARS: Record<string, () => LanguageSupport> = {
   python: python,
   c: cpp,
+  cpp: cpp,
 }
 
 export function hasEditorGrammar(language: string): boolean {

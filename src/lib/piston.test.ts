@@ -115,6 +115,30 @@ describe("runTestCases — language-aware execution", () => {
     expect(body.files[0].name).toBe("main.c")
   })
 
+  it("runs C++ through the gcc package's c++ runtime with a .cpp source file", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          compile: { stdout: "", stderr: "", code: 0 },
+          run: { stdout: "7\n", stderr: "", code: 0 },
+        }),
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    const [r] = await runTestCases(
+      "int main(){...}",
+      [{ id: 1, input: "3 4", expectedOutput: "7", isHidden: false }],
+      "cpp"
+    )
+
+    expect(r.passed).toBe(true)
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.language).toBe("c++")
+    expect(body.version).toBe("10.2.0")
+    expect(body.files[0].name).toBe("main.cpp")
+  })
+
   it("fails the case and surfaces the gcc compile error when C does not compile", async () => {
     vi.stubGlobal(
       "fetch",

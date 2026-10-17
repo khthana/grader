@@ -31,6 +31,8 @@ describe("Problem Type capabilities (type × language)", () => {
     ["unit", "python", true, true],
     ["io", "c", true, false],
     ["unit", "c", false, false],
+    ["io", "cpp", true, false],
+    ["unit", "cpp", false, false],
     ["io", "cobol", true, false],
     ["unit", "cobol", false, false],
   ] as const)("%s in %s → allowed %s, AI %s", (type, language, allowed, ai) => {

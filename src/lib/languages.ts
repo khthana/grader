@@ -4,7 +4,8 @@
 // `piston`/`version` are the Piston runtime + version used in an execute call;
 // `filename` is the source file name sent to Piston. The gcc package appends
 // `.c` to whatever name it receives (so `main.c` compiles as `main.c.c`, which
-// gcc accepts) — verified against the self-hosted engine (issue #61).
+// gcc accepts) — verified against the self-hosted engine (issue #61). C++ is
+// the same gcc package's `c++` runtime (`main.cpp` → `main.cpp.cpp`, verified).
 export interface LanguageConfig {
   piston: string
   version: string
@@ -22,7 +23,7 @@ export interface LanguageConfig {
 }
 
 // A language code a course may declare (a key of the registry below).
-export type Language = "python" | "c"
+export type Language = "python" | "c" | "cpp"
 
 export const LANGUAGE_CONFIG: Record<Language, LanguageConfig> = {
   python: {
@@ -42,6 +43,16 @@ export const LANGUAGE_CONFIG: Record<Language, LanguageConfig> = {
     label: "C",
     commentPrefix: "//",
     starterHint: "#include <stdio.h>",
+    unitTests: false,
+    aiGeneration: false,
+  },
+  cpp: {
+    piston: "c++",
+    version: "10.2.0",
+    filename: "main.cpp",
+    label: "C++",
+    commentPrefix: "//",
+    starterHint: "#include <iostream>",
     unitTests: false,
     aiGeneration: false,
   },

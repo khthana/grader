@@ -9,6 +9,10 @@ describe("getLanguageConfig", () => {
     expect(c.filename).toBe("main.c")
   })
 
+  it("returns the C++ runtime config (Piston c++ / gcc 10.2.0 / main.cpp)", () => {
+    expect(getLanguageConfig("cpp")).toMatchObject({ piston: "c++", version: "10.2.0", filename: "main.cpp" })
+  })
+
   it("falls back to Python config for an unknown or blank language", () => {
     expect(getLanguageConfig("rust")).toEqual(getLanguageConfig("python"))
     expect(getLanguageConfig("")).toEqual(getLanguageConfig("python"))
@@ -20,18 +24,20 @@ describe("display label", () => {
   it("exposes a human label for each language", () => {
     expect(getLanguageConfig("python").label).toBe("Python")
     expect(getLanguageConfig("c").label).toBe("C")
+    expect(getLanguageConfig("cpp").label).toBe("C++")
   })
 })
 
 describe("supported languages", () => {
-  it("lists the languages a course may choose (python + c)", () => {
-    expect(SUPPORTED_LANGUAGES).toContain("python")
-    expect(SUPPORTED_LANGUAGES).toContain("c")
+  it("lists the languages a course may choose (python + c + cpp)", () => {
+    expect(SUPPORTED_LANGUAGES).toEqual(["python", "c", "cpp"])
   })
 
   it("recognises supported languages and rejects unknown ones", () => {
     expect(isSupportedLanguage("python")).toBe(true)
     expect(isSupportedLanguage("c")).toBe(true)
+    expect(isSupportedLanguage("cpp")).toBe(true)
+    expect(isSupportedLanguage("c++")).toBe(false)
     expect(isSupportedLanguage("rust")).toBe(false)
     expect(isSupportedLanguage("")).toBe(false)
   })
@@ -53,6 +59,7 @@ describe("commentLine (#68)", () => {
 
   it("uses // for C", () => {
     expect(commentLine("c", "hint")).toBe("// hint")
+    expect(commentLine("cpp", "hint")).toBe("// hint")
   })
 
   it("falls back to Python's prefix for an unknown language", () => {
@@ -64,6 +71,7 @@ describe("supportsUnitTests", () => {
   it("is Python-only (the unit harness runs Python)", () => {
     expect(supportsUnitTests("python")).toBe(true)
     expect(supportsUnitTests("c")).toBe(false)
+    expect(supportsUnitTests("cpp")).toBe(false)
     expect(supportsUnitTests("rust")).toBe(false)
   })
 })
@@ -72,6 +80,7 @@ describe("supportsAiGeneration", () => {
   it("is Python-only (the prompts ask for Python code)", () => {
     expect(supportsAiGeneration("python")).toBe(true)
     expect(supportsAiGeneration("c")).toBe(false)
+    expect(supportsAiGeneration("cpp")).toBe(false)
     expect(supportsAiGeneration("rust")).toBe(false)
   })
 })

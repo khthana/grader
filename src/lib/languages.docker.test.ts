@@ -24,4 +24,8 @@ describe("piston-init installs languages at the registry versions", () => {
     expect(compose).toContain("gcc")
     expect(compose).toContain(getLanguageConfig("c").version)
   })
+
+  it("C++ comes from that same gcc package — no separate install", () => {
+    expect(getLanguageConfig("cpp").version).toBe(getLanguageConfig("c").version)
+  })
 })
