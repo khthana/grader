@@ -2,7 +2,9 @@
 // normalized, like the Problem Draft (#83). The route never validates the raw
 // body itself; what comes out here is exactly what gets written.
 
-import { isPlanWeek, planErrorKey, sortPlan, MAX_PLAN_WEEK, MIN_PLAN_WEEK, type PlanEntry } from "./plan"
+import { isPlanWeek, sortPlan, MAX_PLAN_WEEK, MIN_PLAN_WEEK, type PlanEntry } from "./plan"
+import { rowErrorKey, type RowList } from "./rows"
+import { isWeight, MAX_WEIGHT, type AssessmentComponent } from "./weights"
 
 /** A Course offering's Syllabus as stored (staff are read live, never stored). */
 export interface Syllabus {
@@ -11,9 +13,11 @@ export interface Syllabus {
   objectives: string
   /** The Teaching Plan (#100), sorted by week. */
   plan: PlanEntry[]
+  /** Assessment Components (#101), in the order sent. */
+  assessments: AssessmentComponent[]
 }
 
-export const EMPTY_SYLLABUS: Syllabus = { credits: "", description: "", objectives: "", plan: [] }
+export const EMPTY_SYLLABUS: Syllabus = { credits: "", description: "", objectives: "", plan: [], assessments: [] }
 
 const TEXT_FIELDS = ["credits", "description", "objectives"] as const
 
@@ -26,46 +30,95 @@ type Errors = Record<string, string>
 const isObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value)
 
+/** Reads one row's fields, recording a field error under that row's key. */
+interface RowReader {
+  /** Optional text, trimmed; a non-string is an error. */
+  text(field: string, message: string): string
+  /** Text that must not be empty once trimmed. */
+  required(field: string, message: string): string
+  /** The raw value, checked by `valid`. */
+  check<T>(field: string, valid: (value: unknown) => value is T, message: string): T
+}
+
+function optionalText(value: unknown, onError: () => void): string {
+  if (value == null) return ""
+  if (typeof value !== "string") {
+    onError()
+    return ""
+  }
+  return value.trim()
+}
+
+function rowReader(raw: Record<string, unknown>, errors: Errors, list: RowList, row: number): RowReader {
+  const fail = (field: string, message: string) => (errors[rowErrorKey(list, row, field)] = message)
+  return {
+    text: (field, message) => optionalText(raw[field], () => fail(field, message)),
+    required(field, message) {
+      const text = typeof raw[field] === "string" ? (raw[field] as string).trim() : ""
+      if (text === "") fail(field, message)
+      return text
+    },
+    check(field, valid, message) {
+      if (!valid(raw[field])) fail(field, message)
+      // An invalid value is recorded as an error, and any error discards the
+      // whole draft — so only a valid value ever reaches what gets written.
+      return raw[field] as never
+    },
+  }
+}
+
+const LIST_MESSAGES: Record<RowList, string> = {
+  plan: "แผนการสอนไม่ถูกต้อง",
+  assessments: "เกณฑ์การวัดผลไม่ถูกต้อง",
+}
+
+// Errors are keyed by the row's position as sent (`plan.2.topic`), which is
+// the editor's row order; the plan is sorted only after.
+function buildRows<T>(value: unknown, list: RowList, errors: Errors, build: (row: RowReader) => T): T[] {
+  if (value == null) return []
+  if (!Array.isArray(value)) {
+    errors[list] = LIST_MESSAGES[list]
+    return []
+  }
+  const rows: T[] = []
+  value.forEach((raw, i) => {
+    if (!isObject(raw)) errors[rowErrorKey(list, i)] = "แถวไม่ถูกต้อง"
+    else rows.push(build(rowReader(raw, errors, list, i)))
+  })
+  return rows
+}
+
+const buildPlanEntry = (row: RowReader): PlanEntry => ({
+  weekNo: row.check("weekNo", isPlanWeek, `สัปดาห์ต้องเป็นจำนวนเต็ม ${MIN_PLAN_WEEK}–${MAX_PLAN_WEEK}`),
+  topic: row.required("topic", "กรุณากรอกหัวข้อ"),
+  detail: row.text("detail", "รายละเอียดต้องเป็นข้อความ"),
+})
+
+const buildAssessment = (row: RowReader): AssessmentComponent => ({
+  name: row.required("name", "กรุณากรอกชื่อ"),
+  weight: row.check("weight", isWeight, `สัดส่วนต้องอยู่ระหว่าง 0–${MAX_WEIGHT} (ทศนิยมไม่เกิน 2 ตำแหน่ง)`),
+  note: row.text("note", "หมายเหตุต้องเป็นข้อความ"),
+})
+
 // A PUT replaces the whole Syllabus, so a field left out is cleared. A
 // wrong-typed field is a field error (a 400), never a crash further down.
 export function buildSyllabusDraft(body: unknown): SyllabusDraftResult {
   if (!isObject(body)) return { ok: false, errors: { body: "ข้อมูลไม่ถูกต้อง" } }
   const errors: Errors = {}
-  const draft: Syllabus = { ...EMPTY_SYLLABUS, plan: buildPlan(body.plan, errors) }
+  const draft: Syllabus = {
+    ...EMPTY_SYLLABUS,
+    plan: sortPlan(buildRows(body.plan, "plan", errors, buildPlanEntry)),
+    assessments: buildRows(body.assessments, "assessments", errors, buildAssessment),
+  }
   for (const key of TEXT_FIELDS) {
-    const value = body[key]
-    if (value == null) continue
-    if (typeof value !== "string") errors[key] = `${key} ต้องเป็นข้อความ`
-    else draft[key] = value.trim()
+    draft[key] = optionalText(body[key], () => (errors[key] = `${key} ต้องเป็นข้อความ`))
   }
   return Object.keys(errors).length > 0 ? { ok: false, errors } : { ok: true, draft }
 }
 
-// Errors are keyed by the entry's position as sent (`plan.2.topic`), which is
-// the editor's row order; the plan is sorted only once it is valid.
-function buildPlan(value: unknown, errors: Errors): PlanEntry[] {
-  if (value == null) return []
-  if (!Array.isArray(value)) {
-    errors.plan = "แผนการสอนไม่ถูกต้อง"
-    return []
-  }
-  const entries: PlanEntry[] = []
-  value.forEach((raw, i) => {
-    if (!isObject(raw)) {
-      errors[planErrorKey(i)] = "แถวแผนการสอนไม่ถูกต้อง"
-      return
-    }
-    if (!isPlanWeek(raw.weekNo)) errors[planErrorKey(i, "weekNo")] = `สัปดาห์ต้องเป็นจำนวนเต็ม ${MIN_PLAN_WEEK}–${MAX_PLAN_WEEK}`
-    const topic = typeof raw.topic === "string" ? raw.topic.trim() : ""
-    if (typeof raw.topic !== "string" || topic === "") errors[planErrorKey(i, "topic")] = "กรุณากรอกหัวข้อ"
-    if (raw.detail != null && typeof raw.detail !== "string") errors[planErrorKey(i, "detail")] = "รายละเอียดต้องเป็นข้อความ"
-    const detail = typeof raw.detail === "string" ? raw.detail.trim() : ""
-    entries.push({ weekNo: raw.weekNo as number, topic, detail })
-  })
-  return sortPlan(entries)
-}
-
 /** Nothing written yet — viewers see "ยังไม่มีประมวลรายวิชา". */
 export function isSyllabusEmpty(syllabus: Syllabus): boolean {
-  return TEXT_FIELDS.every((key) => syllabus[key] === "") && syllabus.plan.length === 0
+  return (
+    TEXT_FIELDS.every((key) => syllabus[key] === "") && syllabus.plan.length === 0 && syllabus.assessments.length === 0
+  )
 }

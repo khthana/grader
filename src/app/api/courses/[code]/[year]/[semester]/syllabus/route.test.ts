@@ -51,7 +51,7 @@ describe("/api/courses/[code]/[year]/[semester]/syllabus", () => {
     const res = await get(student.email)
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.syllabus).toEqual({ credits: "", description: "", objectives: "", plan: [] })
+    expect(body.syllabus).toEqual({ credits: "", description: "", objectives: "", plan: [], assessments: [] })
     expect(body.staff).toEqual({
       instructors: [{ id: f.ins.id, name: f.ins.name, email: f.ins.email }],
       tas: [{ id: f.ta.id, name: f.ta.name, email: f.ta.email }],
@@ -66,6 +66,7 @@ describe("/api/courses/[code]/[year]/[semester]/syllabus", () => {
       description: "วิชานี้เรียน **โครงสร้างข้อมูล**",
       objectives: "1. อธิบาย Array ได้\n2. เขียน Linked List ได้",
       plan: [],
+      assessments: [],
     }
     expect((await res.json()).syllabus).toEqual(saved)
     expect((await (await get(student.email)).json()).syllabus).toEqual(saved)
@@ -75,7 +76,7 @@ describe("/api/courses/[code]/[year]/[semester]/syllabus", () => {
   it("a PUT replaces the whole Syllabus — a field left out is cleared", async () => {
     await put(f.ins.email, content)
     await put(f.ins.email, { credits: "3" })
-    expect((await (await get(student.email)).json()).syllabus).toEqual({ credits: "3", description: "", objectives: "", plan: [] })
+    expect((await (await get(student.email)).json()).syllabus).toEqual({ credits: "3", description: "", objectives: "", plan: [], assessments: [] })
   })
 
   it("an Admin who isn't on the staff may write it", async () => {
@@ -183,6 +184,55 @@ describe("/api/courses/[code]/[year]/[semester]/syllabus", () => {
       const [week1] = await listWeeks(f.db, f.course)
       await setWeekReleased(f.db, week1.id, true)
       expect(await planOf()).toEqual(before)
+    })
+  })
+
+  describe("Assessment Components (#101)", () => {
+    const component = (name: unknown, weight: unknown, note?: unknown) => ({ name, weight, note })
+    const assessmentsOf = async () => (await (await get(student.email)).json()).syllabus.assessments
+
+    it.each([-1, 100.01, 2.555, "30", null])("weight %j is a 400 on that row", async (weight) => {
+      const res = await put(f.ins.email, { assessments: [component("งาน", 30), component("สอบ", weight)] })
+      expect(res.status).toBe(400)
+      expect(Object.keys((await res.json()).errors)).toEqual(["assessments.1.weight"])
+    })
+
+    it("an empty name, a wrong-typed note or a non-list is a 400", async () => {
+      const res = await put(f.ins.email, { assessments: [component(" ", 10), component("x", 10, 3), 7] })
+      expect(res.status).toBe(400)
+      expect(Object.keys((await res.json()).errors).sort()).toEqual([
+        "assessments.0.name",
+        "assessments.1.note",
+        "assessments.2",
+      ])
+      expect((await put(f.ins.email, { assessments: { name: "x" } })).status).toBe(400)
+    })
+
+    it("components keep the order sent and round-trip, decimals included", async () => {
+      const sent = [
+        component(" สอบปลายภาค ", 30),
+        component("งาน/แบบฝึกหัด", 27.5, " รายสัปดาห์ "),
+        component("สอบกลางภาค", 30),
+        component("การเข้าเรียน", 2.5),
+      ]
+      const res = await put(f.ins.email, { assessments: sent })
+      expect(res.status).toBe(200)
+      const expected = [
+        { name: "สอบปลายภาค", weight: 30, note: "" },
+        { name: "งาน/แบบฝึกหัด", weight: 27.5, note: "รายสัปดาห์" },
+        { name: "สอบกลางภาค", weight: 30, note: "" },
+        { name: "การเข้าเรียน", weight: 2.5, note: "" },
+      ]
+      expect((await res.json()).syllabus.assessments).toEqual(expected)
+      expect(await assessmentsOf()).toEqual(expected)
+    })
+
+    it("a total that isn't 100% still saves; a PUT replaces the list", async () => {
+      expect((await put(f.ins.email, { assessments: [component("งาน", 60), component("สอบ", 50)] })).status).toBe(200)
+      await put(f.ins.email, { assessments: [component("สอบ", 50)] })
+      expect(await assessmentsOf()).toEqual([{ name: "สอบ", weight: 50, note: "" }])
+      await put(f.ins.email, {})
+      expect(await assessmentsOf()).toEqual([])
     })
   })
 })

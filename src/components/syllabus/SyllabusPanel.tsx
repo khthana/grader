@@ -7,6 +7,8 @@ import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { MarkdownField } from "@/components/ui/MarkdownField"
 import { isSyllabusEmpty, type Syllabus } from "@/lib/syllabus/draft"
 import type { SyllabusStaff, SyllabusStaffMember } from "@/lib/syllabus/staff"
+import { withoutRowErrors, type RowList } from "@/lib/syllabus/rows"
+import { AssessmentsEditor, AssessmentsView } from "./Assessments"
 import { TeachingPlanEditor, TeachingPlanView } from "./TeachingPlan"
 
 export interface SyllabusCourse {
@@ -68,6 +70,7 @@ export function SyllabusPanel({
     }
   }
 
+  const clearRowErrors = (list: RowList) => setErrors((current) => withoutRowErrors(current, list))
   const set = (patch: Partial<Syllabus>) => setDraft((d) => (d ? { ...d, ...patch } : d))
 
   return (
@@ -171,9 +174,15 @@ export function SyllabusPanel({
               plan={draft.plan}
               errors={errors}
               onChange={(plan) => set({ plan })}
-              onRowsMoved={() =>
-                setErrors((current) => Object.fromEntries(Object.entries(current).filter(([k]) => !k.startsWith("plan."))))
-              }
+              onRowsMoved={() => clearRowErrors("plan")}
+            />
+          </Section>
+          <Section title="เกณฑ์การวัดผล">
+            <AssessmentsEditor
+              assessments={draft.assessments}
+              errors={errors}
+              onChange={(assessments) => set({ assessments })}
+              onRowsMoved={() => clearRowErrors("assessments")}
             />
           </Section>
         </>
@@ -187,6 +196,9 @@ export function SyllabusPanel({
           <TextSection title="วัตถุประสงค์การเรียนรู้" content={syllabus.objectives} />
           <Section title="แผนการสอน">
             <TeachingPlanView plan={syllabus.plan} />
+          </Section>
+          <Section title="เกณฑ์การวัดผล">
+            <AssessmentsView assessments={syllabus.assessments} />
           </Section>
         </>
       )}
