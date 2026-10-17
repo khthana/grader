@@ -2,7 +2,6 @@
 // a plan may list สอบกลางภาค with no Problems, and a week may hold several
 // entries. The pure rules the draft and the editor share live here.
 
-import { moveRow } from "./rows"
 
 export interface PlanEntry {
   weekNo: number
@@ -35,9 +34,4 @@ export function nextPlanWeek(entries: { weekNo: number }[]): number {
 export function canMovePlanEntry(entries: { weekNo: number }[], index: number, step: -1 | 1): boolean {
   const other = entries[index + step]
   return other !== undefined && other.weekNo === entries[index]?.weekNo
-}
-
-/** Swap the row at `index` with its neighbour — unchanged when that would leave its week. */
-export function movePlanEntry<T extends { weekNo: number }>(entries: T[], index: number, step: -1 | 1): T[] {
-  return canMovePlanEntry(entries, index, step) ? moveRow(entries, index, step) : entries
 }

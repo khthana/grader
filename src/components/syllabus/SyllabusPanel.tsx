@@ -10,6 +10,7 @@ import { isSyllabusDirty, isSyllabusEmpty, type Syllabus } from "@/lib/syllabus/
 import type { SyllabusStaff, SyllabusStaffMember } from "@/lib/syllabus/staff"
 import { withoutRowErrors, type RowList } from "@/lib/syllabus/rows"
 import { AssessmentsEditor, AssessmentsView } from "./Assessments"
+import type { RowListErrors } from "./rows"
 import { TeachingPlanEditor, TeachingPlanView } from "./TeachingPlan"
 
 export interface SyllabusCourse {
@@ -66,6 +67,7 @@ export function SyllabusPanel({
   }
 
   const clearRowErrors = (list: RowList) => setErrors((current) => withoutRowErrors(current, list))
+  const rowListErrors: RowListErrors = { fieldErrors: errors, clearRowErrors }
   const set = (patch: Partial<Syllabus>) => setDraft((d) => (d ? { ...d, ...patch } : d))
 
   return (
@@ -178,17 +180,15 @@ export function SyllabusPanel({
           <Section title="แผนการสอน">
             <TeachingPlanEditor
               plan={draft.plan}
-              errors={errors}
+              errors={rowListErrors}
               onChange={(plan) => set({ plan })}
-              onRowsMoved={() => clearRowErrors("plan")}
             />
           </Section>
           <Section title="เกณฑ์การวัดผล">
             <AssessmentsEditor
               assessments={draft.assessments}
-              errors={errors}
+              errors={rowListErrors}
               onChange={(assessments) => set({ assessments })}
-              onRowsMoved={() => clearRowErrors("assessments")}
             />
           </Section>
           <Section title="แหล่งเรียนรู้">

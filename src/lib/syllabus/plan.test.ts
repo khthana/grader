@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
-import { canMovePlanEntry, movePlanEntry, nextPlanWeek, sortPlan } from "./plan"
+import { canMovePlanEntry, nextPlanWeek, sortPlan } from "./plan"
+import { editRows } from "./rows"
 
 const e = (weekNo: number, topic = "") => ({ weekNo, topic, detail: "" })
 
@@ -22,7 +23,8 @@ describe("Teaching Plan rules (#100)", () => {
     expect(canMovePlanEntry(plan, 1, -1)).toBe(false)
     expect(canMovePlanEntry(plan, 1, 1)).toBe(true)
     expect(canMovePlanEntry(plan, 3, 1)).toBe(false)
-    expect(movePlanEntry(plan, 2, -1).map((x) => x.topic)).toEqual(["a", "b2", "b1", "c"])
-    expect(movePlanEntry(plan, 0, 1)).toBe(plan)
+    const move = (index: number, step: -1 | 1) => editRows(plan, { kind: "move", index, step }, canMovePlanEntry)
+    expect(move(2, -1)?.rows.map((x) => x.topic)).toEqual(["a", "b2", "b1", "c"])
+    expect(move(0, 1)).toBeNull()
   })
 })

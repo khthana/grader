@@ -39,3 +39,31 @@ export function moveRow<T>(rows: T[], index: number, step: -1 | 1): T[] {
   ;[next[index], next[other]] = [next[other], next[index]]
   return next
 }
+
+/** A list's move rule — Teaching Plan: `canMovePlanEntry` (within one week); Assessment Components: `canMoveRow`. */
+export type MoveRule<T> = (rows: T[], index: number, step: -1 | 1) => boolean
+
+/** One editor action on a row list (#105). */
+export type RowEdit<T> =
+  | { kind: "update"; index: number; patch: Partial<T> }
+  | { kind: "move"; index: number; step: -1 | 1 }
+  | { kind: "remove"; index: number }
+  | { kind: "add"; row: T }
+
+/**
+ * Apply one edit. `reordered` = rows changed position, so row-keyed errors no
+ * longer point at the right row; null = a move the list's rule refuses.
+ */
+export function editRows<T>(rows: T[], edit: RowEdit<T>, canMove: MoveRule<T>): { rows: T[]; reordered: boolean } | null {
+  switch (edit.kind) {
+    case "update":
+      return { rows: rows.map((row, j) => (j === edit.index ? { ...row, ...edit.patch } : row)), reordered: false }
+    case "add":
+      return { rows: [...rows, edit.row], reordered: false }
+    case "remove":
+      return { rows: rows.filter((_, j) => j !== edit.index), reordered: true }
+    case "move":
+      if (!canMove(rows, edit.index, edit.step)) return null
+      return { rows: moveRow(rows, edit.index, edit.step), reordered: true }
+  }
+}

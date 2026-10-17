@@ -1,25 +1,96 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { FaArrowDown, FaArrowUp, FaPlus, FaTrash } from "react-icons/fa"
-import { moveRow } from "@/lib/syllabus/rows"
+import { canMoveRow, editRows, rowErrors, type Errors, type MoveRule, type RowEdit, type RowList } from "@/lib/syllabus/rows"
+
+/** The panel's field errors travel with the way to drop one list's row errors once its rows move. */
+export interface RowListErrors {
+  fieldErrors: Errors
+  clearRowErrors: (list: RowList) => void
+}
 
 /**
- * Stable React keys for an editor's rows, so focus follows a row that moves.
- * Every change to the rows' order goes through the editor, which reports it here.
+ * One Syllabus row list's editing (#105) — update / move / remove / add, the
+ * rows' stable React keys (so focus follows a row that moves) and dropping the
+ * list's row errors once rows change position. Each editor states only what
+ * differs: its blank row and its move rule.
  */
-export function useRowKeys(count: number) {
-  const next = useRef(count)
-  const [keys, setKeys] = useState(() => Array.from({ length: count }, (_, i) => i))
+export function useRowList<T>({
+  list,
+  rows,
+  onChange,
+  canMove,
+  blankRow,
+  errors,
+}: {
+  list: RowList
+  rows: T[]
+  onChange: (rows: T[]) => void
+  canMove: MoveRule<T>
+  /** The row "เพิ่มแถว" appends, given the rows so far. */
+  blankRow: (rows: T[]) => T
+  errors: RowListErrors
+}) {
+  const nextKey = useRef(rows.length)
+  const [keys, setKeys] = useState(() => Array.from({ length: rows.length }, (_, i) => i))
+
+  const apply = (edit: RowEdit<T>) => {
+    const result = editRows(rows, edit, canMove)
+    if (!result) return
+    onChange(result.rows)
+    if (edit.kind !== "update") {
+      // The keys follow the rows: the same edit, a fresh key for an added row.
+      // The list's own rule already allowed a move, so the keys only need the bounds.
+      const keyEdit: RowEdit<number> = edit.kind === "add" ? { kind: "add", row: nextKey.current++ } : edit
+      setKeys((current) => editRows(current, keyEdit, canMoveRow)?.rows ?? current)
+    }
+    if (result.reordered) errors.clearRowErrors(list)
+  }
+
   return {
     keyAt: (i: number) => keys[i] ?? `extra-${i}`,
-    added: () => {
-      const key = next.current++
-      setKeys((current) => [...current, key])
-    },
-    removed: (i: number) => setKeys((current) => current.filter((_, j) => j !== i)),
-    moved: (i: number, step: -1 | 1) => setKeys((current) => moveRow(current, i, step)),
+    canMove: (i: number, step: -1 | 1) => canMove(rows, i, step),
+    update: (i: number, patch: Partial<T>) => apply({ kind: "update", index: i, patch }),
+    move: (i: number, step: -1 | 1) => apply({ kind: "move", index: i, step }),
+    remove: (i: number) => apply({ kind: "remove", index: i }),
+    add: () => apply({ kind: "add", row: blankRow(rows) }),
+    /** The list's own error (e.g. not a list at all). */
+    listError: errors.fieldErrors[list] as string | undefined,
+    rowErrors: (i: number) => rowErrors(errors.fieldErrors, list, i),
   }
+}
+
+/** A read-only row list as every viewer sees it — "–" when there are no rows. */
+export function RowTable({
+  columns,
+  rowCount,
+  children,
+  footer,
+}: {
+  columns: { label: string; className?: string }[]
+  rowCount: number
+  children: ReactNode
+  footer?: ReactNode
+}) {
+  if (rowCount === 0) return <p className="text-sm text-slate-400">–</p>
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-200 text-left text-slate-500">
+            {columns.map((c, i) => (
+              <th key={c.label} className={[c.className, "py-2", i < columns.length - 1 && "pr-3", "font-medium"].filter(Boolean).join(" ")}>
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+        {footer && <tfoot>{footer}</tfoot>}
+      </table>
+    </div>
+  )
 }
 
 const iconButton = "rounded p-1.5 transition disabled:opacity-30 disabled:hover:bg-transparent"
