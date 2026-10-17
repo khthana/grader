@@ -163,7 +163,7 @@ export function Navbar({
   }
 
   return (
-    <nav className="fixed inset-x-0 top-0 z-[60] flex h-[64px] items-center justify-between bg-primary px-6 shadow-sm">
+    <nav className="print:hidden fixed inset-x-0 top-0 z-[60] flex h-[64px] items-center justify-between bg-primary px-6 shadow-sm">
       <Logo />
 
       <div className="flex items-center gap-3">

@@ -72,12 +72,12 @@ export function AppShell({
         courses={courses}
         activeCourseSlug={activeCourseSlug}
       />
-      <div className="flex min-h-screen bg-[#F8FAFC] pt-[64px]">
+      <div className="flex min-h-screen bg-[#F8FAFC] pt-[64px] print:min-h-0 print:bg-white print:pt-0">
         <Sidebar menu={menu} collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
         <div className="flex min-w-0 flex-1 flex-col">
           {impersonatedName && <ImpersonationBanner userName={impersonatedName} />}
           <Breadcrumbs />
-          <main className="mx-auto w-full max-w-[1920px] px-4 py-6 lg:px-8">
+          <main className="mx-auto w-full max-w-[1920px] px-4 py-6 lg:px-8 print:max-w-none print:p-0">
             <div key={pathname} className="content-enter">
               {children}
             </div>

@@ -12,7 +12,7 @@ export function Breadcrumbs() {
   return (
     <nav
       aria-label="Breadcrumb"
-      className="sticky top-[64px] z-40 border-b border-slate-100 bg-white/50 px-4 py-3 backdrop-blur-sm lg:px-8"
+      className="print:hidden sticky top-[64px] z-40 border-b border-slate-100 bg-white/50 px-4 py-3 backdrop-blur-sm lg:px-8"
     >
       <ol className="flex items-center gap-1 font-thai text-sm">
         {crumbs.map((crumb, i) => (

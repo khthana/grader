@@ -19,7 +19,7 @@ export function ImpersonationBanner({ userName }: { userName: string }) {
   }
 
   return (
-    <div className="flex items-center justify-center gap-3 bg-amber-500 px-4 py-2 text-sm font-medium text-white font-thai">
+    <div className="print:hidden flex items-center justify-center gap-3 bg-amber-500 px-4 py-2 text-sm font-medium text-white font-thai">
       <FaUserSecret className="h-4 w-4 shrink-0" />
       <span>
         กำลังเข้าใช้งานในนาม <strong>{userName}</strong>

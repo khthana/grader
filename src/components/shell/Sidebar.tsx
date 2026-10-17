@@ -18,7 +18,7 @@ export function Sidebar({ menu, collapsed, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className="relative shrink-0 border-r border-slate-100 bg-white shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-[width] duration-200 ease-in-out"
+      className="print:hidden relative shrink-0 border-r border-slate-100 bg-white shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-[width] duration-200 ease-in-out"
       style={{ width: collapsed ? 80 : 320 }}
     >
       {/* Floating collapse toggle */}

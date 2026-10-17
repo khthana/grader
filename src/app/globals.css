@@ -39,3 +39,32 @@
            transition focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100;
   }
 }
+
+/* Printing (#102) — the shell (navbar, sidebar, breadcrumb, banners, toasts)
+   hides itself with print:hidden, and the page is laid out on A4. A page that
+   prints marks its own controls `.print-controls` (not every <button>: some
+   pages' content is buttons). The browser renders the Thai text. */
+@media print {
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+  html,
+  body {
+    background: white;
+  }
+  .print-controls button {
+    display: none !important;
+  }
+  .content-enter {
+    animation: none;
+  }
+  tr,
+  li {
+    break-inside: avoid;
+  }
+  h1,
+  h2 {
+    break-after: avoid;
+  }
+}

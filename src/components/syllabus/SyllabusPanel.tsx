@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { FaEdit } from "react-icons/fa"
+import { FaEdit, FaPrint } from "react-icons/fa"
 import { useToast } from "@/components/shell/ToastProvider"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { MarkdownField } from "@/components/ui/MarkdownField"
@@ -74,7 +74,7 @@ export function SyllabusPanel({
   const set = (patch: Partial<Syllabus>) => setDraft((d) => (d ? { ...d, ...patch } : d))
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="print-controls flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-primary">ประมวลรายวิชา</h1>
@@ -82,14 +82,25 @@ export function SyllabusPanel({
             {course.code} · {course.nameTh}
           </p>
         </div>
-        {canEdit && !draft && (
-          <button
-            onClick={() => setDraft(syllabus)}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-white transition hover:bg-primary-hover"
-          >
-            <FaEdit className="h-3.5 w-3.5" />
-            แก้ไข
-          </button>
+        {!draft && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
+            >
+              <FaPrint className="h-3.5 w-3.5" />
+              พิมพ์
+            </button>
+            {canEdit && (
+              <button
+                onClick={() => setDraft(syllabus)}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-white transition hover:bg-primary-hover"
+              >
+                <FaEdit className="h-3.5 w-3.5" />
+                แก้ไข
+              </button>
+            )}
+          </div>
         )}
         {draft && (
           <div className="flex gap-2">
@@ -208,7 +219,7 @@ export function SyllabusPanel({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5">
+    <section className="rounded-xl border border-gray-200 bg-white p-5 print:rounded-none print:border-0 print:border-b print:px-0 print:py-4">
       <h2 className="mb-3 font-medium text-primary">{title}</h2>
       {children}
     </section>
