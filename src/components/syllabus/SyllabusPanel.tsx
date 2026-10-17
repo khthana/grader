@@ -7,6 +7,7 @@ import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { MarkdownField } from "@/components/ui/MarkdownField"
 import { isSyllabusEmpty, type Syllabus } from "@/lib/syllabus/draft"
 import type { SyllabusStaff, SyllabusStaffMember } from "@/lib/syllabus/staff"
+import { TeachingPlanEditor, TeachingPlanView } from "./TeachingPlan"
 
 export interface SyllabusCourse {
   code: string
@@ -165,6 +166,16 @@ export function SyllabusPanel({
             />
             <FieldError message={errors.objectives} />
           </Section>
+          <Section title="แผนการสอน">
+            <TeachingPlanEditor
+              plan={draft.plan}
+              errors={errors}
+              onChange={(plan) => set({ plan })}
+              onRowsMoved={() =>
+                setErrors((current) => Object.fromEntries(Object.entries(current).filter(([k]) => !k.startsWith("plan."))))
+              }
+            />
+          </Section>
         </>
       ) : isSyllabusEmpty(syllabus) ? (
         <div className="rounded-xl border border-gray-200 bg-white py-16 text-center text-sm text-slate-400">
@@ -174,6 +185,9 @@ export function SyllabusPanel({
         <>
           <TextSection title="คำอธิบายรายวิชา" content={syllabus.description} />
           <TextSection title="วัตถุประสงค์การเรียนรู้" content={syllabus.objectives} />
+          <Section title="แผนการสอน">
+            <TeachingPlanView plan={syllabus.plan} />
+          </Section>
         </>
       )}
     </div>

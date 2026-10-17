@@ -6,6 +6,7 @@ import type { CourseFixture } from "@/lib/test-support/db"
 import { seedStudent } from "@/lib/test-support/quiz"
 import { createUser, assignRole } from "@/lib/users/repository"
 import { assignInstructor, setCourseInstructors } from "@/lib/courses/repository"
+import { addWeek, listWeeks, setWeekReleased } from "@/lib/weeks/repository"
 
 // The Syllabus (#99): general information, Course Description, Learning
 // Objectives — read by anyone linked to the course, written by its managers.
@@ -50,7 +51,7 @@ describe("/api/courses/[code]/[year]/[semester]/syllabus", () => {
     const res = await get(student.email)
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.syllabus).toEqual({ credits: "", description: "", objectives: "" })
+    expect(body.syllabus).toEqual({ credits: "", description: "", objectives: "", plan: [] })
     expect(body.staff).toEqual({
       instructors: [{ id: f.ins.id, name: f.ins.name, email: f.ins.email }],
       tas: [{ id: f.ta.id, name: f.ta.name, email: f.ta.email }],
@@ -64,6 +65,7 @@ describe("/api/courses/[code]/[year]/[semester]/syllabus", () => {
       credits: "3(2-2-5)",
       description: "วิชานี้เรียน **โครงสร้างข้อมูล**",
       objectives: "1. อธิบาย Array ได้\n2. เขียน Linked List ได้",
+      plan: [],
     }
     expect((await res.json()).syllabus).toEqual(saved)
     expect((await (await get(student.email)).json()).syllabus).toEqual(saved)
@@ -73,7 +75,7 @@ describe("/api/courses/[code]/[year]/[semester]/syllabus", () => {
   it("a PUT replaces the whole Syllabus — a field left out is cleared", async () => {
     await put(f.ins.email, content)
     await put(f.ins.email, { credits: "3" })
-    expect((await (await get(student.email)).json()).syllabus).toEqual({ credits: "3", description: "", objectives: "" })
+    expect((await (await get(student.email)).json()).syllabus).toEqual({ credits: "3", description: "", objectives: "", plan: [] })
   })
 
   it("an Admin who isn't on the staff may write it", async () => {
@@ -130,5 +132,57 @@ describe("/api/courses/[code]/[year]/[semester]/syllabus", () => {
     await put(f.ins.email, content)
     const { rows } = await f.db.query(`SELECT action, actor_id, target_email FROM user_logs WHERE action = 'syllabus.update'`)
     expect(rows).toEqual([{ action: "syllabus.update", actor_id: f.ins.id, target_email: "C01/2567/1" }])
+  })
+
+  describe("Teaching Plan (#100)", () => {
+    const entry = (weekNo: unknown, topic: unknown = "หัวข้อ", detail?: unknown) => ({ weekNo, topic, detail })
+    const planOf = async () => (await (await get(student.email)).json()).syllabus.plan
+
+    it.each([0, 21, 1.5, "3", null])("week %j is a 400 on that row", async (weekNo) => {
+      const res = await put(f.ins.email, { plan: [entry(1), entry(weekNo)] })
+      expect(res.status).toBe(400)
+      expect(Object.keys((await res.json()).errors)).toEqual(["plan.1.weekNo"])
+    })
+
+    it("an empty topic, a wrong-typed detail or a non-list plan is a 400", async () => {
+      const res = await put(f.ins.email, { plan: [entry(1, "  "), entry(2, "x", 5), "row"] })
+      expect(res.status).toBe(400)
+      expect(Object.keys((await res.json()).errors).sort()).toEqual(["plan.0.topic", "plan.1.detail", "plan.2"])
+      expect((await put(f.ins.email, { plan: "week 1" })).status).toBe(400)
+    })
+
+    it("entries come back sorted by week; one week keeps the order sent; text trimmed", async () => {
+      const res = await put(f.ins.email, {
+        plan: [entry(8, "สอบกลางภาค"), entry(1, " แนะนำวิชา ", " ภาพรวม "), entry(2, "Loop ตอน 2"), entry(2, "Loop ตอน 1"), entry(16, "สอบปลายภาค")],
+      })
+      expect(res.status).toBe(200)
+      const expected = [
+        { weekNo: 1, topic: "แนะนำวิชา", detail: "ภาพรวม" },
+        { weekNo: 2, topic: "Loop ตอน 2", detail: "" },
+        { weekNo: 2, topic: "Loop ตอน 1", detail: "" },
+        { weekNo: 8, topic: "สอบกลางภาค", detail: "" },
+        { weekNo: 16, topic: "สอบปลายภาค", detail: "" },
+      ]
+      expect((await res.json()).syllabus.plan).toEqual(expected)
+      expect(await planOf()).toEqual(expected)
+    })
+
+    it("a PUT replaces the plan — removed entries are gone", async () => {
+      await put(f.ins.email, { plan: [entry(1, "a"), entry(2, "b"), entry(3, "c")] })
+      await put(f.ins.email, { plan: [entry(2, "b")] })
+      expect(await planOf()).toEqual([{ weekNo: 2, topic: "b", detail: "" }])
+      await put(f.ins.email, {})
+      expect(await planOf()).toEqual([])
+    })
+
+    it("Students see the whole plan whatever Weeks are released; adding or releasing a Week changes nothing", async () => {
+      await put(f.ins.email, { plan: [entry(1, "a"), entry(12, "b")] })
+      const before = await planOf()
+      expect(before).toHaveLength(2)
+      await addWeek(f.db, f.course)
+      const [week1] = await listWeeks(f.db, f.course)
+      await setWeekReleased(f.db, week1.id, true)
+      expect(await planOf()).toEqual(before)
+    })
   })
 })
