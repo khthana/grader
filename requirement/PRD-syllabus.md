@@ -1,7 +1,7 @@
 # PRD — ประมวลรายวิชา (Syllabus)
 
-> CE-Grader — หน้าประมวลรายวิชาของแต่ละการเปิดสอน ประกอบด้วยข้อมูลทั่วไป คำอธิบายรายวิชา วัตถุประสงค์การเรียนรู้ แผนการสอนรายสัปดาห์ และเกณฑ์การวัดผล
-> Domain glossary: `CONTEXT.md` (Syllabus, Course Description · Learning Objectives, Credits, Teaching Plan, Assessment Component)
+> CE-Grader — หน้าประมวลรายวิชาของแต่ละการเปิดสอน ประกอบด้วยข้อมูลทั่วไป คำอธิบายรายวิชา วัตถุประสงค์การเรียนรู้ แผนการสอนรายสัปดาห์ เกณฑ์การวัดผล และแหล่งเรียนรู้
+> Domain glossary: `CONTEXT.md` (Syllabus, Course Description · Learning Objectives, Credits, Teaching Plan, Assessment Component, Learning Resources)
 
 ---
 
@@ -26,6 +26,7 @@
   - แยกจาก **Week** ของโจทย์ จึงมีสัปดาห์สอบได้ และนักศึกษาเห็นทั้งเทอมตั้งแต่แรก
 - **เกณฑ์การวัดผล** เป็นตาราง ชื่อ / สัดส่วน % / หมายเหตุ พร้อมยอดรวม
   - เป็นข้อมูลแสดงอย่างเดียว **ไม่**นำไปคำนวณใน Gradebook หรือ Scorebook
+- **แหล่งเรียนรู้** *(#107)* เป็นข้อความ Markdown หนึ่งก้อน (ตำรา เว็บไซต์ ลิงก์) อยู่ส่วนสุดท้ายของหน้า ลิงก์ไปเว็บนอก CE-Grader เปิดในแท็บใหม่ (#106)
 - ผู้สอนแก้ทั้งหน้าแล้วบันทึกครั้งเดียว ไม่มีขั้นตอนเผยแพร่
 - พิมพ์ได้ และเลือก Save as PDF จากหน้าต่างพิมพ์ของ browser ได้
 - ทำซ้ำไปภาคใหม่ (Course Duplication) แล้วประมวลรายวิชาจะติดไปด้วย
@@ -71,13 +72,13 @@
   - `saveSyllabus(db, course, draft)` writes the whole syllabus inside `withTransaction`: upsert the main row, then DELETE + INSERT the plan entries and the assessment components (pg-mem doesn't handle `ON CONFLICT` well).
   - `copySyllabus(db, source, target, actorId)` is used by duplication.
 - **Instructors:** not stored in the Syllabus. They are read from `course_instructors`. The existing `listCourseInstructors` returns only `id/name/email`, without roles, so add `listCourseStaffWithRoles(db, course)`, which also fetches `user_roles` in a second query (pg-mem has no `STRING_AGG`). The staff are then grouped by global Role into ผู้สอน (Instructor/Admin) and ผู้ช่วยสอน (TA) by the pure function `groupSyllabusStaff(staff)`. A user who holds both Roles counts as a ผู้สอน, the higher-priority Role.
-- **`isSyllabusEmpty(syllabus)`:** true when there is no credits, description, objectives, plan entry or assessment component. Drives the "ยังไม่มีประมวลรายวิชา" empty state.
+- **`isSyllabusEmpty(syllabus)`:** true when there is no credits, description, objectives, Learning Resources, plan entry or assessment component. Drives the "ยังไม่มีประมวลรายวิชา" empty state.
 
-### Schema (`scripts/migrate-012-syllabus.sql` + `schema.sql`)
+### Schema (`scripts/migrate-012-syllabus.sql` + `scripts/migrate-013-syllabus-resources.sql` + `schema.sql`)
 
 - **`course_syllabi`:**
   - PK `(course_code, course_year, course_semester)`, FK → courses `ON DELETE CASCADE`
-  - columns `credits TEXT NOT NULL DEFAULT ''`, `description TEXT NOT NULL DEFAULT ''`, `objectives TEXT NOT NULL DEFAULT ''`, `updated_at`, `updated_by`
+  - columns `credits TEXT NOT NULL DEFAULT ''`, `description TEXT NOT NULL DEFAULT ''`, `objectives TEXT NOT NULL DEFAULT ''`, `resources TEXT NOT NULL DEFAULT ''` (#107, `migrate-013-syllabus-resources.sql`), `updated_at`, `updated_by`
 - **`syllabus_plan_entries`:**
   - `id SERIAL`, course FK `ON DELETE CASCADE`
   - columns `week_no INTEGER CHECK (1–20)`, `topic TEXT NOT NULL`, `detail TEXT NOT NULL DEFAULT ''`, `sort_order INTEGER`
@@ -112,6 +113,7 @@ PUT  /api/courses/[code]/[year]/[semester]/syllabus   → { syllabus }          
   3. วัตถุประสงค์การเรียนรู้
   4. แผนการสอน
   5. เกณฑ์การวัดผล
+  6. แหล่งเรียนรู้ (#107)
 
   Markdown is rendered with `MarkdownContent` as it is today. Managers get a "แก้ไข" button, and every viewer gets "พิมพ์".
 - **`SyllabusEditor`** (edit mode):

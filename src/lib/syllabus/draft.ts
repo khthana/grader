@@ -11,20 +11,23 @@ export interface Syllabus {
   credits: string
   description: string
   objectives: string
+  /** Learning Resources (#107) — one Markdown block, the Syllabus's last part. */
+  resources: string
   /** The Teaching Plan (#100), sorted by week. */
   plan: PlanEntry[]
   /** Assessment Components (#101), in the order sent. */
   assessments: AssessmentComponent[]
 }
 
-export const EMPTY_SYLLABUS: Syllabus = { credits: "", description: "", objectives: "", plan: [], assessments: [] }
+export const EMPTY_SYLLABUS: Syllabus = { credits: "", description: "", objectives: "", resources: "", plan: [], assessments: [] }
 
-const TEXT_FIELDS = ["credits", "description", "objectives"] as const
+const TEXT_FIELDS = ["credits", "description", "objectives", "resources"] as const
 
 const TEXT_FIELD_LABELS: Record<(typeof TEXT_FIELDS)[number], string> = {
   credits: "หน่วยกิต",
   description: "คำอธิบายรายวิชา",
   objectives: "วัตถุประสงค์การเรียนรู้",
+  resources: "แหล่งเรียนรู้",
 }
 
 export type SyllabusDraftResult = { ok: true; draft: Syllabus } | { ok: false; errors: Errors }

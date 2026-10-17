@@ -57,8 +57,8 @@ Courses without assignment.
 
 ### Syllabus (ประมวลรายวิชา)
 The published description of one **Course** offering — what the course is about, what a
-Student will be able to do by the end, the week-by-week plan, and how the grade is made
-up. Each offering has its own Syllabus (a new term may change it); **Course Duplication**
+Student will be able to do by the end, the week-by-week plan, how the grade is made
+up, and what to learn from (**Learning Resources**). Each offering has its own Syllabus (a new term may change it); **Course Duplication**
 carries it to the new term as the starting point. Its general information shows the
 Course's own code and names (not a second copy) plus the **Credits**. Its instructors are
 the **Course staff**, as they stand — ผู้สอน (Instructor, or an Admin on the staff) and
@@ -91,6 +91,13 @@ One part of how a Course is graded, as stated in its **Syllabus** — a name (e.
 optional note. It is a **statement**, not a calculation: the **Gradebook** and
 **Scorebook** do not weight or combine scores by it.
 _Avoid_: grading criteria, score weight (as if it were computed)
+
+### Learning Resources (แหล่งเรียนรู้)
+The last part of a **Syllabus**: the textbooks, readings, websites and other material a
+Student can learn from. Written as one formatted block (it may be grouped — e.g. main
+textbook / further reading / websites — and its links open outside CE-Grader), not as
+separately managed items; nothing counts or sorts them.
+_Avoid_: references (only one kind of resource), course materials (suggests files hosted here)
 
 ### Course Duplication (ทำซ้ำไปภาคใหม่)
 Copying a whole **Course** offering to another academic term — same course `code`, a new

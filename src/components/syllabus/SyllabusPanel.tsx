@@ -196,6 +196,14 @@ export function SyllabusPanel({
               onRowsMoved={() => clearRowErrors("assessments")}
             />
           </Section>
+          <Section title="แหล่งเรียนรู้">
+            <MarkdownField
+              value={draft.resources}
+              onChange={(resources) => set({ resources })}
+              placeholder={"### ตำราหลัก\n- ...\n\n### เว็บไซต์\n- [ชื่อเว็บไซต์](https://...)"}
+            />
+            <FieldError message={errors.resources} />
+          </Section>
         </>
       ) : isSyllabusEmpty(syllabus) ? (
         <div className="rounded-xl border border-gray-200 bg-white py-16 text-center text-sm text-slate-400">
@@ -211,6 +219,7 @@ export function SyllabusPanel({
           <Section title="เกณฑ์การวัดผล">
             <AssessmentsView assessments={syllabus.assessments} />
           </Section>
+          <TextSection title="แหล่งเรียนรู้" content={syllabus.resources} />
         </>
       )}
     </div>

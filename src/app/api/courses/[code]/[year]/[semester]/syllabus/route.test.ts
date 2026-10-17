@@ -38,6 +38,7 @@ describe("/api/courses/[code]/[year]/[semester]/syllabus", () => {
     credits: " 3(2-2-5) ",
     description: "  วิชานี้เรียน **โครงสร้างข้อมูล**  ",
     objectives: "1. อธิบาย Array ได้\n2. เขียน Linked List ได้",
+    resources: "  - [Python docs](https://docs.python.org/3/)  ",
   }
 
   beforeEach(async () => {
@@ -51,7 +52,7 @@ describe("/api/courses/[code]/[year]/[semester]/syllabus", () => {
     const res = await get(student.email)
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.syllabus).toEqual({ credits: "", description: "", objectives: "", plan: [], assessments: [] })
+    expect(body.syllabus).toEqual({ credits: "", description: "", objectives: "", resources: "", plan: [], assessments: [] })
     expect(body.staff).toEqual({
       instructors: [{ id: f.ins.id, name: f.ins.name, email: f.ins.email }],
       tas: [{ id: f.ta.id, name: f.ta.name, email: f.ta.email }],
@@ -65,6 +66,7 @@ describe("/api/courses/[code]/[year]/[semester]/syllabus", () => {
       credits: "3(2-2-5)",
       description: "วิชานี้เรียน **โครงสร้างข้อมูล**",
       objectives: "1. อธิบาย Array ได้\n2. เขียน Linked List ได้",
+      resources: "- [Python docs](https://docs.python.org/3/)",
       plan: [],
       assessments: [],
     }
@@ -76,7 +78,7 @@ describe("/api/courses/[code]/[year]/[semester]/syllabus", () => {
   it("a PUT replaces the whole Syllabus — a field left out is cleared", async () => {
     await put(f.ins.email, content)
     await put(f.ins.email, { credits: "3" })
-    expect((await (await get(student.email)).json()).syllabus).toEqual({ credits: "3", description: "", objectives: "", plan: [], assessments: [] })
+    expect((await (await get(student.email)).json()).syllabus).toEqual({ credits: "3", description: "", objectives: "", resources: "", plan: [], assessments: [] })
   })
 
   it("an Admin who isn't on the staff may write it", async () => {
@@ -104,10 +106,10 @@ describe("/api/courses/[code]/[year]/[semester]/syllabus", () => {
   })
 
   it("a wrong-typed field is a 400 with field errors, not a crash", async () => {
-    const res = await put(f.ins.email, { credits: 3, description: ["x"] })
+    const res = await put(f.ins.email, { credits: 3, description: ["x"], resources: 5 })
     expect(res.status).toBe(400)
     const { errors } = await res.json()
-    expect(Object.keys(errors).sort()).toEqual(["credits", "description"])
+    expect(Object.keys(errors).sort()).toEqual(["credits", "description", "resources"])
     expect((await put(f.ins.email, "not json")).status).toBe(400)
     expect((await put(f.ins.email, [1, 2])).status).toBe(400)
   })

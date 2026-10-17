@@ -15,6 +15,7 @@ describe("duplicateCourseOffering — Syllabus", () => {
     credits: "3(2-2-5)",
     description: "วิชานี้เรียน **โครงสร้างข้อมูล**",
     objectives: "1. อธิบาย Array ได้\n2. เขียน Linked List ได้",
+    resources: "- [Python docs](https://docs.python.org/3/)",
     plan: [
       { weekNo: 1, topic: "แนะนำวิชา", detail: "ภาพรวม" },
       { weekNo: 2, topic: "Loop ตอน 2", detail: "" },

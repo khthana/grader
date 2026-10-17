@@ -10,7 +10,7 @@ const keyParams = (key: CourseKey) => [key.code, key.year, key.semester]
 /** The offering's Syllabus; one never written reads as empty. */
 export async function getSyllabus(db: Queryable, key: CourseKey): Promise<Syllabus> {
   const { rows } = await db.query<Omit<Syllabus, "plan" | "assessments">>(
-    `SELECT credits, description, objectives FROM course_syllabi WHERE ${COURSE}`,
+    `SELECT credits, description, objectives, resources FROM course_syllabi WHERE ${COURSE}`,
     keyParams(key)
   )
   const { rows: plan } = await db.query<PlanEntry>(
@@ -43,9 +43,9 @@ export async function saveSyllabus(
   await db.query(`DELETE FROM course_syllabi WHERE ${COURSE}`, keyParams(key))
   await db.query(
     `INSERT INTO course_syllabi
-       (course_code, course_year, course_semester, credits, description, objectives, updated_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [...keyParams(key), draft.credits, draft.description, draft.objectives, actorId]
+       (course_code, course_year, course_semester, credits, description, objectives, resources, updated_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [...keyParams(key), draft.credits, draft.description, draft.objectives, draft.resources, actorId]
   )
   await db.query(`DELETE FROM syllabus_plan_entries WHERE ${COURSE}`, keyParams(key))
   for (const [i, entry] of draft.plan.entries()) {

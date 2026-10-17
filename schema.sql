@@ -241,6 +241,7 @@ CREATE TABLE IF NOT EXISTS course_syllabi (
   credits         TEXT NOT NULL DEFAULT '',
   description     TEXT NOT NULL DEFAULT '',
   objectives      TEXT NOT NULL DEFAULT '',
+  resources       TEXT NOT NULL DEFAULT '',   -- Learning Resources (#107)
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
   PRIMARY KEY (course_code, course_year, course_semester),

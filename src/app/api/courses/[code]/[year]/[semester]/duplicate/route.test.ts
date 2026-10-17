@@ -9,6 +9,7 @@ import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
 import type { PoolLike } from "@/lib/db"
 import type { CourseFixture, Queryable } from "@/lib/test-support/db"
 import { seedQuiz } from "@/lib/test-support/quiz"
+import { EMPTY_SYLLABUS } from "@/lib/syllabus/draft"
 import { saveSyllabus } from "@/lib/syllabus/repository"
 
 describe("POST /api/courses/[code]/[year]/[semester]/duplicate", () => {
@@ -150,9 +151,8 @@ describe("POST /api/courses/[code]/[year]/[semester]/duplicate", () => {
       f.db,
       f.course,
       {
+        ...EMPTY_SYLLABUS,
         credits: "3",
-        description: "",
-        objectives: "",
         plan: [{ weekNo: 1, topic: "แนะนำวิชา", detail: "" }],
         assessments: [{ name: "สอบ", weight: 100, note: "" }],
       },
