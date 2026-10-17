@@ -11,6 +11,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   logs: "บันทึกกิจกรรม",
   students: "รายชื่อนักศึกษา",
   quizzes: "แบบทดสอบ",
+  syllabus: "ประมวลรายวิชา",
   problems: "โจทย์ปัญหา",
   review: "ตรวจงาน",
   gradebook: "สมุดคะแนน",

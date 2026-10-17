@@ -25,6 +25,7 @@ describe("getSidebarMenu", () => {
       "/users",
       "/logs",
       "/courses",
+      "/syllabus",
       "/students",
       "/quizzes",
       "/problems",
@@ -36,6 +37,7 @@ describe("getSidebarMenu", () => {
   it("gives Instructor course management plus the teaching menu (no User Management)", () => {
     expect(hrefs("Instructor")).toEqual([
       "/courses",
+      "/syllabus",
       "/students",
       "/quizzes",
       "/problems",
@@ -45,11 +47,11 @@ describe("getSidebarMenu", () => {
   })
 
   it("gives TA the teaching menu without course management or review (#70/#78)", () => {
-    expect(hrefs("TA")).toEqual(["/students", "/quizzes", "/problems", "/gradebook"])
+    expect(hrefs("TA")).toEqual(["/syllabus", "/students", "/quizzes", "/problems", "/gradebook"])
   })
 
   it("gives Student their assignments, quizzes and their own scorebook", () => {
-    expect(hrefs("Student")).toEqual(["/assignments", "/quizzes", "/scorebook"])
+    expect(hrefs("Student")).toEqual(["/syllabus", "/assignments", "/quizzes", "/scorebook"])
   })
 
   it("labels each item in Thai", () => {
