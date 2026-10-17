@@ -1,5 +1,19 @@
 import { describe, it, expect } from "vitest"
-import { EMPTY_SYLLABUS, isSyllabusEmpty } from "./draft"
+import { buildSyllabusDraft, EMPTY_SYLLABUS, isSyllabusEmpty } from "./draft"
+
+describe("buildSyllabusDraft — field errors", () => {
+  it("names a wrong-typed text field in Thai, never by its key", () => {
+    const result = buildSyllabusDraft({ credits: 3, description: ["x"], objectives: {} })
+    expect(result).toEqual({
+      ok: false,
+      errors: {
+        credits: "หน่วยกิตต้องเป็นข้อความ",
+        description: "คำอธิบายรายวิชาต้องเป็นข้อความ",
+        objectives: "วัตถุประสงค์การเรียนรู้ต้องเป็นข้อความ",
+      },
+    })
+  })
+})
 
 describe("isSyllabusEmpty", () => {
   it.each([

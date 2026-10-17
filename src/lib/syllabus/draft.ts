@@ -3,7 +3,7 @@
 // body itself; what comes out here is exactly what gets written.
 
 import { isPlanWeek, sortPlan, MAX_PLAN_WEEK, MIN_PLAN_WEEK, type PlanEntry } from "./plan"
-import { rowErrorKey, type RowList } from "./rows"
+import { rowErrorKey, type Errors, type RowList } from "./rows"
 import { isWeight, MAX_WEIGHT, type AssessmentComponent } from "./weights"
 
 /** A Course offering's Syllabus as stored (staff are read live, never stored). */
@@ -21,11 +21,13 @@ export const EMPTY_SYLLABUS: Syllabus = { credits: "", description: "", objectiv
 
 const TEXT_FIELDS = ["credits", "description", "objectives"] as const
 
-export type SyllabusDraftResult =
-  | { ok: true; draft: Syllabus }
-  | { ok: false; errors: Record<string, string> }
+const TEXT_FIELD_LABELS: Record<(typeof TEXT_FIELDS)[number], string> = {
+  credits: "หน่วยกิต",
+  description: "คำอธิบายรายวิชา",
+  objectives: "วัตถุประสงค์การเรียนรู้",
+}
 
-type Errors = Record<string, string>
+export type SyllabusDraftResult = { ok: true; draft: Syllabus } | { ok: false; errors: Errors }
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value)
@@ -36,8 +38,8 @@ interface RowReader {
   text(field: string, message: string): string
   /** Text that must not be empty once trimmed. */
   required(field: string, message: string): string
-  /** The raw value, checked by `valid`. */
-  check<T>(field: string, valid: (value: unknown) => value is T, message: string): T
+  /** The raw value if `valid`, else `fallback` (the error discards the draft anyway). */
+  check<T>(field: string, valid: (value: unknown) => value is T, fallback: T, message: string): T
 }
 
 function optionalText(value: unknown, onError: () => void): string {
@@ -58,11 +60,11 @@ function rowReader(raw: Record<string, unknown>, errors: Errors, list: RowList, 
       if (text === "") fail(field, message)
       return text
     },
-    check(field, valid, message) {
-      if (!valid(raw[field])) fail(field, message)
-      // An invalid value is recorded as an error, and any error discards the
-      // whole draft — so only a valid value ever reaches what gets written.
-      return raw[field] as never
+    check(field, valid, fallback, message) {
+      const value = raw[field]
+      if (valid(value)) return value
+      fail(field, message)
+      return fallback
     },
   }
 }
@@ -89,14 +91,14 @@ function buildRows<T>(value: unknown, list: RowList, errors: Errors, build: (row
 }
 
 const buildPlanEntry = (row: RowReader): PlanEntry => ({
-  weekNo: row.check("weekNo", isPlanWeek, `สัปดาห์ต้องเป็นจำนวนเต็ม ${MIN_PLAN_WEEK}–${MAX_PLAN_WEEK}`),
+  weekNo: row.check("weekNo", isPlanWeek, MIN_PLAN_WEEK, `สัปดาห์ต้องเป็นจำนวนเต็ม ${MIN_PLAN_WEEK}–${MAX_PLAN_WEEK}`),
   topic: row.required("topic", "กรุณากรอกหัวข้อ"),
   detail: row.text("detail", "รายละเอียดต้องเป็นข้อความ"),
 })
 
 const buildAssessment = (row: RowReader): AssessmentComponent => ({
   name: row.required("name", "กรุณากรอกชื่อ"),
-  weight: row.check("weight", isWeight, `สัดส่วนต้องอยู่ระหว่าง 0–${MAX_WEIGHT} (ทศนิยมไม่เกิน 2 ตำแหน่ง)`),
+  weight: row.check("weight", isWeight, 0, `สัดส่วนต้องอยู่ระหว่าง 0–${MAX_WEIGHT} (ทศนิยมไม่เกิน 2 ตำแหน่ง)`),
   note: row.text("note", "หมายเหตุต้องเป็นข้อความ"),
 })
 
@@ -111,7 +113,7 @@ export function buildSyllabusDraft(body: unknown): SyllabusDraftResult {
     assessments: buildRows(body.assessments, "assessments", errors, buildAssessment),
   }
   for (const key of TEXT_FIELDS) {
-    draft[key] = optionalText(body[key], () => (errors[key] = `${key} ต้องเป็นข้อความ`))
+    draft[key] = optionalText(body[key], () => (errors[key] = `${TEXT_FIELD_LABELS[key]}ต้องเป็นข้อความ`))
   }
   return Object.keys(errors).length > 0 ? { ok: false, errors } : { ok: true, draft }
 }

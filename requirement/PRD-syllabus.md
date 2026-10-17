@@ -37,7 +37,7 @@
 1. ในฐานะผู้สอน ฉันเปิดเมนู "ประมวลรายวิชา" แล้วกด "แก้ไข" เพื่อกรอกหน่วยกิต คำอธิบายรายวิชา วัตถุประสงค์ แผนการสอน และเกณฑ์การวัดผลได้ในหน้าเดียว
 2. ในฐานะผู้สอน ฉันกดปุ่มตัวหนา ตัวเอียง รายการแบบจุด และรายการแบบตัวเลขในแถบเครื่องมือได้ โดยไม่ต้องจำ syntax ของ Markdown และสลับไปแท็บ "ดูตัวอย่าง" เพื่อดูผลก่อนบันทึกได้
 3. ในฐานะผู้สอน ฉันเขียนวัตถุประสงค์เป็นรายการตัวเลขที่มีข้อย่อย หรือแบ่งกลุ่ม เช่น "ด้านความรู้ / ด้านทักษะ" ได้
-4. ในฐานะผู้สอน ฉันเพิ่มแถวแผนการสอนได้ แถวใหม่ได้เลขสัปดาห์ถัดไปให้อัตโนมัติ (เลขสูงสุด + 1) และใส่สัปดาห์สอบกลางภาคหรือปลายภาคได้ แม้สัปดาห์นั้นไม่มีโจทย์
+4. ในฐานะผู้สอน ฉันเพิ่มแถวแผนการสอนได้ แถวใหม่ได้เลขสัปดาห์ถัดไปให้อัตโนมัติ (เลขสูงสุด + 1 แต่ไม่เกิน 20) และใส่สัปดาห์สอบกลางภาคหรือปลายภาคได้ แม้สัปดาห์นั้นไม่มีโจทย์
 5. ในฐานะผู้สอน ฉันใส่หลายแถวในสัปดาห์เดียวกันได้ เช่น "Array" กับ "Lab Array" และสลับลำดับแถวภายในสัปดาห์เดียวกันได้
 6. ในฐานะผู้สอน ฉันเพิ่ม แก้ และลบรายการเกณฑ์การวัดผลได้ เห็นยอดรวมเปอร์เซ็นต์ และเห็นคำเตือนสีเหลืองถ้ายอดรวมไม่เท่ากับ 100% แต่ยังบันทึกได้
 7. ในฐานะผู้สอน ถ้าฉันจะออกจากหน้าโดยยังไม่ได้บันทึก ระบบเตือนก่อน
@@ -121,8 +121,9 @@ PUT  /api/courses/[code]/[year]/[semester]/syllabus   → { syllabus }          
 - **`MarkdownField`** (new, shared, `src/components/ui/`):
   - A toolbar with ตัวหนา, ตัวเอียง, รายการแบบจุด and รายการแบบตัวเลข, plus "เขียน / ดูตัวอย่าง" tabs.
   - The toolbar's text transforms live in a pure module `markdown-toolbar.ts`, e.g. `applyFormat(text, selection, kind)` → `{ text, selection }`, so they can be tested without a DOM.
+  - As built: a second click undoes the first (unwraps bold/italic, removes a list whose every line is that kind); whitespace at the selection's edges stays outside the markers; `-`, `*` and `+` are read as bullets and only a 1–3 digit number as a list number (a year at a line's start is text); a nested level is numbered from 1 on its own.
   - The ProblemEditor's problem description switches to this component too, replacing its current hand-written tabs.
-- **Print:** `window.print()` plus `@media print` CSS that hides the navbar, sidebar, breadcrumb and buttons, for A4.
+- **Print:** `window.print()` plus `@media print` CSS that hides the navbar, sidebar, breadcrumb and buttons, for A4. As built, buttons are hidden only inside a page's `.print-controls` wrapper (the Syllabus panel is one) — never every `<button>`, as some pages' content is buttons.
 
 ### Logging
 

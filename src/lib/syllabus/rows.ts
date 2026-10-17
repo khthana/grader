@@ -4,7 +4,8 @@
 
 export type RowList = "plan" | "assessments"
 
-type Errors = Record<string, string>
+/** Field errors, keyed by field or by `rowErrorKey`. */
+export type Errors = Record<string, string>
 
 export function rowErrorKey(list: RowList, row: number, field?: string): string {
   return field ? `${list}.${row}.${field}` : `${list}.${row}`

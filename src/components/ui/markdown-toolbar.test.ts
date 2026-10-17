@@ -26,6 +26,7 @@ describe("applyFormat — inline (bold, italic)", () => {
     ["bold", "ab | ef", "ab **|** ef"],
     ["italic", "|", "*|*"],
     ["bold", "[line one\nline two]", "**[line one\nline two]**"],
+    ["italic", "[line one\nline two]", "*[line one\nline two]*"],
   ] as const)("%s: %j → %j", (kind, input, expected) => {
     expect(run(input, kind)).toBe(expected)
   })
@@ -56,6 +57,10 @@ describe("applyFormat — inline (bold, italic)", () => {
 describe("applyFormat — lists (bullet, numbered)", () => {
   it.each([
     ["bullet", "|", "- |"],
+    ["numbered", "|", "1. |"],
+    // A selection inside one line takes the whole line.
+    ["bullet", "a[b]c", "[- abc]"],
+    ["numbered", "a[b]c", "[1. abc]"],
     // A cursor formats its own line and lands at the end of it, ready to type on.
     ["bullet", "ab|c", "- abc|"],
     ["numbered", "ab|c", "1. abc|"],
