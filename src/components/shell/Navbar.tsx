@@ -8,6 +8,7 @@ import { getLandingRoute, type Role } from "@/lib/roles"
 import { canManageCourses } from "@/lib/courses/access"
 import { isCourseScopedPath } from "@/lib/courses/scope"
 import type { CourseOption } from "./AppShell"
+import { useConfirmLeave } from "./NavigationGuard"
 
 interface NavbarProps {
   name: string
@@ -56,13 +57,14 @@ function CourseSwitcher({
 }) {
   const router = useRouter()
   const pathname = usePathname()
+  const confirmLeave = useConfirmLeave()
   const [open, setOpen] = useState(false)
 
   if (courses.length === 0) {
     if (!canManage) return null
     return (
       <button
-        onClick={() => router.push("/courses?new=1")}
+        onClick={() => confirmLeave(() => router.push("/courses?new=1"))}
         className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 font-thai text-sm text-white hover:bg-white/20"
       >
         <FaPlus className="h-3 w-3" /> เพิ่มรายวิชา
@@ -82,11 +84,13 @@ function CourseSwitcher({
   function select(c: CourseOption) {
     setOpen(false)
     if (courseSlug(c) === courseSlug(active)) return
-    setActiveCourseCookie(courseSlug(c))
     // Preserve the current section when switching courses.
     const section =
       pathname.match(/^\/courses\/[^/]+\/\d+\/\d+\/([^/]+)/)?.[1] ?? "problems"
-    router.push(`${coursePath(c)}/${section}`)
+    confirmLeave(() => {
+      setActiveCourseCookie(courseSlug(c))
+      router.push(`${coursePath(c)}/${section}`)
+    })
   }
 
   return (
@@ -122,7 +126,7 @@ function CourseSwitcher({
             <button
               onClick={() => {
                 setOpen(false)
-                router.push("/courses?new=1")
+                confirmLeave(() => router.push("/courses?new=1"))
               }}
               className="mt-1 flex w-full items-center gap-2 border-t border-slate-100 px-4 py-2 font-thai text-sm text-secondary hover:bg-slate-50"
             >
@@ -145,6 +149,7 @@ export function Navbar({
 }: NavbarProps) {
   const router = useRouter()
   const pathname = usePathname()
+  const confirmLeave = useConfirmLeave()
   const [roleOpen, setRoleOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const showCourseSwitcher = isCourseScopedPath(pathname)
@@ -152,9 +157,11 @@ export function Navbar({
   function switchRole(role: Role) {
     setRoleOpen(false)
     if (role === activeRole) return
-    setActiveRoleCookie(role)
-    router.push(getLandingRoute(role))
-    router.refresh()
+    confirmLeave(() => {
+      setActiveRoleCookie(role)
+      router.push(getLandingRoute(role))
+      router.refresh()
+    })
   }
 
   async function logout() {
@@ -230,13 +237,13 @@ export function Navbar({
               <p className="font-thai text-xs text-slate-400">{activeRole}</p>
             </div>
             <button
-              onClick={() => { setProfileOpen(false); router.push("/profile") }}
+              onClick={() => { setProfileOpen(false); confirmLeave(() => router.push("/profile")) }}
               className="flex w-full items-center gap-3 px-4 py-2 font-thai text-sm text-slate-600 hover:bg-slate-50"
             >
               <FaCog /> โปรไฟล์
             </button>
             <button
-              onClick={logout}
+              onClick={() => confirmLeave(logout)}
               className="flex w-full items-center gap-3 px-4 py-2 font-thai text-sm text-slate-600 hover:bg-slate-50 hover:text-red-600"
             >
               <FaSignOutAlt /> ออกจากระบบ

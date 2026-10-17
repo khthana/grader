@@ -127,3 +127,8 @@ export function isSyllabusEmpty(syllabus: Syllabus): boolean {
     TEXT_FIELDS.every((key) => syllabus[key] === "") && syllabus.plan.length === 0 && syllabus.assessments.length === 0
   )
 }
+
+/** The editor has unsaved changes — `draft` is null when not editing (#104). */
+export function isSyllabusDirty(draft: Syllabus | null, saved: Syllabus): boolean {
+  return draft !== null && JSON.stringify(draft) !== JSON.stringify(saved)
+}

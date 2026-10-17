@@ -2,12 +2,14 @@
 
 import { useState } from "react"
 import { FaUserSecret } from "react-icons/fa"
+import { useConfirmLeave } from "./NavigationGuard"
 
 // Persistent banner shown while an Admin is impersonating another user. Clicking
 // "ออกจากโหมด" hits the exit route, then hard-navigates to User Management so the
 // restored Admin session re-renders the whole shell.
 export function ImpersonationBanner({ userName }: { userName: string }) {
   const [exiting, setExiting] = useState(false)
+  const confirmLeave = useConfirmLeave()
 
   async function exit() {
     setExiting(true)
@@ -25,7 +27,7 @@ export function ImpersonationBanner({ userName }: { userName: string }) {
         กำลังเข้าใช้งานในนาม <strong>{userName}</strong>
       </span>
       <button
-        onClick={exit}
+        onClick={() => confirmLeave(exit)}
         disabled={exiting}
         className="rounded-md bg-white/20 px-3 py-1 text-xs font-semibold hover:bg-white/30 disabled:opacity-60"
       >

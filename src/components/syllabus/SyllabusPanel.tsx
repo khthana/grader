@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { FaEdit, FaPrint } from "react-icons/fa"
+import { useUnsavedChangesGuard } from "@/components/shell/NavigationGuard"
 import { useToast } from "@/components/shell/ToastProvider"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { MarkdownField } from "@/components/ui/MarkdownField"
-import { isSyllabusEmpty, type Syllabus } from "@/lib/syllabus/draft"
+import { isSyllabusDirty, isSyllabusEmpty, type Syllabus } from "@/lib/syllabus/draft"
 import type { SyllabusStaff, SyllabusStaffMember } from "@/lib/syllabus/staff"
 import { withoutRowErrors, type RowList } from "@/lib/syllabus/rows"
 import { AssessmentsEditor, AssessmentsView } from "./Assessments"
@@ -40,14 +41,8 @@ export function SyllabusPanel({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
 
-  const dirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(syllabus)
-
-  useEffect(() => {
-    if (!dirty) return
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
-    window.addEventListener("beforeunload", warn)
-    return () => window.removeEventListener("beforeunload", warn)
-  }, [dirty])
+  const dirty = isSyllabusDirty(draft, syllabus)
+  useUnsavedChangesGuard(dirty)
 
   async function save() {
     if (!draft) return

@@ -8,6 +8,7 @@ import { Sidebar } from "./Sidebar"
 import { Breadcrumbs } from "./Breadcrumbs"
 import { ToastProvider } from "./ToastProvider"
 import { ImpersonationBanner } from "./ImpersonationBanner"
+import { NavigationGuardProvider } from "./NavigationGuard"
 
 export interface CourseOption {
   code: string
@@ -64,26 +65,28 @@ export function AppShell({
 
   return (
     <ToastProvider>
-      <Navbar
-        name={name}
-        picture={picture}
-        roles={roles}
-        activeRole={activeRole}
-        courses={courses}
-        activeCourseSlug={activeCourseSlug}
-      />
-      <div className="flex min-h-screen bg-[#F8FAFC] pt-[64px] print:min-h-0 print:bg-white print:pt-0">
-        <Sidebar menu={menu} collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
-        <div className="flex min-w-0 flex-1 flex-col">
-          {impersonatedName && <ImpersonationBanner userName={impersonatedName} />}
-          <Breadcrumbs />
-          <main className="mx-auto w-full max-w-[1920px] px-4 py-6 lg:px-8 print:max-w-none print:p-0">
-            <div key={pathname} className="content-enter">
-              {children}
-            </div>
-          </main>
+      <NavigationGuardProvider>
+        <Navbar
+          name={name}
+          picture={picture}
+          roles={roles}
+          activeRole={activeRole}
+          courses={courses}
+          activeCourseSlug={activeCourseSlug}
+        />
+        <div className="flex min-h-screen bg-[#F8FAFC] pt-[64px] print:min-h-0 print:bg-white print:pt-0">
+          <Sidebar menu={menu} collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
+          <div className="flex min-w-0 flex-1 flex-col">
+            {impersonatedName && <ImpersonationBanner userName={impersonatedName} />}
+            <Breadcrumbs />
+            <main className="mx-auto w-full max-w-[1920px] px-4 py-6 lg:px-8 print:max-w-none print:p-0">
+              <div key={pathname} className="content-enter">
+                {children}
+              </div>
+            </main>
+          </div>
         </div>
-      </div>
+      </NavigationGuardProvider>
     </ToastProvider>
   )
 }
