@@ -55,6 +55,43 @@ is no per-course capacity column (v1). Being assigned is what grants entitlement
 Course (drives the switcher and every roster/course route). Admin is entitled to all
 Courses without assignment.
 
+### Syllabus (ประมวลรายวิชา)
+The published description of one **Course** offering — what the course is about, what a
+Student will be able to do by the end, the week-by-week plan, and how the grade is made
+up. Each offering has its own Syllabus (a new term may change it); **Course Duplication**
+carries it to the new term as the starting point. Its general information shows the
+Course's own code and names (not a second copy) plus the **Credits**. Its instructors are
+the **Course staff**, as they stand — ผู้สอน (Instructor, or an Admin on the staff) and
+ผู้ช่วยสอน (TA), by official name and email; never a separately typed list.
+_Avoid_: course outline (that is one part of a Syllabus), มคอ.3
+
+### Course Description (คำอธิบายรายวิชา) · Learning Objectives (วัตถุประสงค์การเรียนรู้)
+Two formatted-text parts of a **Syllabus**: what the course covers, and what a Student
+will know or be able to do on finishing it. Learning Objectives are written as one
+formatted block (numbered, possibly grouped or nested), not as separately managed items.
+
+### Credits (หน่วยกิต)
+The credit statement of a Course as written in its **Syllabus**, in the university's
+notation — e.g. `3(2-2-5)` (total, lecture-practice-self-study hours). Free text, shown
+as written; nothing computes from it.
+
+### Teaching Plan (แผนการสอนรายสัปดาห์)
+The week-by-week part of a **Syllabus**: each entry has a week number, a topic and
+optional detail, and may cover weeks with no Problems (e.g. midterm / final exam weeks).
+A week may have several entries; a topic spanning two weeks is one entry per week.
+Entries read in week order.
+It is **not** the **Week** — a Week is a unit of Problems that is released to Students;
+the Teaching Plan is shown in full from the start, whatever has been released, and the
+two may differ in count and topics.
+_Avoid_: Week topic (that belongs to a Week), course schedule
+
+### Assessment Component (เกณฑ์การวัดผล)
+One part of how a Course is graded, as stated in its **Syllabus** — a name (e.g.
+งาน/แบบฝึกหัด, สอบกลางภาค, สอบปลายภาค, การเข้าเรียน), a weight in percent, and an
+optional note. It is a **statement**, not a calculation: the **Gradebook** and
+**Scorebook** do not weight or combine scores by it.
+_Avoid_: grading criteria, score weight (as if it were computed)
+
 ### Course Duplication (ทำซ้ำไปภาคใหม่)
 Copying a whole **Course** offering to another academic term — same course `code`, a new
 `(year, semester)`. Triggered by Admin/Instructor from the รายวิชา list. The operation
