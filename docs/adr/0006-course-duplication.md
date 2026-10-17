@@ -46,6 +46,7 @@ mapping is unambiguous (no merge).
 | Quiz question | `topic`, `prompt`, `code`, `choices`, `correct_letter`, `feedback`, order | — |
 | Round Window | — | never copied (staff set the new term's windows) |
 | Quiz Attempt | — | never copied |
+| Syllabus *(#103)* | the main row (`credits`, `description`, `objectives`), every Teaching Plan entry and every Assessment Component 1:1 in order | only if the source has one — a source never written creates nothing; staff are not part of it (read live from Course staff) |
 
 Problems are copied in `(week_no, problem_no)` order so `createProblem`'s auto-assign
 reproduces the source `problem_no`. The Reference Solution is read through the raw

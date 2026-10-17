@@ -69,7 +69,7 @@
 - **`repository.ts`:**
   - `getSyllabus(db, course)` returns the syllabus, or an empty syllabus when there is no row.
   - `saveSyllabus(db, course, draft)` writes the whole syllabus inside `withTransaction`: upsert the main row, then DELETE + INSERT the plan entries and the assessment components (pg-mem doesn't handle `ON CONFLICT` well).
-  - `copySyllabus(db, source, target)` is used by duplication.
+  - `copySyllabus(db, source, target, actorId)` is used by duplication.
 - **Instructors:** not stored in the Syllabus. They are read from `course_instructors`. The existing `listCourseInstructors` returns only `id/name/email`, without roles, so add `listCourseStaffWithRoles(db, course)`, which also fetches `user_roles` in a second query (pg-mem has no `STRING_AGG`). The staff are then grouped by global Role into ผู้สอน (Instructor/Admin) and ผู้ช่วยสอน (TA) by the pure function `groupSyllabusStaff(staff)`. A user who holds both Roles counts as a ผู้สอน, the higher-priority Role.
 - **`isSyllabusEmpty(syllabus)`:** true when there is no credits, description, objectives, plan entry or assessment component. Drives the "ยังไม่มีประมวลรายวิชา" empty state.
 
@@ -130,7 +130,7 @@ PUT  /api/courses/[code]/[year]/[semester]/syllabus   → { syllabus }          
 
 ### Course Duplication
 
-- `duplicateCourseOffering` calls `copySyllabus(db, source, target)` inside the same transaction:
+- `duplicateCourseOffering` calls `copySyllabus(db, source, target, actorId)` inside the same transaction:
   - the main row
   - plan entries 1:1
   - assessment components 1:1

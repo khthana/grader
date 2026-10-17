@@ -99,7 +99,9 @@ Copying a whole **Course** offering to another academic term — same course `co
 defines the course content: the **Course Language**, **Course staff** (plus the acting
 user), every **Week** (`week_no` + `topic`), every **Problem** (all fields including the
 **Reference Solution**), every **Test Case**, and every **Quiz** (questions, answer key,
-Don't Know setting, Week by `week_no`). Term-specific state is deliberately reset: **Due Date** / **Close
+Don't Know setting, Week by `week_no`), and the **Syllabus** (general information,
+Teaching Plan and Assessment Components — the new term's starting point; a course
+without one gets none). Term-specific state is deliberately reset: **Due Date** / **Close
 Date** are cleared, every Week starts as an unreleased (hidden) **Released Week**, and no
 **Round Window** is copied (a copied Quiz is unlocked).
 **Enrollments**, **Submissions** and **Quiz Attempts** are never copied — a new term has a new roster and a

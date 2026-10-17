@@ -17,6 +17,7 @@ import {
 } from "@/lib/problems/repository"
 import { createQuiz, getQuizForCourse, listQuizzes } from "@/lib/quizzes/repository"
 import { toQuestionDraft } from "@/lib/quizzes/import"
+import { copySyllabus } from "@/lib/syllabus/repository"
 
 export type DuplicateResult =
   | { ok: true; course: CourseRecord }
@@ -125,6 +126,10 @@ export async function duplicateCourseOffering(
       questions: quiz.questions.map(toQuestionDraft),
     })
   }
+
+  // The Syllabus (#103): its whole content as the new term's starting point;
+  // staff come from the Course staff copied above.
+  await copySyllabus(db, source, course, actorId)
 
   return { ok: true, course }
 }

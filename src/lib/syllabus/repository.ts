@@ -67,3 +67,16 @@ export async function saveSyllabus(
   }
   return getSyllabus(db, key)
 }
+
+/**
+ * Copy `source`'s Syllabus to `target` as its starting point (Course
+ * Duplication, #103) — the main row, the Teaching Plan and the Assessment
+ * Components in order. A source never written creates nothing, so the target
+ * reads as empty. Staff aren't part of it (they're read live). Runs on the
+ * duplication's transaction.
+ */
+export async function copySyllabus(db: Queryable, source: CourseKey, target: CourseKey, actorId: number): Promise<void> {
+  const { rows } = await db.query(`SELECT 1 FROM course_syllabi WHERE ${COURSE}`, keyParams(source))
+  if (rows.length === 0) return
+  await saveSyllabus(db, target, await getSyllabus(db, source), actorId)
+}

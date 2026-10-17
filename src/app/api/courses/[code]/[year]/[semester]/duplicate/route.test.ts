@@ -9,6 +9,7 @@ import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
 import type { PoolLike } from "@/lib/db"
 import type { CourseFixture, Queryable } from "@/lib/test-support/db"
 import { seedQuiz } from "@/lib/test-support/quiz"
+import { saveSyllabus } from "@/lib/syllabus/repository"
 
 describe("POST /api/courses/[code]/[year]/[semester]/duplicate", () => {
   let f: CourseFixture
@@ -101,11 +102,10 @@ describe("POST /api/courses/[code]/[year]/[semester]/duplicate", () => {
     expect(res.status).toBe(400)
   })
 
-  it("copies inside one transaction — a failure part-way (copying Quiz questions) rolls back", async () => {
-    // pg-mem accepts BEGIN / ROLLBACK but doesn't undo writes, so "nothing left
-    // behind" can't be read back from the DB. Instead: every write must run on the
-    // transaction's connection, and the failure must end it with ROLLBACK.
-    await seedQuiz(f.db, f.course)
+  // pg-mem accepts BEGIN / ROLLBACK but doesn't undo writes, so "nothing left
+  // behind" can't be read back from the DB. Instead: every write must run on the
+  // transaction's connection, and a failure part-way must end it with ROLLBACK.
+  async function duplicateFailingOn(failOn: RegExp) {
     const real = f.db as Queryable & PoolLike
     const log: [via: "pool" | "tx", sql: string][] = []
     const recording = {
@@ -118,7 +118,7 @@ describe("POST /api/courses/[code]/[year]/[semester]/duplicate", () => {
         return {
           query: (text: string, params?: unknown[]) => {
             log.push(["tx", text])
-            if (/INSERT INTO quiz_questions/.test(text)) throw new Error("boom")
+            if (failOn.test(text)) throw new Error("boom")
             return client.query(text, params)
           },
           release: () => client.release(),
@@ -132,10 +132,35 @@ describe("POST /api/courses/[code]/[year]/[semester]/duplicate", () => {
     const tx = log.filter(([via]) => via === "tx").map(([, sql]) => sql.trim().split(/\s+/).slice(0, 3).join(" "))
     expect(tx[0]).toBe("BEGIN")
     expect(tx).toContain("INSERT INTO courses")
-    expect(tx).toContain("INSERT INTO quizzes")
     expect(tx.at(-1)).toBe("ROLLBACK")
     expect(tx).not.toContain("COMMIT")
     // Every write went through the transaction's connection, none through the pool.
     expect(log.filter(([via, sql]) => via === "pool" && /^\s*(INSERT|UPDATE|DELETE)/i.test(sql))).toEqual([])
+    return tx
+  }
+
+  it("copies inside one transaction — a failure part-way (copying Quiz questions) rolls back", async () => {
+    await seedQuiz(f.db, f.course)
+    expect(await duplicateFailingOn(/INSERT INTO quiz_questions/)).toContain("INSERT INTO quizzes")
+  })
+
+  it("copies the Syllabus in the same transaction — a failure copying it rolls back (#103)", async () => {
+    await seedQuiz(f.db, f.course)
+    await saveSyllabus(
+      f.db,
+      f.course,
+      {
+        credits: "3",
+        description: "",
+        objectives: "",
+        plan: [{ weekNo: 1, topic: "แนะนำวิชา", detail: "" }],
+        assessments: [{ name: "สอบ", weight: 100, note: "" }],
+      },
+      f.ins.id
+    )
+    const tx = await duplicateFailingOn(/INSERT INTO syllabus_assessments/)
+    expect(tx).toContain("INSERT INTO quizzes")
+    expect(tx).toContain("INSERT INTO course_syllabi")
+    expect(tx).toContain("INSERT INTO syllabus_plan_entries")
   })
 })
