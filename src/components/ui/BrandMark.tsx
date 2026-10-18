@@ -1,20 +1,14 @@
-import { useId } from "react"
+import Image from "next/image"
 
 /**
- * The CE-CodeClass mark — the orange C around the grey e, drawn on a white
- * tile as the department's logo is. The same drawing is `src/app/icon.svg`.
+ * The CE-CodeClass mark — the department's CE logo (ce.kmitl.ac.th/CE.ico,
+ * its 256 px image) on a white tile, so it reads on the dark navbar.
+ * `src/app/icon.png` is the same image for the browser tab.
  */
 export function BrandMark({ className = "h-9 w-9" }: { className?: string }) {
-  const mask = useId()
   return (
-    <svg viewBox="0 0 100 100" className={className} role="img" aria-label="CE">
-      <mask id={mask}>
-        <rect width="100" height="100" fill="#fff" />
-        <path d="M24 56.5 L57 46" stroke="#000" strokeWidth="7" />
-      </mask>
-      <rect width="100" height="100" rx="18" fill="#fff" />
-      <path d="M65.7 21.4 A33.5 33.5 0 1 0 82.2 60.2" fill="none" stroke="#F7931E" strokeWidth="8" />
-      <circle cx="51" cy="51" r="20" fill="#9B9B9B" mask={`url(#${mask})`} />
-    </svg>
+    <span className={`inline-flex shrink-0 items-center justify-center rounded-lg bg-white p-0.5 ${className}`}>
+      <Image src="/ce-logo.png" alt="CE" width={256} height={256} className="h-full w-full" priority />
+    </span>
   )
 }
