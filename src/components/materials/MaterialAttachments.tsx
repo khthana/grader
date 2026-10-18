@@ -3,16 +3,17 @@
 import { useRef, useState } from "react"
 import { FaPaperclip, FaTrash } from "react-icons/fa"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
-import { useToast } from "@/components/shell/ToastProvider"
 import { ATTACHMENT_ACCEPT, formatAttachmentSize } from "@/lib/materials/attachments/policy"
 import { attachmentUrl } from "@/lib/materials/attachments/references"
 import type { Attachment } from "@/lib/materials/attachments/repository"
 import type { AttachmentUploader } from "./useAttachmentUpload"
+import { useMaterialRequests } from "./useMaterialRequests"
 
 /**
  * A Teaching Material's Attachments (#114): listed under its content for every
- * viewer, in upload order. A manager attaches files once the Material has been
- * saved — each upload takes effect at once, no body save needed — replaces one
+ * viewer, in upload order. A manager attaches files — each upload takes effect
+ * at once, no body save needed; into a Material not yet written it creates it
+ * (#121) — replaces one
  * by uploading its name again (after confirming) and deletes one (#115).
  * Uploading goes through the Material's `uploader`.
  */
@@ -22,17 +23,14 @@ export function MaterialAttachments({
   uploader,
   onRemoved,
   canEdit,
-  saved,
 }: {
   courseSlug: string
   attachments: Attachment[]
   uploader: AttachmentUploader
   onRemoved: (id: number) => void
   canEdit: boolean
-  /** Whether the Material exists yet — only a saved one takes Attachments. */
-  saved: boolean
 }) {
-  const { notify } = useToast()
+  const { removeAttachment } = useMaterialRequests(courseSlug)
   const input = useRef<HTMLInputElement>(null)
   const [toDelete, setToDelete] = useState<Attachment | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -46,23 +44,17 @@ export function MaterialAttachments({
 
   async function remove(attachment: Attachment) {
     setDeleting(true)
-    const res = await fetch(attachmentUrl(courseSlug, attachment.id), { method: "DELETE" }).catch(() => null)
-    const body = res ? await res.json().catch(() => ({})) : {}
+    const removed = await removeAttachment(attachment)
     setDeleting(false)
     setToDelete(null)
-    if (res?.ok) {
-      onRemoved(attachment.id)
-      notify("success", `ลบไฟล์ ${attachment.name} แล้ว`)
-    } else {
-      notify("error", body.error ?? "ลบไฟล์ไม่สำเร็จ")
-    }
+    if (removed) onRemoved(attachment.id)
   }
 
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-5 print:rounded-none print:border-0 print:px-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-semibold text-primary">ไฟล์แนบ</h2>
-        {canEdit && saved && (
+        {canEdit && (
           <>
             <input
               ref={input}
@@ -83,9 +75,7 @@ export function MaterialAttachments({
           </>
         )}
       </div>
-      {canEdit && !saved ? (
-        <p className="mt-2 text-sm text-slate-400">บันทึกเอกสารก่อนจึงแนบไฟล์ได้</p>
-      ) : attachments.length === 0 ? (
+      {attachments.length === 0 ? (
         <p className="mt-2 text-sm text-slate-400">ยังไม่มีไฟล์แนบ</p>
       ) : (
         <ul className="mt-3 flex flex-col divide-y divide-gray-100">

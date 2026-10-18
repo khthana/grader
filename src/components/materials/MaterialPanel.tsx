@@ -16,6 +16,7 @@ import { attachmentUrlTransform, missingReferences } from "@/lib/materials/attac
 import type { Attachment } from "@/lib/materials/attachments/repository"
 import { MaterialAttachments } from "./MaterialAttachments"
 import { useAttachmentUpload } from "./useAttachmentUpload"
+import { useMaterialRequests } from "./useMaterialRequests"
 import { UnpublishedBadge } from "./UnpublishedBadge"
 
 /**
@@ -62,9 +63,12 @@ export function MaterialPanel({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const apiPath = `/api/courses/${courseSlug}/materials/${weekNo}/${kind}`
-  const uploader = useAttachmentUpload(apiPath, (attachment, replaced) =>
+  const { setPublished } = useMaterialRequests(courseSlug)
+  const uploader = useAttachmentUpload(apiPath, (attachment, replaced) => {
     setAttachments((list) => (replaced ? list.map((a) => (a.id === attachment.id ? attachment : a)) : [...list, attachment]))
-  )
+    // The first upload into a slot creates its Material — empty, unpublished (#121).
+    setMaterial((m) => m ?? { weekNo, kind, body: "", isPublished: false, updatedAt: new Date().toISOString() })
+  })
   // Its text links its Attachments by name and shows no image (#116, #119).
   const markdownOptions = useMemo(
     () => ({ urlTransform: attachmentUrlTransform(courseSlug, attachments), imagesAsLinks: true }),
@@ -101,19 +105,9 @@ export function MaterialPanel({
   async function togglePublished() {
     if (isPublished === null) return
     setPublishing(true)
-    const res = await fetch(`${apiPath}/publish`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ published: !isPublished }),
-    }).catch(() => null)
-    const body = res ? await res.json().catch(() => ({})) : {}
+    const saved = await setPublished(apiPath, !isPublished)
     setPublishing(false)
-    if (res?.ok) {
-      setMaterial(body.material)
-      notify("success", body.material.isPublished ? "เผยแพร่เอกสารแล้ว" : "เลิกเผยแพร่เอกสารแล้ว")
-    } else {
-      notify("error", body.error ?? "เปลี่ยนสถานะไม่สำเร็จ")
-    }
+    if (saved) setMaterial(saved)
   }
 
   async function move() {
@@ -298,7 +292,6 @@ export function MaterialPanel({
         uploader={uploader}
         onRemoved={(id) => setAttachments((list) => list.filter((a) => a.id !== id))}
         canEdit={canEdit}
-        saved={material !== null}
       />
 
       {uploader.dialog}

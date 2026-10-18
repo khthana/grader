@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { useRef, useState } from "react"
 import { FaEdit, FaPaperclip, FaPlus, FaTrash } from "react-icons/fa"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
-import { useToast } from "@/components/shell/ToastProvider"
 import { materialKindLabel, type MaterialKind } from "@/lib/materials/kinds"
 import type { OutlineAttachment, OutlineMaterial } from "@/lib/materials/outline"
 import type { StudentOutlineMaterial } from "@/lib/materials/student-view"
@@ -13,12 +12,13 @@ import { attachmentUrl } from "@/lib/materials/attachments/references"
 import { ATTACHMENT_ACCEPT, formatAttachmentSize } from "@/lib/materials/attachments/policy"
 import { UnpublishedBadge } from "./UnpublishedBadge"
 import { useAttachmentUpload } from "./useAttachmentUpload"
+import { useMaterialRequests } from "./useMaterialRequests"
 
 /**
  * One cell of the Teaching Materials table (#120): the Material's Attachments
  * as download links and "อ่าน" when it has text. A manager also runs the cell
- * from here (#121) — attach files (into an empty cell too: the upload creates
- * the Material), switch publishing, delete an Attachment — and the table
+ * from here (#121) — attach files (into an empty planned cell too: the upload
+ * creates the Material), switch publishing, delete an Attachment — and the table
  * refreshes in place after each.
  */
 export function MaterialCell({
@@ -36,26 +36,24 @@ export function MaterialCell({
   kind: MaterialKind
   material: OutlineMaterial | StudentOutlineMaterial | undefined
   canEdit: boolean
-  /** A Teaching Plan week — only there does an empty cell offer "+ สร้าง" (writing one); attaching works in any row. */
+  /** A Teaching Plan week — only there does an empty cell offer anything (#118: a Material starts in a planned week). */
   planned: boolean
 }) {
   const href = `${coursePath}/materials/${weekNo}/${kind}`
   const label = `${materialKindLabel(kind)} สัปดาห์ ${weekNo}`
 
   if (!material) {
-    if (!canEdit) return <Dash />
+    if (!canEdit || !planned) return <Dash />
     return (
       <div className="flex flex-wrap items-center gap-3">
-        {planned && (
-          <Link
-            href={href}
-            className="inline-flex items-center gap-1 text-xs text-slate-400 transition hover:text-secondary"
-            aria-label={`สร้าง${label}`}
-          >
-            <FaPlus className="h-2.5 w-2.5" />
-            สร้าง
-          </Link>
-        )}
+        <Link
+          href={href}
+          className="inline-flex items-center gap-1 text-xs text-slate-400 transition hover:text-secondary"
+          aria-label={`สร้าง${label}`}
+        >
+          <FaPlus className="h-2.5 w-2.5" />
+          สร้าง
+        </Link>
         <CellControls courseSlug={courseSlug} weekNo={weekNo} kind={kind} label={label} />
       </div>
     )
@@ -112,22 +110,16 @@ function AttachmentLink({ courseSlug, attachment }: { courseSlug: string; attach
 // An Attachment with its delete icon (#121), after ConfirmDialog.
 function ManagedAttachment({ courseSlug, attachment }: { courseSlug: string; attachment: OutlineAttachment }) {
   const router = useRouter()
-  const { notify } = useToast()
+  const { removeAttachment } = useMaterialRequests(courseSlug)
   const [asking, setAsking] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   async function remove() {
     setDeleting(true)
-    const res = await fetch(attachmentUrl(courseSlug, attachment.id), { method: "DELETE" }).catch(() => null)
-    const body = res ? await res.json().catch(() => ({})) : {}
+    const removed = await removeAttachment(attachment)
     setDeleting(false)
     setAsking(false)
-    if (res?.ok) {
-      notify("success", `ลบไฟล์ ${attachment.name} แล้ว`)
-      router.refresh()
-    } else {
-      notify("error", body.error ?? "ลบไฟล์ไม่สำเร็จ")
-    }
+    if (removed) router.refresh()
   }
 
   return (
@@ -172,7 +164,7 @@ function CellControls({
   href?: string
 }) {
   const router = useRouter()
-  const { notify } = useToast()
+  const { setPublished } = useMaterialRequests(courseSlug)
   const input = useRef<HTMLInputElement>(null)
   const [switching, setSwitching] = useState(false)
   const apiPath = `/api/courses/${courseSlug}/materials/${weekNo}/${kind}`
@@ -186,19 +178,9 @@ function CellControls({
 
   async function togglePublished() {
     setSwitching(true)
-    const res = await fetch(`${apiPath}/publish`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ published: !published }),
-    }).catch(() => null)
-    const body = res ? await res.json().catch(() => ({})) : {}
+    const saved = await setPublished(apiPath, !published)
     setSwitching(false)
-    if (res?.ok) {
-      notify("success", body.material.isPublished ? "เผยแพร่เอกสารแล้ว" : "เลิกเผยแพร่เอกสารแล้ว")
-      router.refresh()
-    } else {
-      notify("error", body.error ?? "เปลี่ยนสถานะไม่สำเร็จ")
-    }
+    if (saved) router.refresh()
   }
 
   return (
