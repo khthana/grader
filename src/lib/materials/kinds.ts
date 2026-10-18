@@ -11,10 +11,17 @@ const LABELS: Record<MaterialKind, string> = {
   lab: "ใบงานปฏิบัติการ",
 }
 
+// The Materials table's column headings (#120) — short enough for a phone.
+const COLUMN_LABELS: Record<MaterialKind, string> = { ...LABELS, lab: "ใบงาน" }
+
 export function isMaterialKind(value: unknown): value is MaterialKind {
   return typeof value === "string" && (MATERIAL_KINDS as readonly string[]).includes(value)
 }
 
 export function materialKindLabel(kind: MaterialKind): string {
   return LABELS[kind]
+}
+
+export function materialKindColumnLabel(kind: MaterialKind): string {
+  return COLUMN_LABELS[kind]
 }

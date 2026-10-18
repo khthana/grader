@@ -6,17 +6,34 @@ import type { Queryable } from "@/lib/db"
 import type { CourseKey } from "@/lib/courses/types"
 import { getSyllabus } from "@/lib/syllabus/repository"
 import type { PlanEntry } from "@/lib/syllabus/plan"
-import type { MaterialAddress } from "./params"
-import { buildMaterialsOutline, materialHeading } from "./outline"
+import { materialRef, type MaterialAddress } from "./params"
+import { buildMaterialsOutline, materialHeading, type OutlineAttachment, type OutlineMaterial } from "./outline"
 import { getMaterial, listMaterials } from "./repository"
-import { getAttachmentForCourse, listAttachments, type Attachment, type StoredAttachment } from "./attachments/repository"
+import { getAttachmentForCourse, listAttachments, listCourseAttachments, type Attachment, type StoredAttachment } from "./attachments/repository"
 import { canSeeMaterial, materialFor, materialsOutlineFor, type MaterialViewer, type ViewedMaterial } from "./student-view"
 
 /** The viewer's outline, plus whether the course has a Teaching Plan at all. */
 export async function loadMaterialsOutline(db: Queryable, key: CourseKey, viewer: MaterialViewer) {
-  const [{ plan }, materials] = await Promise.all([getSyllabus(db, key), listMaterials(db, key)])
-  const summaries = materials.map(({ weekNo, kind, isPublished }) => ({ weekNo, kind, isPublished }))
-  return { outline: materialsOutlineFor(viewer, buildMaterialsOutline(plan, summaries)), hasPlan: plan.length > 0 }
+  const [{ plan }, materials, attachments] = await Promise.all([
+    getSyllabus(db, key),
+    listMaterials(db, key),
+    listCourseAttachments(db, key),
+  ])
+  const byMaterial = new Map<string, OutlineAttachment[]>()
+  for (const { weekNo, kind, ...attachment } of attachments) {
+    const at = materialRef({ weekNo, kind })
+    byMaterial.set(at, [...(byMaterial.get(at) ?? []), attachment])
+  }
+  const shown = materials.map(
+    ({ weekNo, kind, body, isPublished }): OutlineMaterial => ({
+      weekNo,
+      kind,
+      isPublished,
+      hasText: body.trim() !== "", // saved bodies are trimmed; this also covers older rows
+      attachments: byMaterial.get(materialRef({ weekNo, kind })) ?? [],
+    })
+  )
+  return { outline: materialsOutlineFor(viewer, buildMaterialsOutline(plan, shown)), hasPlan: plan.length > 0 }
 }
 
 /**

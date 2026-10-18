@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { parseCourseSlug, buildCoursePath } from "@/lib/courses/slug"
+import { parseCourseSlug, buildCoursePath, courseSlugString } from "@/lib/courses/slug"
 import { getCourseAccess } from "@/lib/courses/server"
 import { getDb } from "@/lib/db"
 import { loadMaterialsOutline } from "@/lib/materials/access"
@@ -9,7 +9,7 @@ interface PageProps {
   params: Promise<{ code: string; year: string; semester: string }>
 }
 
-// Teaching Materials by Teaching Plan week (#109) — everyone linked reads what
+// Teaching Materials by Teaching Plan week (#109), as one table (#120) — everyone linked reads what
 // the Student View lets them; the course's managers write.
 export default async function CourseMaterialsPage({ params }: PageProps) {
   const { code, year, semester } = await params
@@ -31,6 +31,7 @@ export default async function CourseMaterialsPage({ params }: PageProps) {
       </div>
       <MaterialsOutline
         outline={outline}
+        courseSlug={courseSlugString(slug)}
         coursePath={buildCoursePath(slug)}
         canEdit={access.manager}
         staff={access.staff}

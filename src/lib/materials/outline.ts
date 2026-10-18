@@ -13,13 +13,26 @@ export interface MaterialSummary {
   isPublished: boolean
 }
 
+/** An Attachment as the outline lists it (#120) — enough for a download link. */
+export interface OutlineAttachment {
+  id: number
+  name: string
+  sizeBytes: number
+}
+
+/** A Material as the outline shows it (#120): whether it has text, and its Attachments in upload order. */
+export interface OutlineMaterial extends MaterialSummary {
+  hasText: boolean
+  attachments: OutlineAttachment[]
+}
+
 export interface OutlineWeek<M> {
   weekNo: number
   heading: string
   materials: Partial<Record<MaterialKind, M>>
 }
 
-export interface MaterialsOutline<M = MaterialSummary> {
+export interface MaterialsOutline<M = OutlineMaterial> {
   /** The distinct Teaching Plan week numbers, in order. */
   weeks: OutlineWeek<M>[]
   /** Materials whose week isn't in the Teaching Plan, by week then Kind. */

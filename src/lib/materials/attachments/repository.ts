@@ -53,6 +53,23 @@ export async function listAttachments(db: Queryable, key: CourseKey, address: Ma
 }
 
 /**
+ * Every Attachment of the course's Materials (#120), in upload order, with
+ * its Material's address — one query for the whole outline.
+ */
+export async function listCourseAttachments(
+  db: Queryable,
+  key: CourseKey
+): Promise<(Pick<Attachment, "id" | "name" | "sizeBytes"> & MaterialAddress)[]> {
+  const { rows } = await db.query<Pick<Attachment, "id" | "name" | "sizeBytes"> & MaterialAddress>(
+    `SELECT a.id, a.name, a.size_bytes AS "sizeBytes", m.week_no AS "weekNo", m.kind
+     FROM material_attachments a JOIN teaching_materials m ON m.id = a.material_id
+     WHERE m.course_code = $1 AND m.course_year = $2::int AND m.course_semester = $3::int ORDER BY a.id`,
+    [key.code, key.year, key.semester]
+  )
+  return rows
+}
+
+/**
  * Record a new Attachment; null when the Material already has one of that
  * name (checked first, and a lost race on the UNIQUE constraint answers the same).
  */

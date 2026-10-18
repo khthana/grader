@@ -4,16 +4,10 @@ import { useRef, useState } from "react"
 import { FaPaperclip, FaTrash } from "react-icons/fa"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
 import { useToast } from "@/components/shell/ToastProvider"
-import { ATTACHMENT_ACCEPT } from "@/lib/materials/attachments/policy"
+import { ATTACHMENT_ACCEPT, formatAttachmentSize } from "@/lib/materials/attachments/policy"
 import { attachmentUrl } from "@/lib/materials/attachments/references"
 import type { Attachment } from "@/lib/materials/attachments/repository"
 import type { AttachmentUploader } from "./useAttachmentUpload"
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
 
 /**
  * A Teaching Material's Attachments (#114): listed under its content for every
@@ -101,7 +95,7 @@ export function MaterialAttachments({
                 {a.name}
               </a>
               <span className="flex shrink-0 items-center gap-3">
-                <span className="text-xs text-slate-400 print:hidden">{formatSize(a.sizeBytes)}</span>
+                <span className="text-xs text-slate-400 print:hidden">{formatAttachmentSize(a.sizeBytes)}</span>
                 {canEdit && (
                   <button
                     onClick={() => setToDelete(a)}

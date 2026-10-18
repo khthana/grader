@@ -1,26 +1,32 @@
 import Link from "next/link"
-import { FaPlus } from "react-icons/fa"
-import { MATERIAL_KINDS, materialKindLabel, type MaterialKind } from "@/lib/materials/kinds"
-import type { MaterialsOutline as Outline, MaterialSummary } from "@/lib/materials/outline"
-import type { StudentMaterialSummary } from "@/lib/materials/student-view"
+import { FaEdit, FaPaperclip, FaPlus } from "react-icons/fa"
+import { MATERIAL_KINDS, materialKindColumnLabel, materialKindLabel, type MaterialKind } from "@/lib/materials/kinds"
+import type { MaterialsOutline as Outline, OutlineMaterial } from "@/lib/materials/outline"
+import type { StudentOutlineMaterial } from "@/lib/materials/student-view"
+import { attachmentUrl } from "@/lib/materials/attachments/references"
+import { formatAttachmentSize } from "@/lib/materials/attachments/policy"
 
-type Summary = MaterialSummary | StudentMaterialSummary
+type Shown = OutlineMaterial | StudentOutlineMaterial
+type Row = { weekNo: number; heading: string | null; materials: Partial<Record<MaterialKind, Shown>> }
 
 /**
- * Teaching Materials by Teaching Plan week (#109): one card per plan week,
- * headed by its live topics, with a slot per Material Kind. The outline comes
- * already shaped for the viewer (materialsOutlineFor); this only decides which
- * empty slots to draw (staff see them, managers can create in them). Staff
- * also get the Unplanned group last (#111) — Students' outline has none.
+ * Teaching Materials as one table (#120): a row per Teaching Plan week, headed
+ * by its live topics, a column per Material Kind. A cell lists its Material's
+ * Attachments as download links and "อ่าน" when it has text. The outline comes
+ * already shaped for the viewer (materialsOutlineFor); this only decides what
+ * to draw in an empty cell (managers can create in it) and the staff extras.
+ * Staff also get the Unplanned rows last (#111) — Students' outline has none.
  */
 export function MaterialsOutline({
   outline,
+  courseSlug,
   coursePath,
   canEdit,
   staff,
   hasPlan,
 }: {
-  outline: Outline<Summary>
+  outline: Outline<Shown>
+  courseSlug: string
   coursePath: string
   canEdit: boolean
   staff: boolean
@@ -45,69 +51,117 @@ export function MaterialsOutline({
     )
   }
 
-  return (
-    <div className="flex flex-col gap-3">
-      {outline.weeks.map((week) => (
-        <section key={week.weekNo} className="rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="mb-3 font-medium text-primary">
-            สัปดาห์ {week.weekNo} · {week.heading}
-          </h2>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {MATERIAL_KINDS.map((kind) => {
-              const material = week.materials[kind]
-              if (material) {
-                return (
-                  <Link
-                    key={kind}
-                    href={href(week.weekNo, kind)}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm text-slate-700 transition hover:border-secondary hover:bg-slate-50"
-                  >
-                    {materialKindLabel(kind)}
-                    {"isPublished" in material && !material.isPublished && <UnpublishedBadge />}
-                  </Link>
-                )
-              }
-              if (!staff) return null
-              return canEdit ? (
-                <Link
-                  key={kind}
-                  href={href(week.weekNo, kind)}
-                  className="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-3 text-sm text-slate-400 transition hover:border-secondary hover:text-secondary"
-                >
-                  <FaPlus className="h-3 w-3" />
-                  สร้าง{materialKindLabel(kind)}
-                </Link>
-              ) : (
-                <div key={kind} className="rounded-lg border border-dashed border-gray-200 px-4 py-3 text-sm text-slate-300">
-                  {materialKindLabel(kind)} —
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      ))}
-      {outline.unplanned.length > 0 && (
-        <section className="rounded-xl border border-dashed border-amber-300 bg-amber-50/40 p-5">
-          <h2 className="font-medium text-amber-800">ไม่อยู่ในแผนการสอน</h2>
-          <p className="mb-3 text-xs text-amber-700">
-            สัปดาห์ของเอกสารเหล่านี้ไม่อยู่ในแผนการสอนแล้ว นักศึกษามองไม่เห็น — ย้ายไปสัปดาห์อื่นหรือลบได้
-          </p>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {outline.unplanned.map((material) => (
-              <Link
-                key={`${material.weekNo}/${material.kind}`}
-                href={href(material.weekNo, material.kind)}
-                className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-slate-700 transition hover:border-secondary hover:bg-slate-50"
-              >
-                สัปดาห์ {material.weekNo} · {materialKindLabel(material.kind)}
-                {"isPublished" in material && !material.isPublished && <UnpublishedBadge />}
+  // Unplanned Materials, one row per week number (the outline sorts them by week).
+  const unplannedRows: Row[] = []
+  for (const m of outline.unplanned) {
+    const last = unplannedRows.at(-1)
+    if (last?.weekNo === m.weekNo) last.materials[m.kind] = m
+    else unplannedRows.push({ weekNo: m.weekNo, heading: null, materials: { [m.kind]: m } })
+  }
+
+  // `planned` = a Teaching Plan week: only there may a manager create a Material.
+  const cell = (weekNo: number, kind: MaterialKind, material: Shown | undefined, planned: boolean) => {
+    if (!material) {
+      return canEdit && planned ? (
+        <Link
+          href={href(weekNo, kind)}
+          className="inline-flex items-center gap-1 text-xs text-slate-400 transition hover:text-secondary"
+          aria-label={`สร้าง${materialKindLabel(kind)} สัปดาห์ ${weekNo}`}
+        >
+          <FaPlus className="h-2.5 w-2.5" />
+          สร้าง
+        </Link>
+      ) : (
+        <Dash />
+      )
+    }
+    const unpublished = "isPublished" in material && !material.isPublished
+    const actions = material.hasText || unpublished || canEdit
+    if (material.attachments.length === 0 && !actions) return <Dash />
+    return (
+      <div className="flex flex-col items-start gap-1">
+        {material.attachments.map((a) => (
+          <a
+            key={a.id}
+            href={attachmentUrl(courseSlug, a.id)}
+            title={formatAttachmentSize(a.sizeBytes)}
+            className="inline-flex max-w-full items-start gap-1.5 break-all text-secondary hover:underline"
+          >
+            <FaPaperclip className="mt-1 h-3 w-3 shrink-0 text-slate-400" />
+            {a.name}
+          </a>
+        ))}
+        {actions && (
+          <div className="flex flex-wrap items-center gap-2">
+            {material.hasText && (
+              <Link href={href(weekNo, kind)} className="text-secondary hover:underline">
+                อ่าน
               </Link>
-            ))}
+            )}
+            {unpublished && <UnpublishedBadge />}
+            {canEdit && (
+              <Link
+                href={href(weekNo, kind)}
+                className="text-slate-400 transition hover:text-secondary"
+                aria-label={`แก้ไข${materialKindLabel(kind)} สัปดาห์ ${weekNo}`}
+                title="แก้ไข"
+              >
+                <FaEdit className="h-3.5 w-3.5" />
+              </Link>
+            )}
           </div>
-        </section>
+        )}
+      </div>
+    )
+  }
+
+  const row = ({ weekNo, heading, materials }: Row, unplanned: boolean) => (
+    <tr
+      key={`${unplanned ? "u" : "w"}${weekNo}`}
+      className={`border-t align-top ${unplanned ? "border-amber-200 bg-amber-50/60" : "border-gray-100"}`}
+    >
+      <td className={`px-4 py-3 text-center font-medium ${unplanned ? "text-amber-800" : "text-primary"}`}>{weekNo}</td>
+      <td className={`px-4 py-3 ${unplanned ? "text-amber-800" : "text-slate-700"}`}>{heading ?? "ไม่อยู่ในแผนการสอน"}</td>
+      {MATERIAL_KINDS.map((kind) => (
+        <td key={kind} className="px-4 py-3">
+          {cell(weekNo, kind, materials[kind], !unplanned)}
+        </td>
+      ))}
+    </tr>
+  )
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <table className="w-full min-w-[40rem] text-sm">
+          <thead>
+            <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-500">
+              <th className="w-20 px-4 py-2.5 text-center">สัปดาห์</th>
+              <th className="px-4 py-2.5">หัวข้อ</th>
+              {MATERIAL_KINDS.map((kind) => (
+                <th key={kind} className="w-[22%] px-4 py-2.5">
+                  {materialKindColumnLabel(kind)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {outline.weeks.map((week) => row(week, false))}
+            {unplannedRows.map((week) => row(week, true))}
+          </tbody>
+        </table>
+      </div>
+      {unplannedRows.length > 0 && (
+        <p className="text-xs text-amber-700">
+          แถวสีเหลือง: สัปดาห์ของเอกสารเหล่านี้ไม่อยู่ในแผนการสอนแล้ว นักศึกษามองไม่เห็น — ย้ายไปสัปดาห์อื่นหรือลบได้
+        </p>
       )}
     </div>
   )
+}
+
+function Dash() {
+  return <span className="text-slate-300">—</span>
 }
 
 export function UnpublishedBadge() {

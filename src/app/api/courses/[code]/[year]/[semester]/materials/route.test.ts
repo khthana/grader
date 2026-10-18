@@ -11,6 +11,8 @@ import { createUser, assignRole } from "@/lib/users/repository"
 import { saveSyllabus } from "@/lib/syllabus/repository"
 import { EMPTY_SYLLABUS } from "@/lib/syllabus/draft"
 import type { PlanEntry } from "@/lib/syllabus/plan"
+import { saveMaterial, setMaterialPublished } from "@/lib/materials/repository"
+import { createAttachment, findMaterialId } from "@/lib/materials/attachments/repository"
 
 // Teaching Materials (#109): staff write them by Teaching Plan week; the
 // heading is the plan's topics, read live (ADR 0012).
@@ -76,8 +78,8 @@ describe("/api/courses/[code]/[year]/[semester]/materials", () => {
       [1, "Intro"],
       [3, "Array · Lab Array"],
     ])
-    expect(weeks[0].materials).toEqual({ slides: { weekNo: 1, kind: "slides", isPublished: false } })
-    expect(weeks[1].materials).toEqual({ lab: { weekNo: 3, kind: "lab", isPublished: false } })
+    expect(weeks[0].materials).toEqual({ slides: { weekNo: 1, kind: "slides", isPublished: false, hasText: true, attachments: [] } })
+    expect(weeks[1].materials).toEqual({ lab: { weekNo: 3, kind: "lab", isPublished: false, hasText: true, attachments: [] } })
     expect(unplanned).toEqual([])
   })
 
@@ -91,7 +93,7 @@ describe("/api/courses/[code]/[year]/[semester]/materials", () => {
   it("a Material outside the plan is Unplanned — staff still read it, with no heading", async () => {
     await put(f.ins.email, 9, "slides", { body: "old" })
     const { unplanned } = await (await outline(f.ins.email)).json()
-    expect(unplanned).toEqual([{ weekNo: 9, kind: "slides", isPublished: false }])
+    expect(unplanned).toEqual([{ weekNo: 9, kind: "slides", isPublished: false, hasText: true, attachments: [] }])
     const body = await (await one(f.ta.email, 9, "slides")).json()
     expect(body.heading).toBeNull()
   })
@@ -195,7 +197,7 @@ describe("/api/courses/[code]/[year]/[semester]/materials", () => {
     it("a Student's outline holds only Published Materials of planned weeks, without the flag", async () => {
       await publish(f.ins.email, 1, "slides", { published: true })
       expect(await (await outline(student.email)).json()).toEqual({
-        weeks: [{ weekNo: 1, heading: "Intro", materials: { slides: { weekNo: 1, kind: "slides" } } }],
+        weeks: [{ weekNo: 1, heading: "Intro", materials: { slides: { weekNo: 1, kind: "slides", hasText: true, attachments: [] } } }],
         unplanned: [],
       })
     })
@@ -235,6 +237,62 @@ describe("/api/courses/[code]/[year]/[semester]/materials", () => {
     })
   })
 
+  // The table (#120): each cell lists its Material's Attachments and whether it has text.
+  describe("the outline's cells (#120)", () => {
+    const attach = async (week: number, kind: "slides" | "handout" | "lab", name: string, size = 4) => {
+      const materialId = await findMaterialId(f.db, f.course, { weekNo: week, kind })
+      return createAttachment(f.db, materialId!, { name, contentType: "application/pdf", sizeBytes: size, sha256: name }, f.ins.id)
+    }
+    const cell = (body: { weeks: { weekNo: number; materials: Record<string, unknown> }[] }, week: number, kind: string) =>
+      body.weeks.find((w) => w.weekNo === week)?.materials[kind]
+
+    beforeEach(async () => {
+      await put(f.ins.email, 3, "slides", { body: "# Array" })
+      await saveMaterial(f.db, f.course, { weekNo: 3, kind: "lab" }, "  ", f.ins.id)
+      await attach(3, "slides", "b.pdf", 10)
+      await attach(3, "slides", "a.pdf", 20)
+      await attach(3, "lab", "lab.zip", 30)
+    })
+
+    it("staff get every Material's Attachments in upload order — id, name and size — and its has-text flag", async () => {
+      const body = await (await outline(f.ins.email)).json()
+      const slides = cell(body, 3, "slides") as { hasText: boolean; attachments: { id: number; name: string; sizeBytes: number }[] }
+      expect(slides.hasText).toBe(true)
+      expect(slides.attachments.map((a) => [a.name, a.sizeBytes])).toEqual([["b.pdf", 10], ["a.pdf", 20]])
+      expect(Object.keys(slides.attachments[0]).sort()).toEqual(["id", "name", "sizeBytes"])
+      expect(cell(body, 3, "lab")).toMatchObject({ isPublished: false, hasText: false, attachments: [{ name: "lab.zip" }] })
+    })
+
+    it("a TA gets what an Instructor gets", async () => {
+      expect(await (await outline(f.ta.email)).json()).toEqual(await (await outline(f.ins.email)).json())
+    })
+
+    it("an Unplanned Material carries its Attachments for staff", async () => {
+      await plan([[1, "Intro"]])
+      const { unplanned } = await (await outline(f.ins.email)).json()
+      expect(unplanned.map((m: { kind: string; attachments: { name: string }[] }) => [m.kind, m.attachments.map((a) => a.name)])).toEqual([
+        ["slides", ["b.pdf", "a.pdf"]],
+        ["lab", ["lab.zip"]],
+      ])
+    })
+
+    it("a Student gets the Attachments of Published Materials only, never the flag", async () => {
+      await setMaterialPublished(f.db, f.course, { weekNo: 3, kind: "lab" }, true)
+      const body = await (await outline(student.email)).json()
+      expect(body).toEqual({
+        weeks: [
+          {
+            weekNo: 3,
+            heading: "Array · Lab Array",
+            materials: { lab: { weekNo: 3, kind: "lab", hasText: false, attachments: [expect.objectContaining({ name: "lab.zip" })] } },
+          },
+        ],
+        unplanned: [],
+      })
+      expect(JSON.stringify(body)).not.toContain("b.pdf")
+    })
+  })
+
   it("logs every save as material.update, naming the Material", async () => {
     await put(f.ins.email, 1, "slides", { body: "a" })
     await put(f.ins.email, 1, "slides", { body: "b" })
@@ -269,7 +327,7 @@ describe("/api/courses/[code]/[year]/[semester]/materials", () => {
       expect((await (await one(f.ins.email, 3, "slides")).json()).material.body).toBe("array slides")
       const { weeks, unplanned } = await (await outline(f.ins.email)).json()
       expect(weeks.map((w: { weekNo: number }) => w.weekNo)).toEqual([1])
-      expect(unplanned).toEqual([{ weekNo: 3, kind: "slides", isPublished: false }])
+      expect(unplanned).toEqual([{ weekNo: 3, kind: "slides", isPublished: false, hasText: true, attachments: [] }])
     })
 
     it("a move into an empty slot carries the Material to that week, same Kind", async () => {

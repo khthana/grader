@@ -62,6 +62,13 @@ export function checkUpload(file: { name: string; size: number }): UploadCheck {
   return { ok: true, name, contentType }
 }
 
+/** A file size as viewers read it. */
+export function formatAttachmentSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < MB) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / MB).toFixed(1)} MB`
+}
+
 /** A Material already holding this many Attachments takes no new one. */
 export const isAtAttachmentLimit = (count: number) => count >= MAX_ATTACHMENTS_PER_MATERIAL
 

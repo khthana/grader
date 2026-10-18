@@ -4,7 +4,7 @@
 // inline. Staff see everything; a Student sees only Published Materials of
 // planned weeks, without the published flag.
 
-import type { MaterialsOutline, MaterialSummary } from "./outline"
+import type { MaterialsOutline, OutlineMaterial } from "./outline"
 import type { Material } from "./repository"
 
 export interface MaterialViewer {
@@ -15,7 +15,7 @@ export function canSeeMaterial(viewer: MaterialViewer, material: { isPublished: 
   return viewer.staff || (material.isPublished && planned)
 }
 
-export type StudentMaterialSummary = Omit<MaterialSummary, "isPublished">
+export type StudentOutlineMaterial = Omit<OutlineMaterial, "isPublished">
 
 /** A Material as a viewer reads it (a Student's carries no published flag). */
 export type ViewedMaterial = Material | Omit<Material, "isPublished">
@@ -28,16 +28,17 @@ export function materialFor<M extends { isPublished: boolean }>(viewer: Material
   return rest
 }
 
-export function materialsOutlineFor(
+/** The outline as this viewer reads it — a Student's holds only what they may see, without the flag. */
+export function materialsOutlineFor<M extends { isPublished: boolean }>(
   viewer: MaterialViewer,
-  outline: MaterialsOutline
-): MaterialsOutline | MaterialsOutline<StudentMaterialSummary> {
+  outline: MaterialsOutline<M>
+): MaterialsOutline<M> | MaterialsOutline<Omit<M, "isPublished">> {
   if (viewer.staff) return outline
   const weeks = outline.weeks.flatMap((week) => {
     const materials = Object.fromEntries(
       Object.entries(week.materials)
         .filter(([, m]) => canSeeMaterial(viewer, m, true))
-        .map(([kind, m]) => [kind, { weekNo: m.weekNo, kind: m.kind }])
+        .map(([kind, m]) => [kind, materialFor(viewer, m)])
     )
     return Object.keys(materials).length === 0 ? [] : [{ ...week, materials }]
   })
