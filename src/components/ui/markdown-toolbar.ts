@@ -104,3 +104,9 @@ function toggleList(text: string, { start, end }: TextSelection, kind: "bullet" 
     selection: start === end ? { start: blockEnd, end: blockEnd } : { start: from, end: blockEnd },
   }
 }
+
+/** Put `snippet` in place of the selection (at the cursor), the cursor after it — "แทรกรูป" (#116). */
+export function insertText(text: string, { start, end }: TextSelection, snippet: string): FormatResult {
+  const at = start + snippet.length
+  return { text: text.slice(0, start) + snippet + text.slice(end), selection: { start: at, end: at } }
+}

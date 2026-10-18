@@ -78,7 +78,7 @@ Phase 1 ให้เขียนเอกสารการสอนเป็น
     - an image gets `Content-Disposition: inline`; everything else gets `attachment` with an RFC 5987 `filename*`, because Thai names occur
     - every response gets `X-Content-Type-Options: nosniff` and `Content-Type` from the allow-list, never the client's
 - **`references.ts` (pure):** the one rule for `attachment:` references.
-  - `resolveAttachmentUrl(url, attachmentsByName, urlFor)` maps `attachment:<name>` to that Material's download URL. A name with no Attachment resolves to an empty string, which renders as a broken image or link. Any other URL falls through to `react-markdown`'s `defaultUrlTransform`, so other sanitising is unchanged.
+  - `attachmentUrlTransform(courseSlug, attachments)` builds the renderer's URL transform, which maps `attachment:<name>` to that Material's download URL. A name with no Attachment resolves to an empty string, which renders as a broken image or link. Any other URL falls through to `react-markdown`'s `defaultUrlTransform`, so other sanitising is unchanged.
   - `missingReferences(body, names)` lists the referenced names that have no Attachment, for the editor warning.
   - The name in a reference is URL-decoded, so `attachment:week%203.png` matches `week 3.png`.
 - **`store.ts`:** the only code that touches `ATTACHMENTS_DIR`.

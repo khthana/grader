@@ -35,6 +35,12 @@ const TYPES: Record<string, string> = {
 /** For a file input's `accept`. */
 export const ATTACHMENT_ACCEPT = Object.keys(TYPES).map((ext) => `.${ext}`).join(",")
 
+/** For "แทรกรูป"'s file input (#116): the allowed types that show inline. */
+export const IMAGE_ACCEPT = Object.entries(TYPES)
+  .filter(([, type]) => type.startsWith("image/"))
+  .map(([ext]) => `.${ext}`)
+  .join(",")
+
 const MB = 1024 * 1024
 /** Why an upload is refused, as shown to staff. */
 export const UPLOAD_ERRORS = {

@@ -3,7 +3,8 @@ import { NextRequest } from "next/server"
 import { mkdtemp, readdir, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { GET as getOne, DELETE as deleteMaterialRoute } from "./[week]/[kind]/route"
+import { GET as getOne, PUT as saveMaterialRoute, DELETE as deleteMaterialRoute } from "./[week]/[kind]/route"
+import { PUT as publishRoute } from "./[week]/[kind]/publish/route"
 import { POST as UPLOAD } from "./[week]/[kind]/attachments/route"
 import { GET as DOWNLOAD, DELETE as REMOVE } from "./attachments/[aid]/route"
 import { DELETE as deleteCourseRoute } from "../route"
@@ -218,6 +219,21 @@ describe("Teaching Material Attachments", () => {
     const otherId = (await findMaterialId(f.db, other, { weekNo: 3, kind: "slides" }))!
     const o = await createAttachment(f.db, otherId, { name: "o.pdf", contentType: "application/pdf", sizeBytes: 1, sha256: "x" }, f.ins.id)
     expect((await download(f.ins.email, o!.id)).status).toBe(404)
+  })
+
+  it("a Material with Attachments but no body saves and publishes, and a Student downloads them (#116)", async () => {
+    const a = await uploaded(f.ins.email, "slides.pdf", "%PDF-1")
+    const put = (route: typeof publishRoute, body: unknown) =>
+      route(
+        withSession(
+          new NextRequest("http://localhost/api/x", { method: "PUT", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } }),
+          f.ins.email
+        ),
+        at(3, "slides")
+      )
+    expect((await put(saveMaterialRoute, { body: "" })).status).toBe(200)
+    expect((await put(publishRoute, { published: true })).status).toBe(200)
+    expect(await (await download(student.email, a.id)).text()).toBe("%PDF-1")
   })
 
   it("deleting the Material deletes its Attachments' rows", async () => {
