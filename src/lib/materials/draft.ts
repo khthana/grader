@@ -1,3 +1,5 @@
+import { isPlanWeek, MAX_PLAN_WEEK, MIN_PLAN_WEEK } from "@/lib/syllabus/plan"
+
 // Material Draft (#109) — the one place a Teaching Material body is validated,
 // like the Syllabus Draft. The route never validates the raw body itself.
 
@@ -6,6 +8,8 @@ export interface MaterialDraft {
 }
 
 export type MaterialDraftResult = { ok: true; draft: MaterialDraft } | { ok: false; errors: Record<string, string> }
+
+export type MoveDraftResult = { ok: true; weekNo: number } | { ok: false; errors: Record<string, string> }
 
 export type PublishDraftResult = { ok: true; published: boolean } | { ok: false; errors: Record<string, string> }
 
@@ -16,6 +20,15 @@ export function buildPublishDraft(input: unknown): PublishDraftResult {
   return typeof published === "boolean"
     ? { ok: true, published }
     : { ok: false, errors: { published: "ต้องระบุว่าเผยแพร่หรือไม่" } }
+}
+
+/** The move's body (#111) — `{ weekNo }`, a Teaching Plan week number (1–20). */
+export function buildMoveDraft(input: unknown): MoveDraftResult {
+  const weekNo =
+    input !== null && typeof input === "object" && !Array.isArray(input) ? (input as Record<string, unknown>).weekNo : undefined
+  return isPlanWeek(weekNo)
+    ? { ok: true, weekNo }
+    : { ok: false, errors: { weekNo: `สัปดาห์ต้องเป็นเลข ${MIN_PLAN_WEEK}–${MAX_PLAN_WEEK}` } }
 }
 
 export function buildMaterialDraft(input: unknown): MaterialDraftResult {

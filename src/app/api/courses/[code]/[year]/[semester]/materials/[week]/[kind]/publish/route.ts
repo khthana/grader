@@ -4,7 +4,7 @@ import { courseRoute } from "@/lib/courses/route"
 import { courseSlugString } from "@/lib/courses/slug"
 import { safeLog } from "@/lib/logs"
 import { buildPublishDraft } from "@/lib/materials/draft"
-import { materialNotFound, parseMaterialAddress } from "@/lib/materials/params"
+import { materialNotFound, materialRef, parseMaterialAddress } from "@/lib/materials/params"
 import { setMaterialPublished } from "@/lib/materials/repository"
 
 type Params = { code: string; year: string; semester: string; week: string; kind: string }
@@ -24,6 +24,7 @@ export const PUT = courseRoute<Params>({ manage: true }, async (req: NextRequest
     actorEmail: auth.user.email,
     action: "material.publish",
     targetEmail: courseSlugString(auth.course),
+    detail: `${result.published ? "publish" : "unpublish"} ${materialRef(address)}`,
   })
   return NextResponse.json({ material })
 })

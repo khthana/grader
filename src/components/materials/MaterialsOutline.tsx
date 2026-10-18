@@ -10,7 +10,8 @@ type Summary = MaterialSummary | StudentMaterialSummary
  * Teaching Materials by Teaching Plan week (#109): one card per plan week,
  * headed by its live topics, with a slot per Material Kind. The outline comes
  * already shaped for the viewer (materialsOutlineFor); this only decides which
- * empty slots to draw (staff see them, managers can create in them).
+ * empty slots to draw (staff see them, managers can create in them). Staff
+ * also get the Unplanned group last (#111) — Students' outline has none.
  */
 export function MaterialsOutline({
   outline,
@@ -27,7 +28,7 @@ export function MaterialsOutline({
 }) {
   const href = (weekNo: number, kind: MaterialKind) => `${coursePath}/materials/${weekNo}/${kind}`
 
-  if (outline.weeks.length === 0) {
+  if (outline.weeks.length === 0 && outline.unplanned.length === 0) {
     return (
       <div className="rounded-xl border border-gray-200 bg-white py-16 text-center text-sm text-slate-400">
         {staff && !hasPlan ? (
@@ -85,6 +86,26 @@ export function MaterialsOutline({
           </div>
         </section>
       ))}
+      {outline.unplanned.length > 0 && (
+        <section className="rounded-xl border border-dashed border-amber-300 bg-amber-50/40 p-5">
+          <h2 className="font-medium text-amber-800">ไม่อยู่ในแผนการสอน</h2>
+          <p className="mb-3 text-xs text-amber-700">
+            สัปดาห์ของเอกสารเหล่านี้ไม่อยู่ในแผนการสอนแล้ว นักศึกษามองไม่เห็น — ย้ายไปสัปดาห์อื่นหรือลบได้
+          </p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {outline.unplanned.map((material) => (
+              <Link
+                key={`${material.weekNo}/${material.kind}`}
+                href={href(material.weekNo, material.kind)}
+                className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-slate-700 transition hover:border-secondary hover:bg-slate-50"
+              >
+                สัปดาห์ {material.weekNo} · {materialKindLabel(material.kind)}
+                {"isPublished" in material && !material.isPublished && <UnpublishedBadge />}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

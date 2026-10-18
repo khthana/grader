@@ -26,6 +26,13 @@ describe("activity log", () => {
     expect(logs[0].createdAt).toBeTruthy()
   })
 
+  it("keeps an optional detail", async () => {
+    await writeLog(db, { action: "material.update", detail: "delete 3/slides" })
+    await writeLog(db, { action: "login" })
+    const { logs } = await listLogs(db, { page: 1, pageSize: 10 })
+    expect(logs.map((l) => l.detail)).toEqual([null, "delete 3/slides"])
+  })
+
   it("filters by action", async () => {
     await writeLog(db, { action: "user.create", actorEmail: "a@x" })
     await writeLog(db, { action: "login", actorEmail: "b@x" })

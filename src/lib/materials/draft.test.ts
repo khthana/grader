@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildMaterialDraft, buildPublishDraft } from "./draft"
+import { buildMaterialDraft, buildMoveDraft, buildPublishDraft } from "./draft"
 
 describe("buildMaterialDraft", () => {
   it("takes the body, trimmed at its ends", () => {
@@ -35,4 +35,20 @@ describe("buildPublishDraft", () => {
     expect(result.ok).toBe(false)
     if (!result.ok) expect(Object.keys(result.errors)).toEqual(["published"])
   })
+})
+
+describe("buildMoveDraft", () => {
+  it("takes a Teaching Plan week number", () => {
+    expect(buildMoveDraft({ weekNo: 5 })).toEqual({ ok: true, weekNo: 5 })
+    expect(buildMoveDraft({ weekNo: 20 })).toEqual({ ok: true, weekNo: 20 })
+  })
+
+  it.each([[{ weekNo: 0 }], [{ weekNo: 21 }], [{ weekNo: 1.5 }], [{ weekNo: "5" }], [{}], [null], [[5]], ["5"]])(
+    "%j is an error on weekNo",
+    (input) => {
+      const result = buildMoveDraft(input)
+      expect(result.ok).toBe(false)
+      if (!result.ok) expect(Object.keys(result.errors)).toEqual(["weekNo"])
+    }
+  )
 })

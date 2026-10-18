@@ -75,3 +75,44 @@ export async function setMaterialPublished(
   )
   return getMaterial(db, key, weekNo, kind)
 }
+
+export type MoveMaterialResult =
+  | { ok: true; material: Material; moved: boolean }
+  | { ok: false; reason: "not-found" | "target-taken" }
+
+/**
+ * Move a Material to another week (#111), keeping its Kind, body and published
+ * state. Checked before writing: a week that already holds this Kind refuses
+ * the move and nothing changes — so does losing a race for that slot to
+ * another write (the UNIQUE constraint). The same week is a no-op (`moved: false`).
+ */
+export async function moveMaterial(
+  db: Queryable,
+  key: CourseKey,
+  { weekNo, kind }: MaterialAddress,
+  toWeekNo: number
+): Promise<MoveMaterialResult> {
+  const material = await getMaterial(db, key, weekNo, kind)
+  if (!material) return { ok: false, reason: "not-found" }
+  if (toWeekNo === weekNo) return { ok: true, material, moved: false }
+  if (await getMaterial(db, key, toWeekNo, kind)) return { ok: false, reason: "target-taken" }
+  try {
+    await db.query(
+      `UPDATE teaching_materials SET week_no = $6::int WHERE ${COURSE} AND week_no = $4::int AND kind = $5`,
+      [...keyParams(key), weekNo, kind, toWeekNo]
+    )
+  } catch (err) {
+    if ((err as { code?: string }).code === "23505") return { ok: false, reason: "target-taken" }
+    throw err
+  }
+  return { ok: true, material: { ...material, weekNo: toWeekNo }, moved: true }
+}
+
+/** Delete a Material (#111); false when there was none. */
+export async function deleteMaterial(db: Queryable, key: CourseKey, { weekNo, kind }: MaterialAddress): Promise<boolean> {
+  const { rows } = await db.query(
+    `DELETE FROM teaching_materials WHERE ${COURSE} AND week_no = $4::int AND kind = $5 RETURNING id`,
+    [...keyParams(key), weekNo, kind]
+  )
+  return rows.length > 0
+}

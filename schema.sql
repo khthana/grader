@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS user_logs (
   action       TEXT NOT NULL,          -- user.create | user.update | user.delete | user.roles | login
   target_id    INTEGER,
   target_email TEXT,
+  detail       TEXT,                   -- what changed, when the action alone doesn't say (#111)
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

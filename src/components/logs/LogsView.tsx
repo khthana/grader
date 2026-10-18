@@ -9,6 +9,7 @@ interface LogEntry {
   actorEmail: string | null
   action: string
   targetEmail: string | null
+  detail: string | null
   createdAt: string
 }
 
@@ -131,7 +132,10 @@ export function LogsView() {
                       {ACTION_LABEL[log.action] ?? log.action}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{log.targetEmail ?? "—"}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {log.targetEmail ?? "—"}
+                    {log.detail && <span className="block text-xs text-slate-400">{log.detail}</span>}
+                  </td>
                 </tr>
               ))
             )}

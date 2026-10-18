@@ -2,19 +2,23 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { FaArrowLeft, FaEdit, FaEye, FaEyeSlash } from "react-icons/fa"
+import { useRouter } from "next/navigation"
+import { FaArrowLeft, FaEdit, FaEye, FaEyeSlash, FaExchangeAlt, FaTrash } from "react-icons/fa"
+import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
 import { useUnsavedChangesGuard } from "@/components/shell/NavigationGuard"
 import { useToast } from "@/components/shell/ToastProvider"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { MarkdownField } from "@/components/ui/MarkdownField"
 import { materialKindLabel, type MaterialKind } from "@/lib/materials/kinds"
+import { MAX_PLAN_WEEK } from "@/lib/syllabus/plan"
 import type { ViewedMaterial } from "@/lib/materials/student-view"
 import { UnpublishedBadge } from "./MaterialsOutline"
 
 /**
  * One Teaching Material (#109): view mode for everyone who may see it; a course
  * manager writes its Markdown body. A Material not yet written opens straight
- * in edit mode for a manager — the first save creates it.
+ * in edit mode for a manager — the first save creates it. A manager also moves
+ * it to another week or deletes it (#111).
  */
 export function MaterialPanel({
   courseSlug,
@@ -42,6 +46,12 @@ export function MaterialPanel({
   const [error, setError] = useState<string>()
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const router = useRouter()
+  const [moveTo, setMoveTo] = useState<number | null>(null)
+  const [moving, setMoving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const apiPath = `/api/courses/${courseSlug}/materials/${weekNo}/${kind}`
   // Only staff get the flag (the Student View drops it).
   const isPublished = material && "isPublished" in material ? material.isPublished : null
 
@@ -51,7 +61,7 @@ export function MaterialPanel({
   async function save() {
     if (draft === null) return
     setSaving(true)
-    const res = await fetch(`/api/courses/${courseSlug}/materials/${weekNo}/${kind}`, {
+    const res = await fetch(apiPath, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ body: draft }),
@@ -72,7 +82,7 @@ export function MaterialPanel({
   async function togglePublished() {
     if (isPublished === null) return
     setPublishing(true)
-    const res = await fetch(`/api/courses/${courseSlug}/materials/${weekNo}/${kind}/publish`, {
+    const res = await fetch(`${apiPath}/publish`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ published: !isPublished }),
@@ -86,6 +96,42 @@ export function MaterialPanel({
       notify("error", body.error ?? "เปลี่ยนสถานะไม่สำเร็จ")
     }
   }
+
+  async function move() {
+    if (moveTo === null) return
+    setMoving(true)
+    const res = await fetch(`${apiPath}/move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weekNo: moveTo }),
+    }).catch(() => null)
+    const body = res ? await res.json().catch(() => ({})) : {}
+    setMoving(false)
+    if (res?.ok) {
+      setMoveTo(null)
+      notify("success", `ย้ายไปสัปดาห์ ${moveTo} แล้ว`)
+      router.replace(`${coursePath}/materials/${moveTo}/${kind}`)
+    } else {
+      notify("error", body.error ?? body.errors?.weekNo ?? "ย้ายไม่สำเร็จ")
+    }
+  }
+
+  async function remove() {
+    setDeleting(true)
+    const res = await fetch(apiPath, { method: "DELETE" }).catch(() => null)
+    const body = res ? await res.json().catch(() => ({})) : {}
+    setDeleting(false)
+    if (res?.ok) {
+      notify("success", "ลบเอกสารแล้ว")
+      router.push(`${coursePath}/materials`)
+    } else {
+      setConfirmDelete(false)
+      notify("error", body.error ?? "ลบไม่สำเร็จ")
+    }
+  }
+
+  const secondaryButton =
+    "inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
 
   return (
     <div className="print-controls flex flex-col gap-4">
@@ -111,13 +157,47 @@ export function MaterialPanel({
           )}
         </div>
         {draft === null && canEdit && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {material && moveTo === null && (
+              <>
+                <button onClick={() => setMoveTo(weekNo)} className={secondaryButton}>
+                  <FaExchangeAlt className="h-3.5 w-3.5" />
+                  ย้ายไปสัปดาห์…
+                </button>
+                <button onClick={() => setConfirmDelete(true)} className={`${secondaryButton} text-red-600`}>
+                  <FaTrash className="h-3.5 w-3.5" />
+                  ลบ
+                </button>
+              </>
+            )}
+            {moveTo !== null && (
+              <div className="flex items-center gap-2">
+                <select
+                  value={moveTo}
+                  onChange={(e) => setMoveTo(Number(e.target.value))}
+                  aria-label="ย้ายไปสัปดาห์"
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-slate-700"
+                >
+                  {Array.from({ length: MAX_PLAN_WEEK }, (_, i) => i + 1).map((w) => (
+                    <option key={w} value={w}>
+                      สัปดาห์ {w}
+                    </option>
+                  ))}
+                </select>
+                <button onClick={() => setMoveTo(null)} disabled={moving} className={secondaryButton}>
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={move}
+                  disabled={moving || moveTo === weekNo}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm text-white transition hover:bg-primary-hover disabled:opacity-60"
+                >
+                  {moving ? "กำลังย้าย..." : "ย้าย"}
+                </button>
+              </div>
+            )}
             {isPublished !== null && (
-              <button
-                onClick={togglePublished}
-                disabled={publishing}
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-              >
+              <button onClick={togglePublished} disabled={publishing} className={secondaryButton}>
                 {isPublished ? <FaEyeSlash className="h-3.5 w-3.5" /> : <FaEye className="h-3.5 w-3.5" />}
                 {isPublished ? "เลิกเผยแพร่" : "เผยแพร่"}
               </button>
@@ -180,6 +260,17 @@ export function MaterialPanel({
           <p className="text-sm text-slate-400">ยังไม่มีเนื้อหา</p>
         )}
       </section>
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="ลบเอกสาร"
+          message={`ต้องการลบ${materialKindLabel(kind)} สัปดาห์ ${weekNo} ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`}
+          confirmLabel="ลบเอกสาร"
+          onConfirm={remove}
+          onCancel={() => setConfirmDelete(false)}
+          busy={deleting}
+        />
+      )}
     </div>
   )
 }

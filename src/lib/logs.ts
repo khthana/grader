@@ -32,6 +32,8 @@ export interface LogInput {
   action: LogAction
   targetId?: number | null
   targetEmail?: string | null
+  /** What exactly changed, when the action alone doesn't say (e.g. `move 3/slides → 5/slides`). */
+  detail?: string | null
 }
 
 export interface LogEntry {
@@ -41,6 +43,7 @@ export interface LogEntry {
   action: string
   targetId: number | null
   targetEmail: string | null
+  detail: string | null
   createdAt: string
 }
 
@@ -57,6 +60,7 @@ interface LogRow {
   action: string
   target_id: number | null
   target_email: string | null
+  detail: string | null
   created_at: string
 }
 
@@ -68,6 +72,7 @@ function toEntry(row: LogRow): LogEntry {
     action: row.action,
     targetId: row.target_id,
     targetEmail: row.target_email,
+    detail: row.detail,
     createdAt: row.created_at,
   }
 }
@@ -83,14 +88,15 @@ export async function safeLog(db: Queryable, input: LogInput): Promise<void> {
 
 export async function writeLog(db: Queryable, input: LogInput): Promise<void> {
   await db.query(
-    `INSERT INTO user_logs (actor_id, actor_email, action, target_id, target_email)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO user_logs (actor_id, actor_email, action, target_id, target_email, detail)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.actorId ?? null,
       input.actorEmail ?? null,
       input.action,
       input.targetId ?? null,
       input.targetEmail ?? null,
+      input.detail ?? null,
     ]
   )
 }
@@ -112,7 +118,7 @@ export async function listLogs(
   const limitIdx = filterParams.length + 1
   const offsetIdx = filterParams.length + 2
   const { rows } = await db.query<LogRow>(
-    `SELECT id, actor_id, actor_email, action, target_id, target_email, created_at
+    `SELECT id, actor_id, actor_email, action, target_id, target_email, detail, created_at
      FROM user_logs ${where}
      ORDER BY id DESC
      LIMIT $${limitIdx} OFFSET $${offsetIdx}`,

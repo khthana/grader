@@ -5,8 +5,8 @@ import { courseSlugString } from "@/lib/courses/slug"
 import { safeLog } from "@/lib/logs"
 import { loadMaterial } from "@/lib/materials/access"
 import { buildMaterialDraft } from "@/lib/materials/draft"
-import { materialNotFound, parseMaterialAddress } from "@/lib/materials/params"
-import { saveMaterial } from "@/lib/materials/repository"
+import { materialNotFound, materialRef, parseMaterialAddress } from "@/lib/materials/params"
+import { deleteMaterial, saveMaterial } from "@/lib/materials/repository"
 
 type Params = { code: string; year: string; semester: string; week: string; kind: string }
 
@@ -33,6 +33,23 @@ export const PUT = courseRoute<Params>({ manage: true }, async (req: NextRequest
     actorEmail: auth.user.email,
     action: "material.update",
     targetEmail: courseSlugString(auth.course),
+    detail: `save ${materialRef(address)}`,
   })
   return NextResponse.json({ material })
+})
+
+/** Delete the Material (#111) — Instructor/Admin of this course; the UI confirms first. */
+export const DELETE = courseRoute<Params>({ manage: true }, async (_req, auth, params) => {
+  const address = parseMaterialAddress(params.week, params.kind)
+  if (!address) return materialNotFound()
+  const db = getDb()
+  if (!(await deleteMaterial(db, auth.course, address))) return materialNotFound()
+  await safeLog(db, {
+    actorId: auth.user.id,
+    actorEmail: auth.user.email,
+    action: "material.update",
+    targetEmail: courseSlugString(auth.course),
+    detail: `delete ${materialRef(address)}`,
+  })
+  return NextResponse.json({ ok: true })
 })

@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { NextRequest } from "next/server"
 import { GET as getOutline } from "./route"
-import { GET as getOne, PUT } from "./[week]/[kind]/route"
+import { GET as getOne, PUT, DELETE } from "./[week]/[kind]/route"
+import { POST as MOVE } from "./[week]/[kind]/move/route"
 import { PUT as PUBLISH } from "./[week]/[kind]/publish/route"
 import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
 import type { CourseFixture } from "@/lib/test-support/db"
@@ -170,9 +171,13 @@ describe("/api/courses/[code]/[year]/[semester]/materials", () => {
       const off = await publish(f.ins.email, 1, "slides", { published: false })
       expect((await off.json()).material.isPublished).toBe(false)
 
-      const { rows } = await f.db.query(`SELECT action, actor_id, target_email FROM user_logs WHERE action = 'material.publish' ORDER BY id`)
-      expect(rows).toHaveLength(2)
-      expect(rows[0]).toEqual({ action: "material.publish", actor_id: f.ins.id, target_email: "C01/2567/1" })
+      const { rows } = await f.db.query(
+        `SELECT action, actor_id, target_email, detail FROM user_logs WHERE action = 'material.publish' ORDER BY id`
+      )
+      expect(rows).toEqual([
+        { action: "material.publish", actor_id: f.ins.id, target_email: "C01/2567/1", detail: "publish 1/slides" },
+        { action: "material.publish", actor_id: f.ins.id, target_email: "C01/2567/1", detail: "unpublish 1/slides" },
+      ])
     })
 
     it("a TA and a Student can't publish", async () => {
@@ -230,13 +235,101 @@ describe("/api/courses/[code]/[year]/[semester]/materials", () => {
     })
   })
 
-  it("logs every save as material.update", async () => {
+  it("logs every save as material.update, naming the Material", async () => {
     await put(f.ins.email, 1, "slides", { body: "a" })
     await put(f.ins.email, 1, "slides", { body: "b" })
-    const { rows } = await f.db.query(`SELECT action, actor_id, target_email FROM user_logs WHERE action = 'material.update'`)
+    const { rows } = await f.db.query(
+      `SELECT action, actor_id, target_email, detail FROM user_logs WHERE action = 'material.update' ORDER BY id`
+    )
     expect(rows).toEqual([
-      { action: "material.update", actor_id: f.ins.id, target_email: "C01/2567/1" },
-      { action: "material.update", actor_id: f.ins.id, target_email: "C01/2567/1" },
+      { action: "material.update", actor_id: f.ins.id, target_email: "C01/2567/1", detail: "save 1/slides" },
+      { action: "material.update", actor_id: f.ins.id, target_email: "C01/2567/1", detail: "save 1/slides" },
     ])
+  })
+
+  describe("Unplanned, move and delete (#111)", () => {
+    const move = async (email: string, week: string | number, kind: string, body: unknown) =>
+      MOVE(req(email, "POST", body), { params: Promise.resolve({ ...course(), week: String(week), kind }) })
+    const del = async (email: string, week: string | number, kind: string) =>
+      DELETE(req(email, "DELETE"), { params: Promise.resolve({ ...course(), week: String(week), kind }) })
+    const logDetails = async () =>
+      (
+        await f.db.query(
+          `SELECT detail FROM user_logs WHERE action = 'material.update' AND detail NOT LIKE 'save%' ORDER BY id`
+        )
+      ).rows.map((r) => r.detail)
+
+    beforeEach(async () => {
+      await put(f.ins.email, 3, "slides", { body: "array slides" })
+      await put(f.ins.email, 1, "slides", { body: "intro slides" })
+    })
+
+    it("saving a Syllabus that drops a week leaves its Materials, listed under Unplanned for staff", async () => {
+      await plan([[1, "Intro"]])
+      expect((await (await one(f.ins.email, 3, "slides")).json()).material.body).toBe("array slides")
+      const { weeks, unplanned } = await (await outline(f.ins.email)).json()
+      expect(weeks.map((w: { weekNo: number }) => w.weekNo)).toEqual([1])
+      expect(unplanned).toEqual([{ weekNo: 3, kind: "slides", isPublished: false }])
+    })
+
+    it("a move into an empty slot carries the Material to that week, same Kind", async () => {
+      const res = await move(f.ins.email, 3, "slides", { weekNo: 5 })
+      expect(res.status).toBe(200)
+      expect((await res.json()).material).toMatchObject({ weekNo: 5, kind: "slides", body: "array slides" })
+      expect((await one(f.ins.email, 5, "slides")).status).toBe(200)
+      expect((await one(f.ins.email, 3, "slides")).status).toBe(404)
+    })
+
+    it("a move keeps the published state", async () => {
+      await PUBLISH(req(f.ins.email, "PUT", { published: true }), {
+        params: Promise.resolve({ ...course(), week: "3", kind: "slides" }),
+      })
+      expect((await (await move(f.ins.email, 3, "slides", { weekNo: 5 })).json()).material.isPublished).toBe(true)
+    })
+
+    it("a move into a taken slot is a 409 with a reason; both Materials stay as they were", async () => {
+      const res = await move(f.ins.email, 3, "slides", { weekNo: 1 })
+      expect(res.status).toBe(409)
+      expect((await res.json()).error).toBeTruthy()
+      expect((await (await one(f.ins.email, 3, "slides")).json()).material.body).toBe("array slides")
+      expect((await (await one(f.ins.email, 1, "slides")).json()).material.body).toBe("intro slides")
+      expect(await logDetails()).toEqual([])
+    })
+
+    it("a move to week 0 or 21 is a 400; to the same week a 200 with no change", async () => {
+      expect((await move(f.ins.email, 3, "slides", { weekNo: 0 })).status).toBe(400)
+      expect((await move(f.ins.email, 3, "slides", { weekNo: 21 })).status).toBe(400)
+      expect((await move(f.ins.email, 3, "slides", "nope")).status).toBe(400)
+      const same = await move(f.ins.email, 3, "slides", { weekNo: 3 })
+      expect(same.status).toBe(200)
+      expect((await same.json()).material).toMatchObject({ weekNo: 3, kind: "slides", body: "array slides" })
+      expect(await logDetails()).toEqual([])
+    })
+
+    it("moving a Material that doesn't exist is a 404", async () => {
+      expect((await move(f.ins.email, 3, "lab", { weekNo: 5 })).status).toBe(404)
+      expect((await move(f.ins.email, 0, "slides", { weekNo: 5 })).status).toBe(404)
+    })
+
+    it("DELETE removes the Material; the next GET is a 404, a second DELETE too", async () => {
+      expect((await del(f.ins.email, 3, "slides")).status).toBe(200)
+      expect((await one(f.ins.email, 3, "slides")).status).toBe(404)
+      expect((await del(f.ins.email, 3, "slides")).status).toBe(404)
+      expect((await one(f.ins.email, 1, "slides")).status).toBe(200)
+    })
+
+    it("a TA and a Student get 403 on move and on delete", async () => {
+      for (const email of [f.ta.email, student.email]) {
+        expect((await move(email, 3, "slides", { weekNo: 5 })).status).toBe(403)
+        expect((await del(email, 3, "slides")).status).toBe(403)
+      }
+      expect((await one(f.ins.email, 3, "slides")).status).toBe(200)
+    })
+
+    it("move and delete each log material.update with the operation and week/Kind", async () => {
+      await move(f.ins.email, 3, "slides", { weekNo: 5 })
+      await del(f.ins.email, 5, "slides")
+      expect(await logDetails()).toEqual(["move 3/slides → 5/slides", "delete 5/slides"])
+    })
   })
 })
