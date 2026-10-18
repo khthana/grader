@@ -99,6 +99,31 @@ textbook / further reading / websites — and its links open outside CE-Grader),
 separately managed items; nothing counts or sorts them.
 _Avoid_: references (only one kind of resource), course materials (suggests files hosted here)
 
+### Teaching Materials (เอกสารการสอน)
+What the staff write or upload into CE-Grader for teaching a **Course** offering, set out
+by the weeks of its **Teaching Plan**. Unlike **Learning Resources** (pointers to things
+outside CE-Grader), Teaching Materials live here.
+_Avoid_: course materials, Learning Resources (those are outside), Week materials (a Week is the unit of Problems)
+
+### Teaching Material
+One document of **Teaching Materials**: one **Material Kind** for one week number of the
+**Teaching Plan** — formatted text, attached files, or both. It carries no title of its
+own; its heading is that week's Teaching Plan topics, as they stand. A Student sees it
+only once it is **Published**. Its week number is its own: when the Teaching Plan no
+longer has that week, the Teaching Material is kept as **Unplanned** — seen by staff
+only, never by Students — until the staff move it to another week or delete it. A week
+holds at most one Teaching Material of each Material Kind.
+
+### Published Teaching Material (เผยแพร่แล้ว)
+A **Teaching Material** the staff have switched on for Students — one switch per
+document (Slides may be published before the Lab Sheet of the same week). New ones start
+unpublished; switching is manual. It is unrelated to **Released Week**.
+_Avoid_: released (that is a Week's flag)
+
+### Material Kind (ประเภทเอกสาร)
+The fixed kinds of **Teaching Material**: สไลด์ (Slides), เอกสารประกอบ (Handout) and
+ใบงานปฏิบัติการ (Lab Sheet). Every Course has the same three; staff do not add kinds.
+
 ### Course Duplication (ทำซ้ำไปภาคใหม่)
 Copying a whole **Course** offering to another academic term — same course `code`, a new
 `(year, semester)`. Triggered by Admin/Instructor from the รายวิชา list. The operation
@@ -108,9 +133,11 @@ user), every **Week** (`week_no` + `topic`), every **Problem** (all fields inclu
 **Reference Solution**), every **Test Case**, and every **Quiz** (questions, answer key,
 Don't Know setting, Week by `week_no`), and the **Syllabus** (general information,
 Teaching Plan and Assessment Components — the new term's starting point; a course
-without one gets none). Term-specific state is deliberately reset: **Due Date** / **Close
+without one gets none), and every **Teaching Material** (same week number and Material
+Kind, Unplanned ones included). Term-specific state is deliberately reset: **Due Date** / **Close
 Date** are cleared, every Week starts as an unreleased (hidden) **Released Week**, and no
-**Round Window** is copied (a copied Quiz is unlocked).
+**Round Window** is copied (a copied Quiz is unlocked), and every Teaching Material starts
+unpublished.
 **Enrollments**, **Submissions** and **Quiz Attempts** are never copied — a new term has a new roster and a
 clean gradebook. The copy is atomic (all-or-nothing).
 
