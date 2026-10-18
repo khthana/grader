@@ -163,23 +163,23 @@ export default function LoginPage() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500 shadow-lg shadow-orange-500/20">
             <span className="text-sm font-bold text-white">CE</span>
           </div>
-          <span className="text-base font-semibold tracking-tight text-white">CE-Grader</span>
+          <span className="text-base font-semibold tracking-tight text-white">CE-CodeClass</span>
         </div>
 
         {/* Hero text */}
         <div className="relative space-y-6">
           <h1 className="text-5xl font-semibold leading-[1.1] tracking-tight text-white">
-            Python<br />
+            Your<br />
             <span className="text-orange-400">Programming</span><br />
-            <span className="text-orange-400">Automated</span><br />
-            Grader.
+            <span className="text-orange-400">Classroom,</span><br />
+            All in One.
           </h1>
           <p className="max-w-xs text-sm leading-relaxed text-slate-400">
-            ระบบตรวจและให้คะแนน Python code ของนักศึกษาอัตโนมัติ
-            ส่ง code เข้ามา รัน ตรวจสอบกับ test cases และรับ feedback ทันที
+            ห้องเรียนวิชาเขียนโปรแกรมครบในที่เดียว — ประมวลรายวิชา เอกสารการสอน
+            แบบทดสอบก่อน–หลังเรียน ส่งโค้ดตรวจอัตโนมัติพร้อม feedback ทันที และสมุดคะแนน
           </p>
           <div className="inline-block rounded-full border border-slate-600 px-4 py-1.5 text-xs text-slate-400">
-            Automated Grading
+            Python · C · C++
           </div>
         </div>
 
@@ -200,7 +200,7 @@ export default function LoginPage() {
               ลงชื่อเข้าใช้งาน
             </h2>
             <p className="mt-2 text-sm text-slate-500">
-              ยินดีต้อนรับสู่ระบบ CE-Grader กรุณาเข้าสู่ระบบด้วยบัญชี
+              ยินดีต้อนรับสู่ระบบ CE-CodeClass กรุณาเข้าสู่ระบบด้วยบัญชี
               ของคุณเพื่อดำเนินการต่อ
             </p>
           </div>

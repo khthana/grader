@@ -2,7 +2,7 @@
 // Markdown renderer, so a Student following a reference never loses unsent work.
 
 /**
- * An http(s) link that leads outside CE-Grader. Relative links, anchors and
+ * An http(s) link that leads outside CE-CodeClass. Relative links, anchors and
  * non-http schemes (mailto:, tel:) never count. While `appOrigin` is unknown
  * (a server render), every absolute http(s) link counts as external.
  */

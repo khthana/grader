@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { isExternalLink } from "./markdown-links"
 
 // Which Markdown links open in a new tab (#106): only http(s) links that lead
-// outside CE-Grader. `appOrigin` is null while it isn't known (server render).
+// outside CE-CodeClass. `appOrigin` is null while it isn't known (server render).
 describe("isExternalLink", () => {
   const app = "https://grader.example.ac.th"
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Grader",
+  title: "CE-CodeClass",
   description: "ระบบตรวจและให้คะแนน Python code อัตโนมัติ",
 }
 

@@ -6,7 +6,7 @@ import { isExternalLink } from "./markdown-links"
 const noSubscribe = () => () => {}
 
 /**
- * A Markdown link: one leading outside CE-Grader opens in a new tab (#106).
+ * A Markdown link: one leading outside CE-CodeClass opens in a new tab (#106).
  * The server doesn't know the app's origin, so it renders with none and the
  * browser settles same-origin absolute links after hydration — no mismatch.
  */

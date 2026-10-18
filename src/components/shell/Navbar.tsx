@@ -25,7 +25,7 @@ function Logo() {
       <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500 font-bold text-white">
         CE
       </div>
-      <span className="font-thai text-lg font-semibold text-white">CE-Grader</span>
+      <span className="font-thai text-lg font-semibold text-white">CE-CodeClass</span>
     </div>
   )
 }
