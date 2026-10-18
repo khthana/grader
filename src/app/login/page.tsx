@@ -169,10 +169,10 @@ export default function LoginPage() {
         {/* Hero text */}
         <div className="relative space-y-6">
           <h1 className="text-5xl font-semibold leading-[1.1] tracking-tight text-white">
-            Your<br />
-            <span className="text-orange-400">Programming</span><br />
-            <span className="text-orange-400">Classroom,</span><br />
-            All in One.
+            Learn.<br />
+            <span className="text-orange-400">Code.</span><br />
+            <span className="text-orange-400">Practice.</span><br />
+            Master.
           </h1>
           <p className="max-w-xs text-sm leading-relaxed text-slate-400">
             ห้องเรียนวิชาเขียนโปรแกรมครบในที่เดียว — ประมวลรายวิชา เอกสารการสอน
