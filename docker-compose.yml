@@ -8,6 +8,10 @@ services:
       POSTGRES_USER: grader
       POSTGRES_PASSWORD: grader
       POSTGRES_DB: grader
+    # Host access for `npm run dev` / scripts (.env.local) — loopback only.
+    # 5432/5433 are taken on this machine by other apps; override with DB_PORT.
+    ports:
+      - "127.0.0.1:${DB_PORT:-5435}:5432"
     volumes:
       - grader-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -21,6 +25,9 @@ services:
     image: ghcr.io/engineer-man/piston
     restart: unless-stopped
     privileged: true
+    # Host access for `npm run dev` (PISTON_URL) — loopback only, never exposed.
+    ports:
+      - "127.0.0.1:${PISTON_PORT:-2000}:2000"
     volumes:
       - piston-data:/piston
     healthcheck:
