@@ -143,9 +143,45 @@ describe("Teaching Material Attachments", () => {
     expect((await UPLOAD(withSession(r, f.ins.email), at(3, "slides"))).status).toBe(400)
   })
 
-  it("a Material that was never saved takes no Attachment — 404", async () => {
-    expect((await upload(f.ins.email, "a.pdf", "x", 3, "lab")).status).toBe(404)
-    expect((await upload(f.ins.email, "a.pdf", "x", 99, "slides")).status).toBe(404)
+  describe("into a slot with no Material yet (#121)", () => {
+    const material = () => getOne(withSession(new NextRequest("http://localhost/api/x"), f.ins.email), at(3, "lab"))
+
+    it("creates the Material — empty text, unpublished — with the Attachment: 201, logged as created", async () => {
+      const res = await upload(f.ins.email, "lab.pdf", "%PDF", 3, "lab")
+      expect(res.status).toBe(201)
+      expect((await res.json()).attachment).toMatchObject({ name: "lab.pdf" })
+      const body = await (await material()).json()
+      expect(body.material).toMatchObject({ weekNo: 3, kind: "lab", body: "", isPublished: false })
+      expect(body.attachments.map((a: { name: string }) => a.name)).toEqual(["lab.pdf"])
+      const { rows } = await f.db.query(`SELECT detail FROM user_logs WHERE action = 'material.update' ORDER BY id`)
+      expect(rows.map((r) => r.detail)).toEqual(["create+attach 3/lab lab.pdf"])
+    })
+
+    it("works for a week outside the Teaching Plan too (it is then Unplanned)", async () => {
+      expect((await upload(f.ins.email, "a.pdf", "x", 9, "slides")).status).toBe(201)
+    })
+
+    it("a refused upload creates no Material", async () => {
+      expect((await upload(f.ins.email, "logo.svg", "x", 3, "lab")).status).toBe(400)
+      expect((await upload(f.ins.email, "   ", "x", 3, "lab")).status).toBe(400)
+      expect((await upload(f.ins.email, "big.pdf", new Uint8Array(MAX_ATTACHMENT_BYTES + 1), 3, "lab")).status).toBe(413)
+      const r = new NextRequest("http://localhost/api/x", {
+        method: "POST",
+        body: "x",
+        headers: { "content-length": String(MAX_ATTACHMENT_BYTES * 2) },
+      })
+      expect((await UPLOAD(withSession(r, f.ins.email), at(3, "lab"))).status).toBe(413)
+      const empty = new NextRequest("http://localhost/api/x", { method: "POST", body: new FormData() })
+      expect((await UPLOAD(withSession(empty, f.ins.email), at(3, "lab"))).status).toBe(400)
+      expect((await material()).status).toBe(404)
+    })
+
+    it("an invalid week or Kind is still a 404; a TA gets 403 and nothing is created", async () => {
+      expect((await upload(f.ins.email, "a.pdf", "x", 21, "slides")).status).toBe(404)
+      expect((await upload(f.ins.email, "a.pdf", "x", 3, "notes")).status).toBe(404)
+      expect((await upload(f.ta.email, "a.pdf", "x", 3, "lab")).status).toBe(403)
+      expect((await material()).status).toBe(404)
+    })
   })
 
   it("a TA or a Student can't upload; no session is a 401", async () => {

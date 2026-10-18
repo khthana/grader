@@ -112,12 +112,14 @@ own; its heading is that week's Teaching Plan topics, as they stand. A Student s
 only once it is **Published**. Its week number is its own: when the Teaching Plan no
 longer has that week, the Teaching Material is kept as **Unplanned** — seen by staff
 only, never by Students — until the staff move it to another week or delete it. A week
-holds at most one Teaching Material of each Material Kind.
+holds at most one Teaching Material of each Material Kind. It exists once the staff save
+its text or attach a file to it.
 
 ### Attachment (ไฟล์แนบ)
 A file the staff upload into one **Teaching Material** — a PDF, a slide deck, an archive or
 an image. Every Attachment is a download, an image too: none is shown inside the text,
-though the text may link to one by name.
+though the text may link to one by name. Uploading into a week and Material Kind that has
+no Teaching Material yet creates it (no text, unpublished).
 _Avoid_: upload, asset, inline image (nothing is shown in the text)
 
 ### Published Teaching Material (เผยแพร่แล้ว)

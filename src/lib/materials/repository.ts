@@ -61,6 +61,25 @@ export async function saveMaterial(
 }
 
 /**
+ * Create an empty, unpublished Material for an upload into its slot (#121) and
+ * return its id. Insert-only: a slot someone else filled first fails on the
+ * UNIQUE constraint (23505) rather than overwriting their text.
+ */
+export async function createEmptyMaterial(
+  db: Queryable,
+  key: CourseKey,
+  { weekNo, kind }: MaterialAddress,
+  actorId: number
+): Promise<number> {
+  const { rows } = await db.query<{ id: number }>(
+    `INSERT INTO teaching_materials (course_code, course_year, course_semester, week_no, kind, body, updated_by)
+     VALUES ($1, $2, $3, $4, $5, '', $6) RETURNING id`,
+    [...keyParams(key), weekNo, kind, actorId]
+  )
+  return rows[0].id
+}
+
+/**
  * Publish or unpublish (#110); null when there is no such Material. Only the
  * switch moves — the body and its last-edited stamp are untouched.
  */

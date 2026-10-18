@@ -16,7 +16,7 @@ import { attachmentUrlTransform, missingReferences } from "@/lib/materials/attac
 import type { Attachment } from "@/lib/materials/attachments/repository"
 import { MaterialAttachments } from "./MaterialAttachments"
 import { useAttachmentUpload } from "./useAttachmentUpload"
-import { UnpublishedBadge } from "./MaterialsOutline"
+import { UnpublishedBadge } from "./UnpublishedBadge"
 
 /**
  * One Teaching Material (#109): view mode for everyone who may see it; a course
