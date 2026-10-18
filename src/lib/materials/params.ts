@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server"
 import { isPlanWeek } from "@/lib/syllabus/plan"
 import { isMaterialKind, type MaterialKind } from "./kinds"
 
@@ -6,6 +7,9 @@ export interface MaterialAddress {
   weekNo: number
   kind: MaterialKind
 }
+
+/** One body for every Material a viewer can't reach, so a Student can't probe what exists. */
+export const materialNotFound = () => NextResponse.json({ error: "ไม่พบเอกสาร" }, { status: 404 })
 
 /** A Material's address from URL segments (`3`, `slides`), or null when malformed. */
 export function parseMaterialAddress(week: string, kind: string): MaterialAddress | null {

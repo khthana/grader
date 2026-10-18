@@ -1,10 +1,11 @@
-// Materials Student View (#109; publishing lands in #110) — the one module for
+// Materials Student View (#109, #110) — the one module for
 // what a Student sees of Teaching Materials, in the spirit of the Problem
 // Student View (#84). Callers pass the viewer's course access and never redact
 // inline. Staff see everything; a Student sees only Published Materials of
 // planned weeks, without the published flag.
 
 import type { MaterialsOutline, MaterialSummary } from "./outline"
+import type { Material } from "./repository"
 
 export interface MaterialViewer {
   staff: boolean
@@ -15,6 +16,17 @@ export function canSeeMaterial(viewer: MaterialViewer, material: { isPublished: 
 }
 
 export type StudentMaterialSummary = Omit<MaterialSummary, "isPublished">
+
+/** A Material as a viewer reads it (a Student's carries no published flag). */
+export type ViewedMaterial = Material | Omit<Material, "isPublished">
+
+/** A Material as this viewer reads it — a Student never gets the published flag. */
+export function materialFor<M extends { isPublished: boolean }>(viewer: MaterialViewer, material: M): M | Omit<M, "isPublished"> {
+  if (viewer.staff) return material
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { isPublished, ...rest } = material
+  return rest
+}
 
 export function materialsOutlineFor(
   viewer: MaterialViewer,

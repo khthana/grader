@@ -2,13 +2,13 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { FaArrowLeft, FaEdit } from "react-icons/fa"
+import { FaArrowLeft, FaEdit, FaEye, FaEyeSlash } from "react-icons/fa"
 import { useUnsavedChangesGuard } from "@/components/shell/NavigationGuard"
 import { useToast } from "@/components/shell/ToastProvider"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
 import { MarkdownField } from "@/components/ui/MarkdownField"
 import { materialKindLabel, type MaterialKind } from "@/lib/materials/kinds"
-import type { Material } from "@/lib/materials/repository"
+import type { ViewedMaterial } from "@/lib/materials/student-view"
 import { UnpublishedBadge } from "./MaterialsOutline"
 
 /**
@@ -32,7 +32,7 @@ export function MaterialPanel({
   kind: MaterialKind
   /** The week's Teaching Plan topics; null = Unplanned. */
   heading: string | null
-  initialMaterial: Material | null
+  initialMaterial: ViewedMaterial | null
   canEdit: boolean
   staff: boolean
 }) {
@@ -41,6 +41,9 @@ export function MaterialPanel({
   const [draft, setDraft] = useState<string | null>(initialMaterial || !canEdit ? null : "")
   const [error, setError] = useState<string>()
   const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  // Only staff get the flag (the Student View drops it).
+  const isPublished = material && "isPublished" in material ? material.isPublished : null
 
   const dirty = draft !== null && draft !== (material?.body ?? "")
   useUnsavedChangesGuard(dirty)
@@ -66,6 +69,24 @@ export function MaterialPanel({
     }
   }
 
+  async function togglePublished() {
+    if (isPublished === null) return
+    setPublishing(true)
+    const res = await fetch(`/api/courses/${courseSlug}/materials/${weekNo}/${kind}/publish`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ published: !isPublished }),
+    }).catch(() => null)
+    const body = res ? await res.json().catch(() => ({})) : {}
+    setPublishing(false)
+    if (res?.ok) {
+      setMaterial(body.material)
+      notify("success", body.material.isPublished ? "เผยแพร่เอกสารแล้ว" : "เลิกเผยแพร่เอกสารแล้ว")
+    } else {
+      notify("error", body.error ?? "เปลี่ยนสถานะไม่สำเร็จ")
+    }
+  }
+
   return (
     <div className="print-controls flex flex-col gap-4">
       <Link
@@ -83,20 +104,32 @@ export function MaterialPanel({
           </p>
           <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold text-primary">
             {heading ?? `สัปดาห์ ${weekNo}`}
-            {staff && material && !material.isPublished && <UnpublishedBadge />}
+            {isPublished === false && <UnpublishedBadge />}
           </h1>
           {staff && heading === null && (
             <p className="mt-1 text-sm text-amber-700">ไม่อยู่ในแผนการสอน — นักศึกษามองไม่เห็นเอกสารนี้</p>
           )}
         </div>
         {draft === null && canEdit && (
-          <button
-            onClick={() => setDraft(material?.body ?? "")}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-white transition hover:bg-primary-hover"
-          >
-            <FaEdit className="h-3.5 w-3.5" />
-            แก้ไข
-          </button>
+          <div className="flex gap-2">
+            {isPublished !== null && (
+              <button
+                onClick={togglePublished}
+                disabled={publishing}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                {isPublished ? <FaEyeSlash className="h-3.5 w-3.5" /> : <FaEye className="h-3.5 w-3.5" />}
+                {isPublished ? "เลิกเผยแพร่" : "เผยแพร่"}
+              </button>
+            )}
+            <button
+              onClick={() => setDraft(material?.body ?? "")}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-white transition hover:bg-primary-hover"
+            >
+              <FaEdit className="h-3.5 w-3.5" />
+              แก้ไข
+            </button>
+          </div>
         )}
         {draft !== null && (
           <div className="flex gap-2">

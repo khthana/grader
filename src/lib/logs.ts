@@ -24,6 +24,7 @@ export type LogAction =
   | "quiz.window"
   | "syllabus.update"
   | "material.update"
+  | "material.publish"
 
 export interface LogInput {
   actorId?: number | null

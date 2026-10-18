@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildMaterialDraft } from "./draft"
+import { buildMaterialDraft, buildPublishDraft } from "./draft"
 
 describe("buildMaterialDraft", () => {
   it("takes the body, trimmed at its ends", () => {
@@ -19,5 +19,20 @@ describe("buildMaterialDraft", () => {
   it.each([[null], ["text"], [[1, 2]], [42]])("a non-object %j is an error, not a throw", (body) => {
     const result = buildMaterialDraft(body)
     expect(result.ok).toBe(false)
+  })
+})
+
+describe("buildPublishDraft", () => {
+  it.each([
+    [{ published: true }, true],
+    [{ published: false }, false],
+  ])("%j → %s", (body, published) => {
+    expect(buildPublishDraft(body)).toEqual({ ok: true, published })
+  })
+
+  it.each([[{ published: "yes" }], [{ published: 1 }], [{}], [null], ["true"], [[true]]])("%j is a field error", (body) => {
+    const result = buildPublishDraft(body)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(Object.keys(result.errors)).toEqual(["published"])
   })
 })

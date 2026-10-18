@@ -58,3 +58,20 @@ export async function saveMaterial(
   }
   return (await getMaterial(db, key, weekNo, kind))!
 }
+
+/**
+ * Publish or unpublish (#110); null when there is no such Material. Only the
+ * switch moves — the body and its last-edited stamp are untouched.
+ */
+export async function setMaterialPublished(
+  db: Queryable,
+  key: CourseKey,
+  { weekNo, kind }: MaterialAddress,
+  published: boolean
+): Promise<Material | null> {
+  await db.query(
+    `UPDATE teaching_materials SET is_published = $6 WHERE ${COURSE} AND week_no = $4::int AND kind = $5`,
+    [...keyParams(key), weekNo, kind, published]
+  )
+  return getMaterial(db, key, weekNo, kind)
+}

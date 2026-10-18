@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { NextRequest } from "next/server"
 import { GET as getOutline } from "./route"
 import { GET as getOne, PUT } from "./[week]/[kind]/route"
+import { PUT as PUBLISH } from "./[week]/[kind]/publish/route"
 import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
 import type { CourseFixture } from "@/lib/test-support/db"
 import { seedStudent } from "@/lib/test-support/quiz"
@@ -150,6 +151,83 @@ describe("/api/courses/[code]/[year]/[semester]/materials", () => {
   ])("week %s / kind %s is a 404", async (week, kind) => {
     expect((await one(f.ins.email, week, kind)).status).toBe(404)
     expect((await put(f.ins.email, week, kind, { body: "x" })).status).toBe(404)
+  })
+
+  describe("publishing (#110)", () => {
+    const publish = async (email: string, week: string | number, kind: string, body: unknown) =>
+      PUBLISH(req(email, "PUT", body), { params: Promise.resolve({ ...course(), week: String(week), kind }) })
+
+    beforeEach(async () => {
+      await put(f.ins.email, 1, "slides", { body: "s" })
+      await put(f.ins.email, 1, "lab", { body: "l" })
+      await put(f.ins.email, 3, "handout", { body: "h" })
+    })
+
+    it("an Instructor publishes and unpublishes; each change logs material.publish", async () => {
+      const on = await publish(f.ins.email, 1, "slides", { published: true })
+      expect(on.status).toBe(200)
+      expect((await on.json()).material).toMatchObject({ weekNo: 1, kind: "slides", isPublished: true })
+      const off = await publish(f.ins.email, 1, "slides", { published: false })
+      expect((await off.json()).material.isPublished).toBe(false)
+
+      const { rows } = await f.db.query(`SELECT action, actor_id, target_email FROM user_logs WHERE action = 'material.publish' ORDER BY id`)
+      expect(rows).toHaveLength(2)
+      expect(rows[0]).toEqual({ action: "material.publish", actor_id: f.ins.id, target_email: "C01/2567/1" })
+    })
+
+    it("a TA and a Student can't publish", async () => {
+      expect((await publish(f.ta.email, 1, "slides", { published: true })).status).toBe(403)
+      expect((await publish(student.email, 1, "slides", { published: true })).status).toBe(403)
+    })
+
+    it("publishing a Material that doesn't exist is a 404; a non-boolean is a 400", async () => {
+      expect((await publish(f.ins.email, 1, "handout", { published: true })).status).toBe(404)
+      expect((await publish(f.ins.email, 0, "slides", { published: true })).status).toBe(404)
+      expect((await publish(f.ins.email, 1, "slides", { published: "yes" })).status).toBe(400)
+      expect((await publish(f.ins.email, 1, "slides", "nope")).status).toBe(400)
+    })
+
+    it("a Student's outline holds only Published Materials of planned weeks, without the flag", async () => {
+      await publish(f.ins.email, 1, "slides", { published: true })
+      expect(await (await outline(student.email)).json()).toEqual({
+        weeks: [{ weekNo: 1, heading: "Intro", materials: { slides: { weekNo: 1, kind: "slides" } } }],
+        unplanned: [],
+      })
+    })
+
+    it("a Student reads a Published planned Material; unpublished and missing are the same 404", async () => {
+      await publish(f.ins.email, 1, "slides", { published: true })
+      expect((await one(student.email, 1, "slides")).status).toBe(200)
+      const unpublished = await one(student.email, 1, "lab")
+      const missing = await one(student.email, 1, "handout")
+      expect(unpublished.status).toBe(404)
+      expect(await unpublished.json()).toEqual(await missing.json())
+    })
+
+    it("a Published Material that leaves the plan is hidden from Students again", async () => {
+      await publish(f.ins.email, 3, "handout", { published: true })
+      expect((await one(student.email, 3, "handout")).status).toBe(200)
+      await plan([[1, "Intro"]])
+      expect((await one(student.email, 3, "handout")).status).toBe(404)
+      expect((await (await outline(student.email)).json()).weeks.map((w: { weekNo: number }) => w.weekNo)).toEqual([])
+    })
+
+    it("a TA reads an unpublished Material", async () => {
+      expect((await one(f.ta.email, 1, "lab")).status).toBe(200)
+    })
+
+    it("saving the body keeps the published state", async () => {
+      await publish(f.ins.email, 1, "slides", { published: true })
+      await put(f.ins.email, 1, "slides", { body: "s v2" })
+      expect((await (await one(f.ins.email, 1, "slides")).json()).material).toMatchObject({ body: "s v2", isPublished: true })
+    })
+
+    it("a Student's single Material carries no published flag", async () => {
+      await publish(f.ins.email, 1, "slides", { published: true })
+      const { material } = await (await one(student.email, 1, "slides")).json()
+      expect(material).toMatchObject({ weekNo: 1, kind: "slides", body: "s" })
+      expect(material).not.toHaveProperty("isPublished")
+    })
   })
 
   it("logs every save as material.update", async () => {
