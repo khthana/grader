@@ -23,6 +23,7 @@ export type LogAction =
   | "quiz.delete"
   | "quiz.window"
   | "syllabus.update"
+  | "material.update"
 
 export interface LogInput {
   actorId?: number | null

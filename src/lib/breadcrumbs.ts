@@ -1,3 +1,5 @@
+import { MATERIAL_KINDS, materialKindLabel } from "./materials/kinds"
+
 export interface Crumb {
   label: string
   href: string
@@ -12,6 +14,9 @@ const SEGMENT_LABELS: Record<string, string> = {
   students: "รายชื่อนักศึกษา",
   quizzes: "แบบทดสอบ",
   syllabus: "ประมวลรายวิชา",
+  materials: "เอกสารการสอน",
+  // A Teaching Material page ends in its Kind (…/materials/3/slides).
+  ...Object.fromEntries(MATERIAL_KINDS.map((kind) => [kind, materialKindLabel(kind)])),
   problems: "โจทย์ปัญหา",
   review: "ตรวจงาน",
   gradebook: "สมุดคะแนน",

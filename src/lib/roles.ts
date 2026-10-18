@@ -12,6 +12,7 @@ const MENU = {
   logs: { label: "บันทึกกิจกรรม", href: "/logs", icon: "logs" },
   courses: { label: "รายวิชา", href: "/courses", icon: "courses" },
   syllabus: { label: "ประมวลรายวิชา", href: "/syllabus", icon: "syllabus", courseScoped: true },
+  materials: { label: "เอกสารการสอน", href: "/materials", icon: "materials", courseScoped: true },
   students: { label: "รายชื่อนักศึกษา", href: "/students", icon: "students", courseScoped: true },
   quizzes: { label: "แบบทดสอบ", href: "/quizzes", icon: "quizzes", courseScoped: true },
   problems: { label: "โจทย์ปัญหา", href: "/problems", icon: "problems", courseScoped: true },
@@ -23,6 +24,7 @@ const MENU = {
 
 const TEACHING_MENU: MenuItem[] = [
   MENU.syllabus,
+  MENU.materials,
   MENU.students,
   MENU.quizzes,
   MENU.problems,
@@ -40,8 +42,8 @@ const SIDEBAR_MENU: Record<Role, MenuItem[]> = {
   // or review.
   Instructor: [MENU.courses, ...TEACHING_MENU],
   TA: TA_MENU,
-  // Every Role reads the course's Syllabus (#99).
-  Student: [MENU.syllabus, MENU.assignments, MENU.quizzes, MENU.scorebook],
+  // Every Role reads the course's Syllabus (#99) and Teaching Materials (#109).
+  Student: [MENU.syllabus, MENU.materials, MENU.assignments, MENU.quizzes, MENU.scorebook],
 }
 
 export function getSidebarMenu(role: Role): MenuItem[] {

@@ -12,6 +12,7 @@ import {
   FaChartBar,
   FaListOl,
   FaFileAlt,
+  FaFolderOpen,
 } from "react-icons/fa"
 
 // Maps the string `icon` keys from the role-resolution menu config to components,
@@ -28,6 +29,7 @@ const ICONS: Record<string, IconType> = {
   scorebook: FaChartBar,
   quizzes: FaListOl,
   syllabus: FaFileAlt,
+  materials: FaFolderOpen,
 }
 
 export function MenuIcon({ name, className }: { name: string; className?: string }) {

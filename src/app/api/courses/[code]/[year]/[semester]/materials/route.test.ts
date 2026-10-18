@@ -1,0 +1,164 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest"
+import { NextRequest } from "next/server"
+import { GET as getOutline } from "./route"
+import { GET as getOne, PUT } from "./[week]/[kind]/route"
+import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
+import type { CourseFixture } from "@/lib/test-support/db"
+import { seedStudent } from "@/lib/test-support/quiz"
+import { createUser, assignRole } from "@/lib/users/repository"
+import { saveSyllabus } from "@/lib/syllabus/repository"
+import { EMPTY_SYLLABUS } from "@/lib/syllabus/draft"
+import type { PlanEntry } from "@/lib/syllabus/plan"
+
+// Teaching Materials (#109): staff write them by Teaching Plan week; the
+// heading is the plan's topics, read live (ADR 0012).
+describe("/api/courses/[code]/[year]/[semester]/materials", () => {
+  let f: CourseFixture
+  let student: { id: number; email: string }
+
+  function req(email: string | null, method = "GET", body?: unknown) {
+    const r = new NextRequest("http://localhost/api/x", {
+      method,
+      body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body),
+    })
+    if (email) r.cookies.set("session", sessionFor(email))
+    return r
+  }
+  const course = () => ({ code: f.course.code, year: String(f.course.year), semester: String(f.course.semester) })
+  const outline = async (email: string | null) => getOutline(req(email), { params: Promise.resolve(course()) })
+  const one = async (email: string, week: string | number, kind: string) =>
+    getOne(req(email), { params: Promise.resolve({ ...course(), week: String(week), kind }) })
+  const put = async (email: string, week: string | number, kind: string, body: unknown) =>
+    PUT(req(email, "PUT", body), { params: Promise.resolve({ ...course(), week: String(week), kind }) })
+
+  const plan = (entries: [number, string][]) =>
+    saveSyllabus(
+      f.db,
+      f.course,
+      { ...EMPTY_SYLLABUS, plan: entries.map(([weekNo, topic]): PlanEntry => ({ weekNo, topic, detail: "" })) },
+      f.ins.id
+    )
+
+  beforeEach(async () => {
+    f = await courseFixture()
+    setTestDb(f.db)
+    student = await seedStudent(f.db, f.course, "1")
+    await plan([
+      [1, "Intro"],
+      [3, "Array"],
+      [3, "Lab Array"],
+    ])
+  })
+  afterEach(() => setTestDb(null))
+
+  it("an Instructor's first PUT creates the Material, the second updates it; it starts unpublished", async () => {
+    const created = await put(f.ins.email, 3, "slides", { body: "  # Array  " })
+    expect(created.status).toBe(200)
+    expect((await created.json()).material).toMatchObject({ weekNo: 3, kind: "slides", body: "# Array", isPublished: false })
+
+    expect((await put(f.ins.email, 3, "slides", { body: "# Array v2" })).status).toBe(200)
+    const res = await one(f.ins.email, 3, "slides")
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.material).toMatchObject({ weekNo: 3, kind: "slides", body: "# Array v2", isPublished: false })
+    expect(body.heading).toBe("Array · Lab Array")
+  })
+
+  it("the outline lists the plan weeks with live headings and each Material in its Kind slot", async () => {
+    await put(f.ins.email, 3, "lab", { body: "lab" })
+    await put(f.ins.email, 1, "slides", { body: "s" })
+    const res = await outline(f.ins.email)
+    expect(res.status).toBe(200)
+    const { weeks, unplanned } = await res.json()
+    expect(weeks.map((w: { weekNo: number; heading: string }) => [w.weekNo, w.heading])).toEqual([
+      [1, "Intro"],
+      [3, "Array · Lab Array"],
+    ])
+    expect(weeks[0].materials).toEqual({ slides: { weekNo: 1, kind: "slides", isPublished: false } })
+    expect(weeks[1].materials).toEqual({ lab: { weekNo: 3, kind: "lab", isPublished: false } })
+    expect(unplanned).toEqual([])
+  })
+
+  it("editing the Teaching Plan changes the heading on the next read", async () => {
+    await put(f.ins.email, 1, "handout", { body: "h" })
+    await plan([[1, "Python basics"]])
+    expect((await (await one(f.ins.email, 1, "handout")).json()).heading).toBe("Python basics")
+    expect((await (await outline(f.ins.email)).json()).weeks[0].heading).toBe("Python basics")
+  })
+
+  it("a Material outside the plan is Unplanned — staff still read it, with no heading", async () => {
+    await put(f.ins.email, 9, "slides", { body: "old" })
+    const { unplanned } = await (await outline(f.ins.email)).json()
+    expect(unplanned).toEqual([{ weekNo: 9, kind: "slides", isPublished: false }])
+    const body = await (await one(f.ta.email, 9, "slides")).json()
+    expect(body.heading).toBeNull()
+  })
+
+  it("a TA reads everything but can't write; a Student can't write", async () => {
+    await put(f.ins.email, 1, "slides", { body: "s" })
+    expect((await one(f.ta.email, 1, "slides")).status).toBe(200)
+    expect((await (await outline(f.ta.email)).json()).weeks[0].materials.slides).toBeDefined()
+    expect((await put(f.ta.email, 1, "slides", { body: "x" })).status).toBe(403)
+    expect((await put(student.email, 1, "slides", { body: "x" })).status).toBe(403)
+  })
+
+  it("a Student sees no Material while none is published — the outline is empty, a Material is a 404", async () => {
+    await put(f.ins.email, 1, "slides", { body: "s" })
+    const res = await outline(student.email)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ weeks: [], unplanned: [] })
+    const unpublished = await one(student.email, 1, "slides")
+    const missing = await one(student.email, 1, "lab")
+    expect(unpublished.status).toBe(404)
+    expect(missing.status).toBe(404)
+    expect(await unpublished.json()).toEqual(await missing.json())
+  })
+
+  it("a missing Material is a 404 for staff too", async () => {
+    expect((await one(f.ins.email, 1, "lab")).status).toBe(404)
+  })
+
+  it("an Admin who isn't on the staff may write", async () => {
+    const admin = await createUser(f.db, { email: "adm@kmitl.ac.th", name: "adm" })
+    await assignRole(f.db, admin.id, "Admin")
+    expect((await put(admin.email, 1, "slides", { body: "s" })).status).toBe(200)
+  })
+
+  it("someone not linked to the course is refused; no session is a 401", async () => {
+    const outsider = await createUser(f.db, { email: "out@kmitl.ac.th", name: "out" })
+    await assignRole(f.db, outsider.id, "Instructor")
+    expect((await outline(outsider.email)).status).toBe(403)
+    expect((await one(outsider.email, 1, "slides")).status).toBe(403)
+    expect((await put(outsider.email, 1, "slides", { body: "x" })).status).toBe(403)
+    expect((await outline(null)).status).toBe(401)
+  })
+
+  it("a bad body is a 400 with field errors", async () => {
+    const res = await put(f.ins.email, 1, "slides", { body: 3 })
+    expect(res.status).toBe(400)
+    expect(Object.keys((await res.json()).errors)).toEqual(["body"])
+    expect((await put(f.ins.email, 1, "slides", "not json")).status).toBe(400)
+  })
+
+  it.each([
+    ["0", "slides"],
+    ["21", "slides"],
+    ["1.5", "slides"],
+    ["x", "slides"],
+    ["1", "Slides"],
+    ["1", "lab-sheet"],
+  ])("week %s / kind %s is a 404", async (week, kind) => {
+    expect((await one(f.ins.email, week, kind)).status).toBe(404)
+    expect((await put(f.ins.email, week, kind, { body: "x" })).status).toBe(404)
+  })
+
+  it("logs every save as material.update", async () => {
+    await put(f.ins.email, 1, "slides", { body: "a" })
+    await put(f.ins.email, 1, "slides", { body: "b" })
+    const { rows } = await f.db.query(`SELECT action, actor_id, target_email FROM user_logs WHERE action = 'material.update'`)
+    expect(rows).toEqual([
+      { action: "material.update", actor_id: f.ins.id, target_email: "C01/2567/1" },
+      { action: "material.update", actor_id: f.ins.id, target_email: "C01/2567/1" },
+    ])
+  })
+})
