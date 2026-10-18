@@ -11,6 +11,7 @@ import type { CourseFixture, Queryable } from "@/lib/test-support/db"
 import { seedQuiz } from "@/lib/test-support/quiz"
 import { EMPTY_SYLLABUS } from "@/lib/syllabus/draft"
 import { saveSyllabus } from "@/lib/syllabus/repository"
+import { saveMaterial } from "@/lib/materials/repository"
 
 describe("POST /api/courses/[code]/[year]/[semester]/duplicate", () => {
   let f: CourseFixture
@@ -162,5 +163,14 @@ describe("POST /api/courses/[code]/[year]/[semester]/duplicate", () => {
     expect(tx).toContain("INSERT INTO quizzes")
     expect(tx).toContain("INSERT INTO course_syllabi")
     expect(tx).toContain("INSERT INTO syllabus_plan_entries")
+  })
+
+  it("copies Teaching Materials in the same transaction — a failure copying them rolls back (#112)", async () => {
+    // A Syllabus too, so the test shows the copy before the Materials ran on the transaction.
+    await saveSyllabus(f.db, f.course, { ...EMPTY_SYLLABUS, plan: [{ weekNo: 1, topic: "Intro", detail: "" }] }, f.ins.id)
+    await saveMaterial(f.db, f.course, { weekNo: 1, kind: "slides" }, "s", f.ins.id)
+    await saveMaterial(f.db, f.course, { weekNo: 9, kind: "lab" }, "l", f.ins.id)
+    const tx = await duplicateFailingOn(/INSERT INTO teaching_materials/)
+    expect(tx).toContain("INSERT INTO course_syllabi")
   })
 })

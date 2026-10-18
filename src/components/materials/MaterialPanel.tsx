@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { FaArrowLeft, FaEdit, FaEye, FaEyeSlash, FaExchangeAlt, FaTrash } from "react-icons/fa"
+import { FaArrowLeft, FaEdit, FaEye, FaEyeSlash, FaExchangeAlt, FaPrint, FaTrash } from "react-icons/fa"
 import { ConfirmDialog } from "@/components/shell/ConfirmDialog"
 import { useUnsavedChangesGuard } from "@/components/shell/NavigationGuard"
 import { useToast } from "@/components/shell/ToastProvider"
@@ -18,7 +18,8 @@ import { UnpublishedBadge } from "./MaterialsOutline"
  * One Teaching Material (#109): view mode for everyone who may see it; a course
  * manager writes its Markdown body. A Material not yet written opens straight
  * in edit mode for a manager — the first save creates it. A manager also moves
- * it to another week or deletes it (#111).
+ * it to another week or deletes it (#111). Every viewer prints it (#112) —
+ * only the heading and content reach the paper.
  */
 export function MaterialPanel({
   courseSlug,
@@ -137,7 +138,7 @@ export function MaterialPanel({
     <div className="print-controls flex flex-col gap-4">
       <Link
         href={`${coursePath}/materials`}
-        className="inline-flex w-fit items-center gap-2 text-sm text-slate-500 hover:text-primary"
+        className="inline-flex w-fit items-center gap-2 text-sm text-slate-500 hover:text-primary print:hidden"
       >
         <FaArrowLeft className="h-3 w-3" />
         เอกสารการสอน
@@ -153,62 +154,70 @@ export function MaterialPanel({
             {isPublished === false && <UnpublishedBadge />}
           </h1>
           {staff && heading === null && (
-            <p className="mt-1 text-sm text-amber-700">ไม่อยู่ในแผนการสอน — นักศึกษามองไม่เห็นเอกสารนี้</p>
+            <p className="mt-1 text-sm text-amber-700 print:hidden">ไม่อยู่ในแผนการสอน — นักศึกษามองไม่เห็นเอกสารนี้</p>
           )}
         </div>
-        {draft === null && canEdit && (
+        {draft === null && (
           <div className="flex flex-wrap gap-2">
-            {material && moveTo === null && (
+            <button onClick={() => window.print()} className={secondaryButton}>
+              <FaPrint className="h-3.5 w-3.5" />
+              พิมพ์
+            </button>
+            {canEdit && (
               <>
-                <button onClick={() => setMoveTo(weekNo)} className={secondaryButton}>
-                  <FaExchangeAlt className="h-3.5 w-3.5" />
-                  ย้ายไปสัปดาห์…
-                </button>
-                <button onClick={() => setConfirmDelete(true)} className={`${secondaryButton} text-red-600`}>
-                  <FaTrash className="h-3.5 w-3.5" />
-                  ลบ
+                {material && moveTo === null && (
+                  <>
+                    <button onClick={() => setMoveTo(weekNo)} className={secondaryButton}>
+                      <FaExchangeAlt className="h-3.5 w-3.5" />
+                      ย้ายไปสัปดาห์…
+                    </button>
+                    <button onClick={() => setConfirmDelete(true)} className={`${secondaryButton} text-red-600`}>
+                      <FaTrash className="h-3.5 w-3.5" />
+                      ลบ
+                    </button>
+                  </>
+                )}
+                {moveTo !== null && (
+                  <div className="flex items-center gap-2 print:hidden">
+                    <select
+                      value={moveTo}
+                      onChange={(e) => setMoveTo(Number(e.target.value))}
+                      aria-label="ย้ายไปสัปดาห์"
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-slate-700"
+                    >
+                      {Array.from({ length: MAX_PLAN_WEEK }, (_, i) => i + 1).map((w) => (
+                        <option key={w} value={w}>
+                          สัปดาห์ {w}
+                        </option>
+                      ))}
+                    </select>
+                    <button onClick={() => setMoveTo(null)} disabled={moving} className={secondaryButton}>
+                      ยกเลิก
+                    </button>
+                    <button
+                      onClick={move}
+                      disabled={moving || moveTo === weekNo}
+                      className="rounded-lg bg-primary px-4 py-2 text-sm text-white transition hover:bg-primary-hover disabled:opacity-60"
+                    >
+                      {moving ? "กำลังย้าย..." : "ย้าย"}
+                    </button>
+                  </div>
+                )}
+                {isPublished !== null && (
+                  <button onClick={togglePublished} disabled={publishing} className={secondaryButton}>
+                    {isPublished ? <FaEyeSlash className="h-3.5 w-3.5" /> : <FaEye className="h-3.5 w-3.5" />}
+                    {isPublished ? "เลิกเผยแพร่" : "เผยแพร่"}
+                  </button>
+                )}
+                <button
+                  onClick={() => setDraft(material?.body ?? "")}
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-white transition hover:bg-primary-hover"
+                >
+                  <FaEdit className="h-3.5 w-3.5" />
+                  แก้ไข
                 </button>
               </>
             )}
-            {moveTo !== null && (
-              <div className="flex items-center gap-2">
-                <select
-                  value={moveTo}
-                  onChange={(e) => setMoveTo(Number(e.target.value))}
-                  aria-label="ย้ายไปสัปดาห์"
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-slate-700"
-                >
-                  {Array.from({ length: MAX_PLAN_WEEK }, (_, i) => i + 1).map((w) => (
-                    <option key={w} value={w}>
-                      สัปดาห์ {w}
-                    </option>
-                  ))}
-                </select>
-                <button onClick={() => setMoveTo(null)} disabled={moving} className={secondaryButton}>
-                  ยกเลิก
-                </button>
-                <button
-                  onClick={move}
-                  disabled={moving || moveTo === weekNo}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm text-white transition hover:bg-primary-hover disabled:opacity-60"
-                >
-                  {moving ? "กำลังย้าย..." : "ย้าย"}
-                </button>
-              </div>
-            )}
-            {isPublished !== null && (
-              <button onClick={togglePublished} disabled={publishing} className={secondaryButton}>
-                {isPublished ? <FaEyeSlash className="h-3.5 w-3.5" /> : <FaEye className="h-3.5 w-3.5" />}
-                {isPublished ? "เลิกเผยแพร่" : "เผยแพร่"}
-              </button>
-            )}
-            <button
-              onClick={() => setDraft(material?.body ?? "")}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-white transition hover:bg-primary-hover"
-            >
-              <FaEdit className="h-3.5 w-3.5" />
-              แก้ไข
-            </button>
           </div>
         )}
         {draft !== null && (

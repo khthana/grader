@@ -18,6 +18,7 @@ import {
 import { createQuiz, getQuizForCourse, listQuizzes } from "@/lib/quizzes/repository"
 import { toQuestionDraft } from "@/lib/quizzes/import"
 import { copySyllabus } from "@/lib/syllabus/repository"
+import { copyMaterials } from "@/lib/materials/repository"
 
 export type DuplicateResult =
   | { ok: true; course: CourseRecord }
@@ -130,6 +131,10 @@ export async function duplicateCourseOffering(
   // The Syllabus (#103): its whole content as the new term's starting point;
   // staff come from the Course staff copied above.
   await copySyllabus(db, source, course, actorId)
+
+  // Teaching Materials (#112, ADR 0012): all of them, Unplanned included, at the
+  // same week + Kind — every copy unpublished until staff publish it again.
+  await copyMaterials(db, source, course, actorId)
 
   return { ok: true, course }
 }

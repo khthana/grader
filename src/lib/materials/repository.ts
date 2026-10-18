@@ -116,3 +116,18 @@ export async function deleteMaterial(db: Queryable, key: CourseKey, { weekNo, ki
   )
   return rows.length > 0
 }
+
+/**
+ * Course Duplication (#112): every Material — Unplanned ones too — at the same
+ * week and Kind with its body, each copy unpublished. A source with none
+ * creates nothing.
+ */
+export async function copyMaterials(db: Queryable, source: CourseKey, target: CourseKey, actorId: number): Promise<void> {
+  for (const { weekNo, kind, body } of await listMaterials(db, source)) {
+    await db.query(
+      `INSERT INTO teaching_materials (course_code, course_year, course_semester, week_no, kind, body, is_published, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7)`,
+      [...keyParams(target), weekNo, kind, body, actorId]
+    )
+  }
+}

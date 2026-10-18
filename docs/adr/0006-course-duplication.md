@@ -47,6 +47,7 @@ mapping is unambiguous (no merge).
 | Round Window | — | never copied (staff set the new term's windows) |
 | Quiz Attempt | — | never copied |
 | Syllabus *(#103)* | the main row (`credits`, `description`, `objectives`), every Teaching Plan entry and every Assessment Component 1:1 in order | only if the source has one — a source never written creates nothing; staff are not part of it (read live from Course staff) |
+| Teaching Material *(#112, ADR 0012)* | every Material — Unplanned ones included — at the same `week_no` and `kind`, with its `body` | `is_published` → `false` (staff publish again in the new term); a source with none creates nothing |
 
 Problems are copied in `(week_no, problem_no)` order so `createProblem`'s auto-assign
 reproduces the source `problem_no`. The Reference Solution is read through the raw
@@ -79,4 +80,4 @@ course create/edit share one year/semester rule.
 **Negative / costs**
 - The copy is N+1 by Problem (read detail + reference solution, write problem + test cases per Problem). Acceptable: it runs once per duplication, not on a hot path.
 - Copying into an *existing* offering (merge/append) and selective copy are out of scope — only a fresh target is supported.
-- Instructors must still release Weeks and set deadlines in the new term by hand (by design — those are term-specific).
+- Instructors must still release Weeks, publish Teaching Materials and set deadlines in the new term by hand (by design — those are term-specific).
