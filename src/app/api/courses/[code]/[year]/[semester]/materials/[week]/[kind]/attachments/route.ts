@@ -13,8 +13,15 @@ import {
   UPLOAD_ERRORS,
   type UploadRefusal,
 } from "@/lib/materials/attachments/policy"
-import { createAttachment, findMaterialId, listAttachments } from "@/lib/materials/attachments/repository"
+import {
+  createAttachment,
+  findMaterialId,
+  listAttachments,
+  replaceAttachment,
+  type AttachmentFile,
+} from "@/lib/materials/attachments/repository"
 import { putFile } from "@/lib/materials/attachments/store"
+import { sweepAttachmentsQuietly } from "@/lib/materials/attachments/sweep"
 
 type Params = { code: string; year: string; semester: string; week: string; kind: string }
 
@@ -27,6 +34,9 @@ const refuse = (status: number, reason: string, error: string) => NextResponse.j
 /**
  * Attach one file (multipart field `file`) to a saved Teaching Material (#114) —
  * Instructor/Admin of this course; takes effect at once, no body save needed.
+ * A name the Material already has is refused (409 `name-taken`, so the UI can
+ * ask) unless `replace=true`: then that Attachment points at the new bytes —
+ * same id and name, so references to it keep working (#115).
  */
 export const POST = courseRoute<Params>({ manage: true }, async (req: NextRequest, auth, params) => {
   const address = parseMaterialAddress(params.week, params.kind)
@@ -39,22 +49,25 @@ export const POST = courseRoute<Params>({ manage: true }, async (req: NextReques
   const materialId = await findMaterialId(db, auth.course, address)
   if (materialId === null) return materialNotFound()
 
-  const file = (await req.formData().catch(() => null))?.get("file")
+  const form = await req.formData().catch(() => null)
+  const file = form?.get("file")
+  const replace = form?.get("replace") === "true"
   if (!(file instanceof File)) return refuse(400, "file", "ไม่พบไฟล์ที่อัปโหลด")
   const check = checkUpload(file)
   if (!check.ok) return refuse(REFUSAL_STATUS[check.reason], check.reason, check.error)
 
   const existing = await listAttachments(db, auth.course, address)
-  if (existing.some((a) => a.name === check.name)) return refuse(409, "name-taken", nameTakenError(check.name))
-  if (isAtAttachmentLimit(existing.length)) return refuse(409, "limit", ATTACHMENT_LIMIT_ERROR)
+  const replacing = existing.some((a) => a.name === check.name)
+  if (replacing && !replace) return refuse(409, "name-taken", nameTakenError(check.name))
+  // A replacement adds no file, so only a new name counts against the limit.
+  if (!replacing && isAtAttachmentLimit(existing.length)) return refuse(409, "limit", ATTACHMENT_LIMIT_ERROR)
 
   const { sha256, size } = await putFile(new Uint8Array(await file.arrayBuffer()))
-  const attachment = await createAttachment(
-    db,
-    materialId,
-    { name: check.name, contentType: check.contentType, sizeBytes: size, sha256 },
-    auth.user.id
-  )
+  const stored: AttachmentFile = { name: check.name, contentType: check.contentType, sizeBytes: size, sha256 }
+  const attachment = replacing
+    ? await replaceAttachment(db, materialId, stored, auth.user.id)
+    : await createAttachment(db, materialId, stored, auth.user.id)
+  // Lost a race: another request added or removed this name in between.
   if (!attachment) return refuse(409, "name-taken", nameTakenError(check.name))
 
   await safeLog(db, {
@@ -62,7 +75,9 @@ export const POST = courseRoute<Params>({ manage: true }, async (req: NextReques
     actorEmail: auth.user.email,
     action: "material.update",
     targetEmail: courseSlugString(auth.course),
-    detail: `attach ${materialRef(address)} ${attachment.name}`,
+    detail: `${replacing ? "replace" : "attach"} ${materialRef(address)} ${attachment.name}`,
   })
-  return NextResponse.json({ attachment, replaced: false }, { status: 201 })
+  // The replaced bytes may now be unreferenced.
+  if (replacing) await sweepAttachmentsQuietly(db)
+  return NextResponse.json({ attachment, replaced: replacing }, { status: replacing ? 200 : 201 })
 })

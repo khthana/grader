@@ -12,6 +12,14 @@ export interface Attachment {
   uploadedAt: string
 }
 
+/** What an upload records for one file: its checked name and type, and its stored bytes. */
+export interface AttachmentFile {
+  name: string
+  contentType: string
+  sizeBytes: number
+  sha256: string
+}
+
 /** An Attachment with what serving it needs: its bytes' hash and its Material. */
 export interface StoredAttachment extends Attachment {
   sha256: string
@@ -19,6 +27,8 @@ export interface StoredAttachment extends Attachment {
 }
 
 const COLS = `a.id, a.name, a.content_type AS "contentType", a.size_bytes AS "sizeBytes", a.uploaded_at AS "uploadedAt"`
+// COLS for a row just written (no join, so no alias).
+const RETURNING_COLS = `id, name, content_type AS "contentType", size_bytes AS "sizeBytes", uploaded_at AS "uploadedAt"`
 const MATERIAL_AT = `m.course_code = $1 AND m.course_year = $2::int AND m.course_semester = $3::int
   AND m.week_no = $4::int AND m.kind = $5`
 const addressParams = (key: CourseKey, { weekNo, kind }: MaterialAddress) => [key.code, key.year, key.semester, weekNo, kind]
@@ -49,7 +59,7 @@ export async function listAttachments(db: Queryable, key: CourseKey, address: Ma
 export async function createAttachment(
   db: Queryable,
   materialId: number,
-  file: { name: string; contentType: string; sizeBytes: number; sha256: string },
+  file: AttachmentFile,
   actorId: number
 ): Promise<Attachment | null> {
   const { rows: taken } = await db.query(
@@ -61,7 +71,7 @@ export async function createAttachment(
     const { rows } = await db.query<Attachment>(
       `INSERT INTO material_attachments (material_id, name, content_type, size_bytes, sha256, uploaded_by)
        VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, name, content_type AS "contentType", size_bytes AS "sizeBytes", uploaded_at AS "uploadedAt"`,
+       RETURNING ${RETURNING_COLS}`,
       [materialId, file.name, file.contentType, file.sizeBytes, file.sha256, actorId]
     )
     return rows[0]
@@ -69,6 +79,44 @@ export async function createAttachment(
     if ((err as { code?: string }).code === "23505") return null
     throw err
   }
+}
+
+/**
+ * Point the Material's Attachment of this name at new bytes (#115) — same id
+ * and name, so whatever refers to it keeps working. Null when there is none.
+ */
+export async function replaceAttachment(
+  db: Queryable,
+  materialId: number,
+  file: AttachmentFile,
+  actorId: number
+): Promise<Attachment | null> {
+  const { rows } = await db.query<Attachment>(
+    `UPDATE material_attachments
+     SET content_type = $3, size_bytes = $4, sha256 = $5, uploaded_by = $6, uploaded_at = now()
+     WHERE material_id = $1::int AND name = $2
+     RETURNING ${RETURNING_COLS}`,
+    [materialId, file.name, file.contentType, file.sizeBytes, file.sha256, actorId]
+  )
+  return rows[0] ?? null
+}
+
+/**
+ * Delete one Attachment of this course (#115); returns what was deleted (its
+ * name and Material, for the log), or null when it isn't this course's. The
+ * bytes stay until a sweep finds them unreferenced.
+ */
+export async function deleteAttachment(db: Queryable, key: CourseKey, id: number): Promise<StoredAttachment | null> {
+  const attachment = await getAttachmentForCourse(db, key, id)
+  if (!attachment) return null
+  await db.query(`DELETE FROM material_attachments WHERE id = $1::int`, [id])
+  return attachment
+}
+
+/** Every hash some Attachment refers to — what a sweep must keep. */
+export async function listReferencedHashes(db: Queryable): Promise<string[]> {
+  const { rows } = await db.query<{ sha256: string }>(`SELECT DISTINCT sha256 FROM material_attachments`)
+  return rows.map((r) => r.sha256)
 }
 
 /** One Attachment of this course with its Material — null when it isn't this course's. */

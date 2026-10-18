@@ -1,11 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest"
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { NextRequest } from "next/server"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, readdir, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { GET as getOne } from "./[week]/[kind]/route"
+import { GET as getOne, DELETE as deleteMaterialRoute } from "./[week]/[kind]/route"
 import { POST as UPLOAD } from "./[week]/[kind]/attachments/route"
-import { GET as DOWNLOAD } from "./attachments/[aid]/route"
+import { GET as DOWNLOAD, DELETE as REMOVE } from "./attachments/[aid]/route"
+import { DELETE as deleteCourseRoute } from "../route"
 import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
 import type { CourseFixture } from "@/lib/test-support/db"
 import { seedStudent } from "@/lib/test-support/quiz"
@@ -31,9 +32,17 @@ describe("Teaching Material Attachments", () => {
     if (email) r.cookies.set("session", sessionFor(email))
     return r
   }
-  async function upload(email: string | null, name: string, content: string | Uint8Array = "data", week = 3, kind = "slides") {
+  async function upload(
+    email: string | null,
+    name: string,
+    content: string | Uint8Array = "data",
+    week = 3,
+    kind = "slides",
+    replace = false
+  ) {
     const form = new FormData()
     form.set("file", new File([content as BlobPart], name))
+    if (replace) form.set("replace", "true")
     const r = new NextRequest("http://localhost/api/x", { method: "POST", body: form })
     return UPLOAD(withSession(r, email), at(week, kind))
   }
@@ -224,5 +233,142 @@ describe("Teaching Material Attachments", () => {
       `SELECT action, target_email, detail FROM user_logs WHERE detail LIKE 'attach%'`
     )
     expect(rows).toEqual([{ action: "material.update", target_email: "C01/2567/1", detail: "attach 3/slides slides.pdf" }])
+  })
+
+  describe("replace, delete and sweep (#115)", () => {
+    const HOUR = 60 * 60 * 1000
+    const replace = (name: string, content: string) => upload(f.ins.email, name, content, 3, "slides", true)
+    const remove = (email: string | null, aid: number | string) =>
+      REMOVE(withSession(new NextRequest("http://localhost/api/x", { method: "DELETE" }), email), {
+        params: Promise.resolve({ ...course(), aid: String(aid) }),
+      })
+    const storedFiles = async () =>
+      (await readdir(dir, { recursive: true, withFileTypes: true }))
+        .filter((e) => e.isFile() && !e.parentPath.endsWith(".tmp"))
+        .map((e) => e.name)
+    /** Make every stored file look older than the sweep's grace period. */
+    const ageStore = async () => {
+      const t = new Date(Date.now() - 2 * HOUR)
+      for (const e of await readdir(dir, { recursive: true, withFileTypes: true })) {
+        if (e.isFile()) await utimes(path.join(e.parentPath, e.name), t, t)
+      }
+    }
+    const details = async () =>
+      (await f.db.query<{ detail: string }>(`SELECT detail FROM user_logs WHERE action = 'material.update' ORDER BY id`)).rows.map(
+        (r) => r.detail
+      )
+
+    it("replacing keeps the Attachment's id and name, serves the new bytes and sweeps the old ones", async () => {
+      const first = await uploaded(f.ins.email, "slides.pdf", "v1")
+      await ageStore()
+      const res = await replace("slides.pdf", "version 2")
+      expect(res.status).toBe(200)
+      const { attachment, replaced } = await res.json()
+      expect(replaced).toBe(true)
+      expect(attachment).toMatchObject({ id: first.id, name: "slides.pdf", sizeBytes: 9 })
+      expect(await (await download(f.ins.email, first.id)).text()).toBe("version 2")
+      expect(await storedFiles()).toHaveLength(1)
+    })
+
+    it("replacing a name that isn't there simply attaches it", async () => {
+      const res = await replace("new.pdf", "x")
+      expect(res.status).toBe(201)
+      expect((await res.json()).replaced).toBe(false)
+    })
+
+    it("a Material at its 20-file limit still takes a replacement, never a new name", async () => {
+      await uploaded(f.ins.email, "slides.pdf", "v1")
+      const materialId = (await findMaterialId(f.db, f.course, { weekNo: 3, kind: "slides" }))!
+      for (let i = 1; i < MAX_ATTACHMENTS_PER_MATERIAL; i++) {
+        await createAttachment(f.db, materialId, { name: `f${i}.txt`, contentType: "text/plain", sizeBytes: 1, sha256: "x" }, f.ins.id)
+      }
+      expect((await replace("slides.pdf", "v2")).status).toBe(200)
+      expect((await replace("other.pdf", "v2")).status).toBe(409)
+    })
+
+    it("a manager deletes an Attachment: it leaves the Material, its old bytes are swept", async () => {
+      const a = await uploaded(f.ins.email, "a.pdf", "aaa")
+      const b = await uploaded(f.ins.email, "b.pdf", "bbb")
+      await ageStore()
+      const res = await remove(f.ins.email, a.id)
+      expect(res.status).toBe(200)
+      expect((await download(f.ins.email, a.id)).status).toBe(404)
+      expect(await (await download(f.ins.email, b.id)).text()).toBe("bbb")
+      const { attachments } = await (await getOne(withSession(new NextRequest("http://localhost/api/x"), f.ins.email), at(3, "slides"))).json()
+      expect(attachments.map((x: { name: string }) => x.name)).toEqual(["b.pdf"])
+      expect(await storedFiles()).toHaveLength(1)
+    })
+
+    it("bytes another Attachment still uses are never swept", async () => {
+      const a = await uploaded(f.ins.email, "a.pdf", "same")
+      const b = await uploaded(f.ins.email, "b.pdf", "same")
+      await ageStore()
+      await remove(f.ins.email, a.id)
+      expect(await (await download(f.ins.email, b.id)).text()).toBe("same")
+    })
+
+    it("a just-deleted upload younger than an hour stays on disk until a later sweep", async () => {
+      const a = await uploaded(f.ins.email, "a.pdf", "fresh")
+      await remove(f.ins.email, a.id)
+      expect(await storedFiles()).toHaveLength(1)
+    })
+
+    it("a TA or a Student can't delete; another course's or a malformed id is a 404", async () => {
+      const a = await uploaded(f.ins.email, "a.pdf")
+      expect((await remove(f.ta.email, a.id)).status).toBe(403)
+      expect((await remove(student.email, a.id)).status).toBe(403)
+      expect((await remove(null, a.id)).status).toBe(401)
+      expect((await remove(f.ins.email, "abc")).status).toBe(404)
+      expect((await remove(f.ins.email, 9999)).status).toBe(404)
+
+      const other = await createCourse(f.db, { code: "C02", year: 2567, semester: 1, nameTh: "ข", nameEn: "B" })
+      await saveMaterial(f.db, other, { weekNo: 3, kind: "slides" }, "x", f.ins.id)
+      const otherId = (await findMaterialId(f.db, other, { weekNo: 3, kind: "slides" }))!
+      const o = await createAttachment(f.db, otherId, { name: "o.pdf", contentType: "application/pdf", sizeBytes: 1, sha256: "x" }, f.ins.id)
+      expect((await remove(f.ins.email, o!.id)).status).toBe(404)
+      expect((await f.db.query(`SELECT 1 FROM material_attachments WHERE id = $1::int`, [o!.id])).rows).toHaveLength(1)
+    })
+
+    it("deleting the Material sweeps its Attachments' bytes", async () => {
+      await uploaded(f.ins.email, "a.pdf", "aaa")
+      await uploaded(f.ins.email, "b.pdf", "bbb")
+      await ageStore()
+      const res = await deleteMaterialRoute(
+        withSession(new NextRequest("http://localhost/api/x", { method: "DELETE" }), f.ins.email),
+        at(3, "slides")
+      )
+      expect(res.status).toBe(200)
+      expect(await storedFiles()).toEqual([])
+    })
+
+    it("deleting the Course sweeps its Materials' Attachment bytes", async () => {
+      await uploaded(f.ins.email, "a.pdf", "aaa")
+      await ageStore()
+      const res = await deleteCourseRoute(
+        withSession(new NextRequest("http://localhost/api/x", { method: "DELETE" }), f.ins.email),
+        { params: Promise.resolve(course()) }
+      )
+      expect(res.status).toBe(200)
+      expect(await storedFiles()).toEqual([])
+    })
+
+    it("a failing sweep never fails the request", async () => {
+      const a = await uploaded(f.ins.email, "a.pdf")
+      // A store root that is a file, not a folder: the sweep throws.
+      const notADir = path.join(dir, "not-a-dir")
+      await writeFile(notADir, "x")
+      setTestAttachmentStore(notADir)
+      const errors = vi.spyOn(console, "error").mockImplementation(() => {})
+      expect((await remove(f.ins.email, a.id)).status).toBe(200)
+      expect(errors).toHaveBeenCalledWith("attachment sweep failed", expect.anything())
+      errors.mockRestore()
+    })
+
+    it("logs replace and remove as material.update, naming the Material and the file", async () => {
+      const a = await uploaded(f.ins.email, "slides.pdf", "v1")
+      await replace("slides.pdf", "v2")
+      await remove(f.ins.email, a.id)
+      expect(await details()).toEqual(["attach 3/slides slides.pdf", "replace 3/slides slides.pdf", "remove 3/slides slides.pdf"])
+    })
   })
 })

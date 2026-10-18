@@ -7,6 +7,7 @@ import { loadMaterial } from "@/lib/materials/access"
 import { buildMaterialDraft } from "@/lib/materials/draft"
 import { materialNotFound, materialRef, parseMaterialAddress } from "@/lib/materials/params"
 import { deleteMaterial, saveMaterial } from "@/lib/materials/repository"
+import { sweepAttachmentsQuietly } from "@/lib/materials/attachments/sweep"
 
 type Params = { code: string; year: string; semester: string; week: string; kind: string }
 
@@ -51,5 +52,7 @@ export const DELETE = courseRoute<Params>({ manage: true }, async (_req, auth, p
     targetEmail: courseSlugString(auth.course),
     detail: `delete ${materialRef(address)}`,
   })
+  // Its Attachments went with it (cascade); sweep their bytes (#115).
+  await sweepAttachmentsQuietly(db)
   return NextResponse.json({ ok: true })
 })

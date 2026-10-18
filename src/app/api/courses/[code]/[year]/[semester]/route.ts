@@ -5,6 +5,7 @@ import { updateCourse, deleteCourse, getCourseCascadeCounts } from "@/lib/course
 import { canChangeCourseLanguage } from "@/lib/courses/access"
 import { validateCourseLanguage } from "@/lib/courses/validation"
 import { safeLog } from "@/lib/logs"
+import { sweepAttachmentsQuietly } from "@/lib/materials/attachments/sweep"
 
 export const GET = courseRoute({ manage: true }, async (_request, auth) => {
   const db = getDb()
@@ -78,5 +79,7 @@ export const DELETE = courseRoute({ manage: true }, async (_request, auth) => {
     action: "course.delete",
     targetEmail: course.code,
   })
+  // The Attachments of its Teaching Materials went with it (cascade); sweep their bytes.
+  await sweepAttachmentsQuietly(db)
   return NextResponse.json({ ok: true })
 })

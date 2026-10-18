@@ -280,7 +280,7 @@ export function MaterialPanel({
         courseSlug={courseSlug}
         materialApiPath={apiPath}
         attachments={attachments}
-        onAttached={(a) => setAttachments((list) => [...list, a])}
+        onChange={setAttachments}
         canEdit={canEdit}
         saved={material !== null}
       />
