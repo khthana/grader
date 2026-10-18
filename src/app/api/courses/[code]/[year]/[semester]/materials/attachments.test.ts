@@ -86,7 +86,7 @@ describe("Teaching Material Attachments", () => {
     expect(await file.text()).toBe("%PDF-1")
   })
 
-  it("a download is served with the stored type: an image inline, anything else as a file, always nosniff", async () => {
+  it("a download is served with the stored type, always as a file — an image too (#119) — and nosniff", async () => {
     const pdf = await uploaded(f.ins.email, "สไลด์.pdf")
     const png = await uploaded(f.ins.email, "diagram.png")
     const a = await download(f.ins.email, pdf.id)
@@ -95,7 +95,7 @@ describe("Teaching Material Attachments", () => {
     expect(a.headers.get("x-content-type-options")).toBe("nosniff")
     const b = await download(f.ins.email, png.id)
     expect(b.headers.get("content-type")).toBe("image/png")
-    expect(b.headers.get("content-disposition")).toMatch(/^inline;/)
+    expect(b.headers.get("content-disposition")).toMatch(/^attachment;/)
     expect(b.headers.get("x-content-type-options")).toBe("nosniff")
   })
 

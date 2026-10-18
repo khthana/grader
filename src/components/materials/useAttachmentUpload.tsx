@@ -6,16 +6,16 @@ import { useToast } from "@/components/shell/ToastProvider"
 import type { Attachment } from "@/lib/materials/attachments/repository"
 
 export interface AttachmentUploader {
-  /** Upload files one by one; a name the Material already has asks "แทนที่ไฟล์" first. Returns those that went in. */
-  upload: (files: File[]) => Promise<Attachment[]>
+  /** Upload files one by one; a name the Material already has asks "แทนที่ไฟล์" first. */
+  upload: (files: File[]) => Promise<void>
   uploading: boolean
   /** The replace confirmation — render it once. */
   dialog: ReactNode
 }
 
 /**
- * Uploading into one Teaching Material (#114–#116) — shared by "แนบไฟล์" and
- * "แทรกรูป", so a name clash goes through the same replace confirmation.
+ * Uploading into one Teaching Material (#114–#115) — one place for the
+ * replace confirmation a name clash goes through.
  * `onUploaded` gets the Attachment and whether it replaced one of the same id.
  */
 export function useAttachmentUpload(
@@ -45,32 +45,26 @@ export function useAttachmentUpload(
     return { res, body: res ? await res.json().catch(() => ({})) : {} }
   }
 
-  async function uploadOne(file: File): Promise<Attachment | null> {
+  async function uploadOne(file: File) {
     let { res, body } = await send(file, false)
     if (res?.status === 409 && body.reason === "name-taken") {
-      if (!(await askReplace(file.name))) return null
+      if (!(await askReplace(file.name))) return
       ;({ res, body } = await send(file, true))
     }
     if (!res?.ok) {
       notify("error", `${file.name}: ${body.error ?? "แนบไฟล์ไม่สำเร็จ"}`)
-      return null
+      return
     }
     const attachment: Attachment = body.attachment
     onUploaded(attachment, body.replaced === true)
     if (body.replaced) notify("success", `แทนที่ไฟล์ ${attachment.name} แล้ว`)
-    return attachment
   }
 
   // Busy for the whole batch, not file by file.
-  async function upload(files: File[]): Promise<Attachment[]> {
+  async function upload(files: File[]) {
     setUploading(true)
     try {
-      const done: Attachment[] = []
-      for (const file of files) {
-        const attachment = await uploadOne(file)
-        if (attachment) done.push(attachment)
-      }
-      return done
+      for (const file of files) await uploadOne(file)
     } finally {
       setUploading(false)
     }
@@ -79,7 +73,7 @@ export function useAttachmentUpload(
   const dialog = replaceAsk && (
     <ConfirmDialog
       title="แทนที่ไฟล์"
-      message={`มีไฟล์ชื่อ ${replaceAsk.name} อยู่แล้ว ต้องการแทนที่ไฟล์เดิมใช่หรือไม่? รูปหรือลิงก์ในเนื้อหาที่อ้างชื่อนี้จะใช้ไฟล์ใหม่`}
+      message={`มีไฟล์ชื่อ ${replaceAsk.name} อยู่แล้ว ต้องการแทนที่ไฟล์เดิมใช่หรือไม่? ลิงก์ในเนื้อหาที่อ้างชื่อนี้จะใช้ไฟล์ใหม่`}
       confirmLabel="แทนที่"
       onConfirm={() => replaceAsk.answer(true)}
       onCancel={() => replaceAsk.answer(false)}

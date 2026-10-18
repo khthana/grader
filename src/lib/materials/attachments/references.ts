@@ -26,7 +26,7 @@ function referencedName(url: string): string | null {
 
 /**
  * The renderer's URL transform for one Material: `attachment:<name>` → that
- * Attachment's download URL, or "" when it has none (a broken image or link);
+ * Attachment's download URL, or "" when it has none (a link to nowhere);
  * anything else goes through react-markdown's own sanitising, unchanged.
  */
 export function attachmentUrlTransform(
@@ -58,14 +58,4 @@ export function missingReferences(body: string, names: Iterable<string>): string
     if (name !== null && !present.has(name)) missing.add(name)
   }
   return [...missing]
-}
-
-const hex = (c: string) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`
-
-/** The Markdown that shows (`image`) or links an Attachment by name — what "แทรกรูป" inserts. */
-export function attachmentReference(name: string, { image }: { image: boolean }): string {
-  const text = name.replace(/[[\]\\]/g, "\\$&")
-  // Encode what would end the URL early; the rest (Thai included) stays readable.
-  const target = name.replace(/[%\s()<>]/g, hex)
-  return `${image ? "!" : ""}[${text}](attachment:${target})`
 }

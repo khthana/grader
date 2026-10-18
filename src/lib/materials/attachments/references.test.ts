@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { MarkdownContent } from "@/components/ui/MarkdownContent"
-import { attachmentReference, attachmentUrlTransform, missingReferences } from "./references"
+import { attachmentUrlTransform, missingReferences } from "./references"
 
 // `attachment:` references in a Teaching Material's body (#116, ADR 0013):
 // resolved by name against the Material's own Attachments at render time.
@@ -51,41 +51,48 @@ describe("missingReferences", () => {
   })
 })
 
-describe("attachmentReference", () => {
+// The shared renderer as Teaching Materials use it: references resolved, and
+// no image shown — an image is a link to its file (#119).
+describe("MarkdownContent for a Teaching Material", () => {
+  const material = (content: string) =>
+    renderToStaticMarkup(createElement(MarkdownContent, { content, urlTransform: resolve, imagesAsLinks: true }))
+  const plain = (content: string) => renderToStaticMarkup(createElement(MarkdownContent, { content }))
+
+  it("links a file by name", () => {
+    expect(material("[s](attachment:week%203.png)")).toContain(`href="${url(8)}"`)
+  })
+
+  it("an Attachment image is a link to its download, named by its alt text", () => {
+    const html = material("![แผนภาพ](attachment:array-diagram.png)")
+    expect(html).not.toContain("<img")
+    expect(html).toMatch(new RegExp(`<a href="${url(7)}"[^>]*>แผนภาพ</a>`))
+  })
+
   it.each([
-    ["an image", "diagram.png", true, "![diagram.png](attachment:diagram.png)"],
-    ["a link", "slides.pdf", false, "[slides.pdf](attachment:slides.pdf)"],
-    ["spaces and parens are encoded", "week 3 (a).png", true, "![week 3 (a).png](attachment:week%203%20%28a%29.png)"],
-    ["brackets in the text are escaped", "a[1].png", true, "![a\\[1\\].png](attachment:a[1].png)"],
-  ])("%s", (_, name, image, expected) => {
-    expect(attachmentReference(name, { image })).toBe(expected)
+    ["an Attachment", "![](attachment:week%203.png)", url(8), "week 3.png"],
+    ["an outside image", "![](https://example.com/img/logo.png?v=2)", "https://example.com/img/logo.png?v=2", "logo.png"],
+  ])("an image without alt text is labelled by its file name: %s", (_, content, href, label) => {
+    const html = material(content)
+    expect(html).toContain(`<a href="${href}"`)
+    expect(html).toMatch(new RegExp(`>${label.replace(/\./g, "\\.")}</a>`))
   })
 
-  it("every inserted reference resolves back to its Attachment", () => {
-    for (const { name } of attachments) {
-      expect(missingReferences(attachmentReference(name, { image: true }), [name])).toEqual([])
-    }
-  })
-})
-
-// The shared renderer, through the transform only Teaching Materials pass.
-describe("MarkdownContent with attachment references", () => {
-  const render = (content: string, urlTransform?: (url: string) => string) =>
-    renderToStaticMarkup(createElement(MarkdownContent, { content, urlTransform }))
-
-  it("shows an Attachment image and links a file by name", () => {
-    const html = render("![d](attachment:array-diagram.png)\n\n[s](attachment:week%203.png)", resolve)
-    expect(html).toContain(`src="${url(7)}"`)
-    expect(html).toContain(`href="${url(8)}"`)
+  it("an external image is a link too", () => {
+    const html = material("![logo](https://example.com/logo.png)")
+    expect(html).not.toContain("<img")
+    expect(html).toContain('href="https://example.com/logo.png"')
   })
 
-  it("an unknown name renders as a broken image, never another URL", () => {
-    expect(render("![x](attachment:gone.png)", resolve)).not.toContain("attachment:")
+  it("an unknown name is a link to nowhere, never another URL", () => {
+    const html = material("![x](attachment:gone.png)")
+    expect(html).not.toContain("<img")
+    expect(html).not.toContain("attachment:")
+    expect(html).toContain('href=""')
   })
 
-  it("without the transform (Problems, Syllabus) Markdown works as before", () => {
-    const html = render("[docs](https://docs.python.org/3/) [x](attachment:array-diagram.png)")
-    expect(html).toContain('href="https://docs.python.org/3/"')
+  it("Problems and the Syllabus still show images, and leave attachment: alone", () => {
+    const html = plain("![logo](https://example.com/logo.png) [x](attachment:array-diagram.png)")
+    expect(html).toContain('<img src="https://example.com/logo.png"')
     expect(html).not.toContain(url(7))
   })
 })

@@ -4,6 +4,8 @@
 > Domain glossary: `CONTEXT.md` (Attachment, Teaching Material, Published Teaching Material, Course Duplication)
 > Design decisions: **ADR 0012** (Teaching Materials keyed by Teaching Plan week number), **ADR 0013** (Attachments stored on disk by content hash and referenced by name)
 > Phase 1: `requirement/PRD-teaching-materials.md` (#108–#112, shipped)
+>
+> **แก้ไขภายหลัง (2026-10-18, #118/#119):** เนื้อหาเอกสารการสอนไม่แสดงรูปแล้ว `![..](...)` จะแสดงเป็นลิงก์ ไฟล์แนบทุกไฟล์รวมทั้งรูปเป็นการดาวน์โหลด และเอาปุ่ม "แทรกรูป" ออกแล้ว ส่วนที่อ้างถึงรูปในเนื้อหาหรือ "แทรกรูป" ข้างล่างนี้เป็นของเดิม ดู ADR 0013 Amendment
 
 ---
 

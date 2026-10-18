@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest"
 import {
   attachmentHeaders,
   checkUpload,
-  IMAGE_ACCEPT,
   isAtAttachmentLimit,
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_MATERIAL,
@@ -68,8 +67,8 @@ describe("isAtAttachmentLimit", () => {
 describe("attachmentHeaders", () => {
   const headers = (name: string, contentType: string) => attachmentHeaders({ name, contentType, sizeBytes: 42 })
 
-  it("an image is shown inline; everything else downloads", () => {
-    expect(headers("a.png", "image/png")["Content-Disposition"]).toMatch(/^inline;/)
+  it("every Attachment downloads, an image too (#119)", () => {
+    expect(headers("a.png", "image/png")["Content-Disposition"]).toMatch(/^attachment;/)
     expect(headers("a.pdf", "application/pdf")["Content-Disposition"]).toMatch(/^attachment;/)
     expect(headers("notes.txt", "text/plain; charset=utf-8")["Content-Disposition"]).toMatch(/^attachment;/)
   })
@@ -91,12 +90,5 @@ describe("attachmentHeaders", () => {
   it("a quote in the name can't break the header", () => {
     const d = headers('a"b.pdf', "application/pdf")["Content-Disposition"]
     expect(d).toContain('filename="a_b.pdf"')
-  })
-})
-
-describe("IMAGE_ACCEPT", () => {
-  it("offers \"แทรกรูป\" only the allowed images that show inline (#116)", () => {
-    expect(IMAGE_ACCEPT.split(",")).toEqual([".png", ".jpg", ".jpeg", ".gif", ".webp"])
-    for (const ext of IMAGE_ACCEPT.split(",")) expect(checkUpload({ name: `a${ext}`, size: 1 })).toMatchObject({ ok: true })
   })
 })

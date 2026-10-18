@@ -35,12 +35,6 @@ const TYPES: Record<string, string> = {
 /** For a file input's `accept`. */
 export const ATTACHMENT_ACCEPT = Object.keys(TYPES).map((ext) => `.${ext}`).join(",")
 
-/** For "แทรกรูป"'s file input (#116): the allowed types that show inline. */
-export const IMAGE_ACCEPT = Object.entries(TYPES)
-  .filter(([, type]) => type.startsWith("image/"))
-  .map(([ext]) => `.${ext}`)
-  .join(",")
-
 const MB = 1024 * 1024
 /** Why an upload is refused, as shown to staff. */
 export const UPLOAD_ERRORS = {
@@ -76,24 +70,21 @@ export const ATTACHMENT_LIMIT_ERROR = `แนบได้ไม่เกิน $
 /** File names are unique within one Material (ADR 0013). */
 export const nameTakenError = (name: string) => `มีไฟล์ชื่อ ${name} อยู่แล้ว`
 
-const isImageType = (contentType: string) => contentType.startsWith("image/")
-
 // RFC 5987 attr-char leaves out ' ( ) * , which encodeURIComponent keeps.
 const encodeRfc5987 = (name: string) =>
   encodeURIComponent(name).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
 
 /**
- * Response headers for a stored Attachment: an image shows inline (in the
- * Material's text), anything else always downloads — never rendered as a page
- * of this site. `nosniff` stops a browser second-guessing the stored type.
+ * Response headers for a stored Attachment: every one downloads, an image too
+ * (#119) — never shown or rendered as a page of this site. `nosniff` stops a
+ * browser second-guessing the stored type.
  */
 export function attachmentHeaders(a: { name: string; contentType: string; sizeBytes: number }): Record<string, string> {
   const fallback = a.name.replace(/[^\x20-\x7e]|["\\]/g, "_")
-  const disposition = isImageType(a.contentType) ? "inline" : "attachment"
   return {
     "Content-Type": a.contentType,
     "Content-Length": String(a.sizeBytes),
-    "Content-Disposition": `${disposition}; filename="${fallback}"; filename*=UTF-8''${encodeRfc5987(a.name)}`,
+    "Content-Disposition": `attachment; filename="${fallback}"; filename*=UTF-8''${encodeRfc5987(a.name)}`,
     "X-Content-Type-Options": "nosniff",
     "Cache-Control": "private, no-cache",
   }

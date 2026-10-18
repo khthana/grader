@@ -74,3 +74,19 @@ things shape the design:
   that survive moves and copies.
 - An Attachment is seen exactly when its Teaching Material is seen (`canSeeMaterial`).
   There is no per-file publish switch.
+
+## Amendment, 2026-10-18 (#118, #119): no images in the text
+
+The staff want a Teaching Material to be text plus downloads, nothing shown inline.
+Decision 3 stands, and references still name a file, but only as links:
+
+- Markdown image syntax in a Teaching Material renders as a link to the file, labelled
+  by its alt text. This holds for `attachment:` names and outside URLs alike. Problems
+  and the Syllabus still show images.
+- Every Attachment is served as a download, images included. Nothing is served inline
+  any more.
+- The "แทรกรูป" editor action is gone.
+
+Bodies written before this keep working: an embedded image becomes a download link. It
+also does away with two problems: an image that stayed stale after its file was replaced
+(same URL), and an image inserted into the middle of a line.

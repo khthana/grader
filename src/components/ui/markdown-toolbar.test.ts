@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { applyFormat, insertText, type FormatKind } from "./markdown-toolbar"
+import { applyFormat, type FormatKind } from "./markdown-toolbar"
 
 // The toolbar's text transforms (#98): (text, selection, kind) → (text, selection).
 // `[` and `]` mark the selection in these cases; `|` is a collapsed cursor.
@@ -108,18 +108,5 @@ describe("applyFormat — lists (bullet, numbered)", () => {
 
   it("leaves the text outside the touched lines alone", () => {
     expect(run("before\n[x]\nafter", "bullet")).toBe("before\n[- x]\nafter")
-  })
-})
-
-describe("insertText", () => {
-  it.each([
-    ["at the cursor", "ab", { start: 1, end: 1 }, "a![x](attachment:x)b", 19],
-    ["in place of a selection", "a sel b", { start: 2, end: 5 }, "a ![x](attachment:x) b", 20],
-    ["into an empty body", "", { start: 0, end: 0 }, "![x](attachment:x)", 18],
-  ])("%s", (_, text, selection, expected, cursor) => {
-    expect(insertText(text, selection, "![x](attachment:x)")).toEqual({
-      text: expected,
-      selection: { start: cursor, end: cursor },
-    })
   })
 })

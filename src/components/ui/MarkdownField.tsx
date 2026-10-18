@@ -2,9 +2,9 @@
 
 import { useLayoutEffect, useRef, useState } from "react"
 import type { IconType } from "react-icons"
-import { FaBold, FaImage, FaItalic, FaListOl, FaListUl } from "react-icons/fa"
-import { MarkdownContent, type UrlTransform } from "./MarkdownContent"
-import { applyFormat, insertText, type FormatKind, type TextSelection } from "./markdown-toolbar"
+import { FaBold, FaItalic, FaListOl, FaListUl } from "react-icons/fa"
+import { MarkdownContent, type MarkdownOptions } from "./MarkdownContent"
+import { applyFormat, type FormatKind, type TextSelection } from "./markdown-toolbar"
 
 const TOOLS: { kind: FormatKind; label: string; icon: IconType }[] = [
   { kind: "bold", label: "ตัวหนา", icon: FaBold },
@@ -17,35 +17,23 @@ const TOOLS: { kind: FormatKind; label: string; icon: IconType }[] = [
  * A Markdown textarea with a formatting toolbar and เขียน / ดูตัวอย่าง tabs
  * (#98) — shared by the Problem description and the Syllabus. The toolbar's
  * transforms live in `markdown-toolbar.ts`; rendering is `MarkdownContent`.
- * A Teaching Material also passes its preview's `urlTransform` and an
- * `insertImage` action — "แทรกรูป" (#116).
+ * A Teaching Material also passes how its preview renders (`options`).
  */
 export function MarkdownField({
   value,
   onChange,
   placeholder,
-  urlTransform,
-  insertImage,
+  options,
 }: {
   value: string
   onChange: (value: string) => void
   placeholder?: string
-  urlTransform?: UrlTransform
-  /** Upload a chosen image and give back the Markdown to put at the cursor (null = nothing). */
-  insertImage?: { accept: string; busy: boolean; insert: (file: File) => Promise<string | null> }
+  options?: MarkdownOptions
 }) {
   const [tab, setTab] = useState<"write" | "preview">("write")
   const textarea = useRef<HTMLTextAreaElement>(null)
   // The selection to restore once the formatted value has rendered.
   const pending = useRef<TextSelection | null>(null)
-  const imageInput = useRef<HTMLInputElement>(null)
-  // Where the image goes — taken when the button is pressed, before the file dialog.
-  const imageAt = useRef<TextSelection>({ start: 0, end: 0 })
-  // The value once the upload is back — the tab may have changed meanwhile, so not the textarea's.
-  const latest = useRef(value)
-  useLayoutEffect(() => {
-    latest.current = value
-  }, [value])
 
   useLayoutEffect(() => {
     const el = textarea.current
@@ -62,17 +50,6 @@ export function MarkdownField({
     // the selection offsets count against that, so a stored CRLF can't shift them.
     const result = applyFormat(el.value, { start: el.selectionStart, end: el.selectionEnd }, kind)
     if (result.text === el.value) return
-    pending.current = result.selection
-    onChange(result.text)
-  }
-
-  async function addImage(file: File) {
-    if (imageInput.current) imageInput.current.value = ""
-    const snippet = await insertImage?.insert(file)
-    if (!snippet) return
-    const text = latest.current
-    const at = Math.min(imageAt.current.start, text.length)
-    const result = insertText(text, { start: at, end: Math.max(at, Math.min(imageAt.current.end, text.length)) }, snippet)
     pending.current = result.selection
     onChange(result.text)
   }
@@ -108,32 +85,6 @@ export function MarkdownField({
                 <Icon className="h-3.5 w-3.5" />
               </button>
             ))}
-            {insertImage && (
-              <>
-                <input
-                  ref={imageInput}
-                  type="file"
-                  accept={insertImage.accept}
-                  className="hidden"
-                  onChange={(e) => e.target.files?.[0] && addImage(e.target.files[0])}
-                />
-                <button
-                  type="button"
-                  title="แทรกรูป"
-                  aria-label="แทรกรูป"
-                  disabled={insertImage.busy}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    const el = textarea.current
-                    if (el) imageAt.current = { start: el.selectionStart, end: el.selectionEnd }
-                    imageInput.current?.click()
-                  }}
-                  className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
-                >
-                  <FaImage className="h-3.5 w-3.5" />
-                </button>
-              </>
-            )}
           </div>
         )}
       </div>
@@ -149,7 +100,7 @@ export function MarkdownField({
       ) : (
         <div className="min-h-[144px] rounded-lg border border-gray-200 bg-slate-50 px-4 py-3">
           {value.trim() ? (
-            <MarkdownContent content={value} urlTransform={urlTransform} />
+            <MarkdownContent content={value} {...options} />
           ) : (
             <span className="text-sm text-slate-400">ยังไม่มีเนื้อหา</span>
           )}

@@ -116,9 +116,9 @@ holds at most one Teaching Material of each Material Kind.
 
 ### Attachment (ไฟล์แนบ)
 A file the staff upload into one **Teaching Material** — a PDF, a slide deck, an archive or
-an image. All of a Teaching Material's Attachments are listed with it; an image Attachment
-may also be shown inside its formatted text. There is no separate kind of "inline image".
-_Avoid_: upload, asset, inline image (an image is just an Attachment shown in the text)
+an image. Every Attachment is a download, an image too: none is shown inside the text,
+though the text may link to one by name.
+_Avoid_: upload, asset, inline image (nothing is shown in the text)
 
 ### Published Teaching Material (เผยแพร่แล้ว)
 A **Teaching Material** the staff have switched on for Students — one switch per

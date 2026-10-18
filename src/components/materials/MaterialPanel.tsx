@@ -12,8 +12,7 @@ import { MarkdownField } from "@/components/ui/MarkdownField"
 import { materialKindLabel, type MaterialKind } from "@/lib/materials/kinds"
 import { MAX_PLAN_WEEK } from "@/lib/syllabus/plan"
 import type { ViewedMaterial } from "@/lib/materials/student-view"
-import { IMAGE_ACCEPT } from "@/lib/materials/attachments/policy"
-import { attachmentReference, attachmentUrlTransform, missingReferences } from "@/lib/materials/attachments/references"
+import { attachmentUrlTransform, missingReferences } from "@/lib/materials/attachments/references"
 import type { Attachment } from "@/lib/materials/attachments/repository"
 import { MaterialAttachments } from "./MaterialAttachments"
 import { useAttachmentUpload } from "./useAttachmentUpload"
@@ -25,8 +24,8 @@ import { UnpublishedBadge } from "./MaterialsOutline"
  * in edit mode for a manager — the first save creates it. A manager also moves
  * it to another week or deletes it (#111). Every viewer prints it (#112) —
  * only the heading, content and Attachment names reach the paper. Its
- * Attachments are listed under the content (#114); its text shows them by
- * name — `![…](attachment:name)` — and "แทรกรูป" uploads one into it (#116).
+ * Attachments are listed under the content (#114); its text links them by
+ * name — `[…](attachment:name)` (#116) — and shows no image (#119).
  */
 export function MaterialPanel({
   courseSlug,
@@ -66,7 +65,11 @@ export function MaterialPanel({
   const uploader = useAttachmentUpload(apiPath, (attachment, replaced) =>
     setAttachments((list) => (replaced ? list.map((a) => (a.id === attachment.id ? attachment : a)) : [...list, attachment]))
   )
-  const urlTransform = useMemo(() => attachmentUrlTransform(courseSlug, attachments), [courseSlug, attachments])
+  // Its text links its Attachments by name and shows no image (#116, #119).
+  const markdownOptions = useMemo(
+    () => ({ urlTransform: attachmentUrlTransform(courseSlug, attachments), imagesAsLinks: true }),
+    [courseSlug, attachments]
+  )
   const missing = draft === null ? [] : missingReferences(draft, attachments.map((a) => a.name))
   // Only staff get the flag (the Student View drops it).
   const isPublished = material && "isPublished" in material ? material.isPublished : null
@@ -275,28 +278,15 @@ export function MaterialPanel({
               value={draft}
               onChange={setDraft}
               placeholder={"# หัวข้อ\n\nเนื้อหา… ใส่ลิงก์สไลด์ได้ เช่น [สไลด์](https://...)"}
-              urlTransform={urlTransform}
-              insertImage={
-                // Only a saved Material takes Attachments.
-                material !== null
-                  ? {
-                      accept: IMAGE_ACCEPT,
-                      busy: uploader.uploading,
-                      insert: async (file) => {
-                        const [attachment] = await uploader.upload([file])
-                        return attachment ? attachmentReference(attachment.name, { image: true }) : null
-                      },
-                    }
-                  : undefined
-              }
+              options={markdownOptions}
             />
             {missing.length > 0 && (
-              <p className="mt-1 text-xs text-amber-700">ไม่มีไฟล์แนบชื่อ {missing.join(", ")} — รูปหรือลิงก์นั้นจะใช้ไม่ได้</p>
+              <p className="mt-1 text-xs text-amber-700">ไม่มีไฟล์แนบชื่อ {missing.join(", ")} — ลิงก์นั้นจะใช้ไม่ได้</p>
             )}
             {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
           </>
         ) : material?.body ? (
-          <MarkdownContent content={material.body} urlTransform={urlTransform} />
+          <MarkdownContent content={material.body} {...markdownOptions} />
         ) : (
           <p className="text-sm text-slate-400">ยังไม่มีเนื้อหา</p>
         )}

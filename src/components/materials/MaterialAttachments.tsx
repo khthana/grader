@@ -20,7 +20,7 @@ function formatSize(bytes: number): string {
  * viewer, in upload order. A manager attaches files once the Material has been
  * saved — each upload takes effect at once, no body save needed — replaces one
  * by uploading its name again (after confirming) and deletes one (#115).
- * Uploading goes through the Material's `uploader`, shared with "แทรกรูป".
+ * Uploading goes through the Material's `uploader`.
  */
 export function MaterialAttachments({
   courseSlug,
