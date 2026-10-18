@@ -9,6 +9,7 @@ import { canManageCourses } from "@/lib/courses/access"
 import { isCourseScopedPath } from "@/lib/courses/scope"
 import type { CourseOption } from "./AppShell"
 import { useConfirmLeave } from "./NavigationGuard"
+import { BrandMark } from "@/components/ui/BrandMark"
 
 interface NavbarProps {
   name: string
@@ -22,9 +23,7 @@ interface NavbarProps {
 function Logo() {
   return (
     <div className="flex items-center gap-2">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500 font-bold text-white">
-        CE
-      </div>
+      <BrandMark className="h-9 w-9" />
       <span className="font-thai text-lg font-semibold text-white">CE-CodeClass</span>
     </div>
   )

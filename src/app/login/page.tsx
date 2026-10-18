@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { BrandMark } from "@/components/ui/BrandMark"
 
 function GoogleIcon() {
   return (
@@ -160,9 +161,7 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="relative flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500 shadow-lg shadow-orange-500/20">
-            <span className="text-sm font-bold text-white">CE</span>
-          </div>
+          <BrandMark className="h-10 w-10 shadow-lg shadow-orange-500/20" />
           <span className="text-base font-semibold tracking-tight text-white">CE-CodeClass</span>
         </div>
 
