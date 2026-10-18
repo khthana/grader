@@ -1,9 +1,9 @@
-# CE-Grader
+# CE-CodeClass
 
-ระบบตรวจและให้คะแนน Python code ของนักศึกษาอัตโนมัติ (Computer Engineering Python Grader)  
+**Learn. Code. Practice. Master.** — ห้องเรียนวิชาเขียนโปรแกรมครบในที่เดียว: ประมวลรายวิชา เอกสารการสอน แบบทดสอบก่อน–หลังเรียน ส่งโค้ดตรวจอัตโนมัติพร้อม feedback ทันที และสมุดคะแนน (เดิมชื่อ CE-Grader — repo, โฟลเดอร์ และ Docker project ยังใช้ชื่อ `grader`)  
 Faculty of Engineering, KMITL — Standalone product (the sibling `DEEP-QA-*` repos are read-only design references).
 
-นักศึกษาส่งโค้ด (**Python หรือ C** ตามภาษาของรายวิชา) เข้ามา ระบบรัน/คอมไพล์กับ test cases ผ่าน [Piston](https://github.com/engineer-man/piston) แล้วให้คะแนนพร้อม feedback ทันที
+นักศึกษาส่งโค้ด (**Python, C หรือ C++** ตามภาษาของรายวิชา) เข้ามา ระบบรัน/คอมไพล์กับ test cases ผ่าน [Piston](https://github.com/engineer-man/piston) แล้วให้คะแนนพร้อม feedback ทันที
 
 ## Features
 
