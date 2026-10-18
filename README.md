@@ -29,15 +29,20 @@ Faculty of Engineering, KMITL — Standalone product (the sibling `DEEP-QA-*` re
 | **Unit Test Mode** | โจทย์แบบ pytest-style block (`assert`) — all-or-nothing scoring; นักศึกษาเห็นแค่ผ่าน/ไม่ผ่าน (traceback เฉพาะ staff) |
 | **User Profile** | ตั้ง nickname + อัปโหลด avatar (resize 256×256) + เปลี่ยนรหัสผ่าน (ทุก role) |
 | **Course-scoped access** | สิทธิ์ผูกกับรายวิชา — TA/Instructor มีสิทธิ์เฉพาะวิชาที่ตัวเองสอน; ปิด id probing / cross-course write |
-| **Course Duplication** | ทำซ้ำทั้งวิชา (โจทย์ + เฉลย + test cases + ผู้สอน + weeks) ไปภาคการศึกษาใหม่คลิกเดียว (Instructor/Admin) |
-| **Multi-language (Python / C)** | เลือกภาษาต่อรายวิชา; โจทย์ทุกข้อ inherit ภาษานั้น; C คอมไพล์+รันผ่าน gcc (I/O mode); Unit Test + AI gen เฉพาะ Python |
+| **Course Duplication** | ทำซ้ำทั้งวิชา (โจทย์ + เฉลย + test cases + ผู้สอน + weeks + แบบทดสอบ + ประมวลรายวิชา + เอกสารการสอนและไฟล์แนบ) ไปภาคการศึกษาใหม่คลิกเดียว — เอกสารที่ copy ไปเริ่มแบบยังไม่เผยแพร่ (Instructor/Admin) |
+| **Multi-language (Python / C / C++)** | เลือกภาษาต่อรายวิชา; โจทย์ทุกข้อ inherit ภาษานั้น; C/C++ คอมไพล์+รันผ่าน gcc (I/O mode); Unit Test + AI gen เฉพาะ Python |
+| **Pre/Post-test Quizzes** | แบบทดสอบปรนัยก่อน–หลังเรียน (ไม่นับคะแนน) — import จาก JSON, ตัวเลือก "ไม่ทราบ", เปิด–ปิดรอบตามกลุ่มเรียน, บันทึกคำตอบอัตโนมัติ, เฉลยเปิดหลังปิดรอบ Post-test, รายงานเทียบ Pre vs Post รายข้อ/รายคน + export Excel |
+| **Syllabus (ประมวลรายวิชา)** | ข้อมูลรายวิชา + ผู้สอน (ดึงสด) + คำอธิบาย/วัตถุประสงค์/แหล่งเรียนรู้ (Markdown) + แผนการสอนรายสัปดาห์ + สัดส่วนคะแนน (เตือนเมื่อรวมไม่ถึง 100%) + พิมพ์ได้ |
+| **Teaching Materials (เอกสารการสอน)** | ตารางสัปดาห์ (ตามแผนการสอน) × ชนิด (สไลด์ / เอกสารประกอบ / ใบงาน) — เนื้อหา Markdown, เผยแพร่/ซ่อนทีละชิ้น, ย้ายสัปดาห์, พิมพ์ได้; จัดการแนบไฟล์/เผยแพร่/ลบได้จากตารางโดยตรง |
+| **Material Attachments (ไฟล์แนบ)** | แนบไฟล์ (pdf, pptx, docx, xlsx, py, c, ipynb, zip, รูป ฯลฯ ≤ 50 MB, 20 ไฟล์/เอกสาร) — ดาวน์โหลดได้เมื่อเห็นเอกสาร, แทนที่ไฟล์ชื่อเดิม, อ้างในเนื้อหาด้วย `attachment:ชื่อไฟล์`; ไฟล์เก็บบน disk ตาม SHA-256 (backup คู่กับ DB — [ADR 0013](docs/adr/0013-material-attachments-content-addressed-referenced-by-name.md)) |
+| **Unsaved-changes guard** | ถามยืนยันก่อนออกจากหน้าที่ยังไม่บันทึก (ประมวลรายวิชา) |
 
 ## Tech stack
 
 - **Next.js 16** (App Router, Turbopack) · TypeScript · React 19
 - **Tailwind CSS v4** + `@tailwindcss/typography` · `react-icons`
 - **PostgreSQL** via raw `pg` + SQL · **bcryptjs** password hashing
-- **Piston** — sandboxed code execution (Python 3.10.0 · C `gcc` 10.2.0)
+- **Piston** — sandboxed code execution (Python 3.10.0 · C/C++ `gcc` 10.2.0)
 - HMAC-SHA256 session cookie · Google OAuth (optional) · route protection via Next 16 `proxy`
 - **Vitest** + **pg-mem** (in-memory Postgres) for tests · `xlsx` for bulk import/export
 - `react-markdown` + `remark-gfm` — Markdown rendering for problem descriptions
