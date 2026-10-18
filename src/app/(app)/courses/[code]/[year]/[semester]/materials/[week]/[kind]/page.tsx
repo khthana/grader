@@ -21,7 +21,7 @@ export default async function CourseMaterialPage({ params }: PageProps) {
   const access = await getCourseAccess(slug)
   if (!access) notFound()
 
-  const { exists, material, heading } = await loadMaterial(getDb(), slug, address, access)
+  const { exists, material, heading, attachments } = await loadMaterial(getDb(), slug, address, access)
   if (exists ? !material : !access.manager) notFound()
 
   return (
@@ -33,6 +33,7 @@ export default async function CourseMaterialPage({ params }: PageProps) {
         kind={address.kind}
         heading={heading}
         initialMaterial={material}
+        initialAttachments={attachments}
         canEdit={access.manager}
         staff={access.staff}
       />

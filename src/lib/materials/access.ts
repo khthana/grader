@@ -5,9 +5,11 @@
 import type { Queryable } from "@/lib/db"
 import type { CourseKey } from "@/lib/courses/types"
 import { getSyllabus } from "@/lib/syllabus/repository"
+import type { PlanEntry } from "@/lib/syllabus/plan"
 import type { MaterialAddress } from "./params"
 import { buildMaterialsOutline, materialHeading } from "./outline"
 import { getMaterial, listMaterials } from "./repository"
+import { getAttachmentForCourse, listAttachments, type Attachment, type StoredAttachment } from "./attachments/repository"
 import { canSeeMaterial, materialFor, materialsOutlineFor, type MaterialViewer, type ViewedMaterial } from "./student-view"
 
 /** The viewer's outline, plus whether the course has a Teaching Plan at all. */
@@ -18,8 +20,9 @@ export async function loadMaterialsOutline(db: Queryable, key: CourseKey, viewer
 }
 
 /**
- * One Material with its live heading (null = Unplanned). `exists` says whether
- * there is one at all; `material` is set only when the viewer may see it —
+ * One Material with its live heading (null = Unplanned) and its Attachments
+ * (#114). `exists` says whether there is one at all; `material` is set only
+ * when the viewer may see it, and `attachments` is empty unless it is —
  * callers answer a refused one exactly as a missing one.
  */
 export async function loadMaterial(
@@ -27,9 +30,35 @@ export async function loadMaterial(
   key: CourseKey,
   address: MaterialAddress,
   viewer: MaterialViewer
-): Promise<{ exists: boolean; material: ViewedMaterial | null; heading: string | null }> {
+): Promise<{ exists: boolean; material: ViewedMaterial | null; heading: string | null; attachments: Attachment[] }> {
   const [material, { plan }] = await Promise.all([getMaterial(db, key, address.weekNo, address.kind), getSyllabus(db, key)])
   const heading = materialHeading(plan, address.weekNo)
-  const visible = material !== null && canSeeMaterial(viewer, material, heading !== null)
-  return { exists: material !== null, material: visible ? materialFor(viewer, material) : null, heading }
+  const visible = material !== null && isVisible(viewer, material, plan)
+  return {
+    exists: material !== null,
+    material: visible ? materialFor(viewer, material) : null,
+    heading,
+    attachments: visible ? await listAttachments(db, key, address) : [],
+  }
 }
+
+/**
+ * One Attachment for this viewer (#114) — seen exactly when its Teaching
+ * Material is (ADR 0013). Null for one that isn't this course's or that the
+ * viewer may not see: callers answer both alike.
+ */
+export async function loadAttachment(
+  db: Queryable,
+  key: CourseKey,
+  attachmentId: number,
+  viewer: MaterialViewer
+): Promise<StoredAttachment | null> {
+  const attachment = await getAttachmentForCourse(db, key, attachmentId)
+  if (!attachment) return null
+  const { plan } = await getSyllabus(db, key)
+  return isVisible(viewer, attachment.material, plan) ? attachment : null
+}
+
+/** The Student View's rule, with "planned" read from the course's Teaching Plan. */
+const isVisible = (viewer: MaterialViewer, material: { weekNo: number; isPublished: boolean }, plan: PlanEntry[]) =>
+  canSeeMaterial(viewer, material, materialHeading(plan, material.weekNo) !== null)

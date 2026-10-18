@@ -10,13 +10,13 @@ import { deleteMaterial, saveMaterial } from "@/lib/materials/repository"
 
 type Params = { code: string; year: string; semester: string; week: string; kind: string }
 
-/** One Teaching Material with its live heading (null = Unplanned) — anyone linked (#109). */
+/** One Teaching Material with its live heading (null = Unplanned) and Attachments — anyone linked (#109, #114). */
 export const GET = courseRoute<Params>({}, async (_req, auth, params) => {
   const address = parseMaterialAddress(params.week, params.kind)
   if (!address) return materialNotFound()
-  const { material, heading } = await loadMaterial(getDb(), auth.course, address, auth)
+  const { material, heading, attachments } = await loadMaterial(getDb(), auth.course, address, auth)
   if (!material) return materialNotFound()
-  return NextResponse.json({ material, heading })
+  return NextResponse.json({ material, heading, attachments })
 })
 
 /** Write the body — the first save creates it, unpublished (Instructor/Admin of this course). */

@@ -296,3 +296,19 @@ CREATE TABLE IF NOT EXISTS teaching_materials (
   FOREIGN KEY (course_code, course_year, course_semester)
     REFERENCES courses(code, year, semester) ON DELETE CASCADE
 );
+
+-- Attachments (ไฟล์แนบ) of a Teaching Material (#114, ADR 0013). The bytes live
+-- on disk under ATTACHMENTS_DIR, named by sha256; a row is deleted with its
+-- Material, and unreferenced files are swept.
+CREATE TABLE IF NOT EXISTS material_attachments (
+  id            SERIAL PRIMARY KEY,
+  material_id   INTEGER NOT NULL REFERENCES teaching_materials(id) ON DELETE CASCADE,
+  name          TEXT    NOT NULL,
+  content_type  TEXT    NOT NULL,
+  size_bytes    INTEGER NOT NULL,
+  sha256        TEXT    NOT NULL,
+  uploaded_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  uploaded_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  UNIQUE (material_id, name)
+);
+CREATE INDEX IF NOT EXISTS material_attachments_sha256 ON material_attachments (sha256);

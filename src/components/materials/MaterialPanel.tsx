@@ -12,6 +12,8 @@ import { MarkdownField } from "@/components/ui/MarkdownField"
 import { materialKindLabel, type MaterialKind } from "@/lib/materials/kinds"
 import { MAX_PLAN_WEEK } from "@/lib/syllabus/plan"
 import type { ViewedMaterial } from "@/lib/materials/student-view"
+import type { Attachment } from "@/lib/materials/attachments/repository"
+import { MaterialAttachments } from "./MaterialAttachments"
 import { UnpublishedBadge } from "./MaterialsOutline"
 
 /**
@@ -19,7 +21,8 @@ import { UnpublishedBadge } from "./MaterialsOutline"
  * manager writes its Markdown body. A Material not yet written opens straight
  * in edit mode for a manager — the first save creates it. A manager also moves
  * it to another week or deletes it (#111). Every viewer prints it (#112) —
- * only the heading and content reach the paper.
+ * only the heading, content and Attachment names reach the paper. Its
+ * Attachments are listed under the content (#114).
  */
 export function MaterialPanel({
   courseSlug,
@@ -28,6 +31,7 @@ export function MaterialPanel({
   kind,
   heading,
   initialMaterial,
+  initialAttachments,
   canEdit,
   staff,
 }: {
@@ -38,11 +42,13 @@ export function MaterialPanel({
   /** The week's Teaching Plan topics; null = Unplanned. */
   heading: string | null
   initialMaterial: ViewedMaterial | null
+  initialAttachments: Attachment[]
   canEdit: boolean
   staff: boolean
 }) {
   const { notify } = useToast()
   const [material, setMaterial] = useState(initialMaterial)
+  const [attachments, setAttachments] = useState(initialAttachments)
   const [draft, setDraft] = useState<string | null>(initialMaterial || !canEdit ? null : "")
   const [error, setError] = useState<string>()
   const [saving, setSaving] = useState(false)
@@ -269,6 +275,15 @@ export function MaterialPanel({
           <p className="text-sm text-slate-400">ยังไม่มีเนื้อหา</p>
         )}
       </section>
+
+      <MaterialAttachments
+        courseSlug={courseSlug}
+        materialApiPath={apiPath}
+        attachments={attachments}
+        onAttached={(a) => setAttachments((list) => [...list, a])}
+        canEdit={canEdit}
+        saved={material !== null}
+      />
 
       {confirmDelete && (
         <ConfirmDialog

@@ -89,7 +89,12 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       PISTON_URL:           http://piston:2000/api/v2
       ANTHROPIC_API_KEY:    ${ANTHROPIC_API_KEY:-}
+      ATTACHMENTS_DIR:      /data/attachments
+    volumes:
+      # Teaching Material Attachments (ADR 0013) — back up together with the DB.
+      - grader-attachments:/data/attachments
 
 volumes:
   grader-db-data:
   piston-data:
+  grader-attachments:

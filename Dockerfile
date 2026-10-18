@@ -31,6 +31,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs \
  && adduser  --system --uid 1001 nextjs
+# The Attachments volume mount point — a fresh named volume takes this owner.
+RUN mkdir -p /data/attachments && chown nextjs:nodejs /data/attachments
 
 COPY --from=builder /app/public                                 ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
