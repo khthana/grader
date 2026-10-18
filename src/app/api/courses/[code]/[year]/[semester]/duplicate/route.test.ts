@@ -12,6 +12,7 @@ import { seedQuiz } from "@/lib/test-support/quiz"
 import { EMPTY_SYLLABUS } from "@/lib/syllabus/draft"
 import { saveSyllabus } from "@/lib/syllabus/repository"
 import { saveMaterial } from "@/lib/materials/repository"
+import { createAttachment, findMaterialId } from "@/lib/materials/attachments/repository"
 
 describe("POST /api/courses/[code]/[year]/[semester]/duplicate", () => {
   let f: CourseFixture
@@ -172,5 +173,13 @@ describe("POST /api/courses/[code]/[year]/[semester]/duplicate", () => {
     await saveMaterial(f.db, f.course, { weekNo: 9, kind: "lab" }, "l", f.ins.id)
     const tx = await duplicateFailingOn(/INSERT INTO teaching_materials/)
     expect(tx).toContain("INSERT INTO course_syllabi")
+  })
+
+  it("copies Attachments in the same transaction — a failure copying them rolls back (#117)", async () => {
+    await saveMaterial(f.db, f.course, { weekNo: 1, kind: "slides" }, "s", f.ins.id)
+    const materialId = (await findMaterialId(f.db, f.course, { weekNo: 1, kind: "slides" }))!
+    const file = { name: "a.pdf", contentType: "application/pdf", sizeBytes: 1, sha256: "a".repeat(64) }
+    await createAttachment(f.db, materialId, file, f.ins.id)
+    expect(await duplicateFailingOn(/INSERT INTO material_attachments/)).toContain("INSERT INTO teaching_materials")
   })
 })

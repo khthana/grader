@@ -113,6 +113,21 @@ export async function deleteAttachment(db: Queryable, key: CourseKey, id: number
   return attachment
 }
 
+/**
+ * Course Duplication (#117, ADR 0013): give the copied Material its source's
+ * Attachments — same names, same hashes, no bytes copied. From then on each
+ * row is its own: replacing or deleting one never touches the other, and the
+ * shared bytes stay while any row still refers to them.
+ */
+export async function copyAttachments(db: Queryable, sourceMaterialId: number, targetMaterialId: number): Promise<void> {
+  await db.query(
+    `INSERT INTO material_attachments (material_id, name, content_type, size_bytes, sha256, uploaded_by)
+     SELECT $2::int, name, content_type, size_bytes, sha256, uploaded_by
+     FROM material_attachments WHERE material_id = $1::int ORDER BY id`,
+    [sourceMaterialId, targetMaterialId]
+  )
+}
+
 /** Every hash some Attachment refers to — what a sweep must keep. */
 export async function listReferencedHashes(db: Queryable): Promise<string[]> {
   const { rows } = await db.query<{ sha256: string }>(`SELECT DISTINCT sha256 FROM material_attachments`)

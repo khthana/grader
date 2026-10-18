@@ -140,7 +140,8 @@ user), every **Week** (`week_no` + `topic`), every **Problem** (all fields inclu
 Don't Know setting, Week by `week_no`), and the **Syllabus** (general information,
 Teaching Plan and Assessment Components — the new term's starting point; a course
 without one gets none), and every **Teaching Material** (same week number and Material
-Kind, Unplanned ones included). Term-specific state is deliberately reset: **Due Date** / **Close
+Kind, Unplanned ones included) with its **Attachments** (same names, sharing the stored
+files — after the copy each term's Attachment is its own). Term-specific state is deliberately reset: **Due Date** / **Close
 Date** are cleared, every Week starts as an unreleased (hidden) **Released Week**, and no
 **Round Window** is copied (a copied Quiz is unlocked), and every Teaching Material starts
 unpublished.

@@ -48,6 +48,7 @@ mapping is unambiguous (no merge).
 | Quiz Attempt | — | never copied |
 | Syllabus *(#103)* | the main row (`credits`, `description`, `objectives`), every Teaching Plan entry and every Assessment Component 1:1 in order | only if the source has one — a source never written creates nothing; staff are not part of it (read live from Course staff) |
 | Teaching Material *(#112, ADR 0012)* | every Material — Unplanned ones included — at the same `week_no` and `kind`, with its `body` | `is_published` → `false` (staff publish again in the new term); a source with none creates nothing |
+| Attachment *(#117, ADR 0013)* | every Attachment of each copied Material — `name`, `content_type`, `size_bytes`, `sha256`, `uploaded_by`, in upload order | **no bytes are copied** — both rows point to the same stored file; replacing or deleting one leaves the other alone |
 
 Problems are copied in `(week_no, problem_no)` order so `createProblem`'s auto-assign
 reproduces the source `problem_no`. The Reference Solution is read through the raw

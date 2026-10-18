@@ -8,6 +8,7 @@ import { PUT as publishRoute } from "./[week]/[kind]/publish/route"
 import { POST as UPLOAD } from "./[week]/[kind]/attachments/route"
 import { GET as DOWNLOAD, DELETE as REMOVE } from "./attachments/[aid]/route"
 import { DELETE as deleteCourseRoute } from "../route"
+import { POST as DUPLICATE } from "../duplicate/route"
 import { courseFixture, setTestDb, sessionFor } from "@/lib/test-support/db"
 import type { CourseFixture } from "@/lib/test-support/db"
 import { seedStudent } from "@/lib/test-support/quiz"
@@ -385,6 +386,75 @@ describe("Teaching Material Attachments", () => {
       await replace("slides.pdf", "v2")
       await remove(f.ins.email, a.id)
       expect(await details()).toEqual(["attach 3/slides slides.pdf", "replace 3/slides slides.pdf", "remove 3/slides slides.pdf"])
+    })
+
+    describe("Course Duplication (#117)", () => {
+      // The copy: the same course in 2568/1, made by the duplicate route.
+      const copy = () => ({ code: f.course.code, year: "2568", semester: "1" })
+      const duplicate = () =>
+        DUPLICATE(
+          withSession(
+            new NextRequest("http://localhost/api/x", { method: "POST", body: JSON.stringify({ year: 2568, semester: 1 }) }),
+            f.ins.email
+          ),
+          { params: Promise.resolve(course()) }
+        )
+      const copiedAttachments = async () => {
+        const res = await getOne(withSession(new NextRequest("http://localhost/api/x"), f.ins.email), {
+          params: Promise.resolve({ ...copy(), week: "3", kind: "slides" }),
+        })
+        return (await res.json()).attachments as { id: number; name: string }[]
+      }
+      const inCopy = {
+        download: (aid: number) =>
+          DOWNLOAD(withSession(new NextRequest("http://localhost/api/x"), f.ins.email), {
+            params: Promise.resolve({ ...copy(), aid: String(aid) }),
+          }),
+        replace: (name: string, content: string) => {
+          const form = new FormData()
+          form.set("file", new File([content], name))
+          form.set("replace", "true")
+          return UPLOAD(withSession(new NextRequest("http://localhost/api/x", { method: "POST", body: form }), f.ins.email), {
+            params: Promise.resolve({ ...copy(), week: "3", kind: "slides" }),
+          })
+        },
+        remove: (aid: number) =>
+          REMOVE(withSession(new NextRequest("http://localhost/api/x", { method: "DELETE" }), f.ins.email), {
+            params: Promise.resolve({ ...copy(), aid: String(aid) }),
+          }),
+      }
+
+      it("copies every Material's Attachments by name and hash — no bytes are copied", async () => {
+        const a = await uploaded(f.ins.email, "diagram.png", "png")
+        await uploaded(f.ins.email, "slides.pdf", "pdf")
+        const before = await storedFiles()
+        expect((await duplicate()).status).toBe(201)
+
+        const copied = await copiedAttachments()
+        expect(copied.map((x) => x.name)).toEqual(["diagram.png", "slides.pdf"])
+        expect(copied[0].id).not.toBe(a.id)
+        const hashes = await f.db.query<{ sha256: string; n: number }>(
+          `SELECT sha256, COUNT(*)::int AS n FROM material_attachments GROUP BY sha256`
+        )
+        expect(hashes.rows.map((r) => r.n)).toEqual([2, 2]) // each source file now named by two rows
+        expect(await storedFiles()).toEqual(before)
+        expect(await (await inCopy.download(copied[0].id)).text()).toBe("png")
+      })
+
+      it("replacing or deleting an Attachment on the copy leaves the source's Attachment and file alone", async () => {
+        const a = await uploaded(f.ins.email, "slides.pdf", "v1")
+        const b = await uploaded(f.ins.email, "notes.txt", "keep")
+        await duplicate()
+        const [copiedA, copiedB] = await copiedAttachments()
+        await ageStore()
+
+        expect((await inCopy.replace("slides.pdf", "v2")).status).toBe(200)
+        expect(await (await inCopy.download(copiedA.id)).text()).toBe("v2")
+        expect(await (await download(f.ins.email, a.id)).text()).toBe("v1")
+
+        expect((await inCopy.remove(copiedB.id)).status).toBe(200)
+        expect(await (await download(f.ins.email, b.id)).text()).toBe("keep")
+      })
     })
   })
 })

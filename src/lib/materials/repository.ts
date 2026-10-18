@@ -3,6 +3,7 @@ import type { CourseKey } from "@/lib/courses/types"
 import type { MaterialKind } from "./kinds"
 import type { MaterialSummary } from "./outline"
 import type { MaterialAddress } from "./params"
+import { copyAttachments } from "./attachments/repository"
 
 /** A Teaching Material as stored — identified by week number + Kind (ADR 0012). */
 export interface Material extends MaterialSummary {
@@ -119,15 +120,22 @@ export async function deleteMaterial(db: Queryable, key: CourseKey, { weekNo, ki
 
 /**
  * Course Duplication (#112): every Material — Unplanned ones too — at the same
- * week and Kind with its body, each copy unpublished. A source with none
- * creates nothing.
+ * week and Kind with its body, each copy unpublished, with its Attachments
+ * (#117 — rows only, the bytes are shared). A source with none creates nothing.
  */
 export async function copyMaterials(db: Queryable, source: CourseKey, target: CourseKey, actorId: number): Promise<void> {
-  for (const { weekNo, kind, body } of await listMaterials(db, source)) {
-    await db.query(
+  // Not listMaterials: the copy needs each source's id (the Attachments' anchor), which a Material never shows.
+  const { rows: materials } = await db.query<{ id: number; weekNo: number; kind: MaterialKind; body: string }>(
+    `SELECT id, week_no AS "weekNo", kind, body FROM teaching_materials WHERE ${COURSE} ORDER BY week_no, id`,
+    keyParams(source)
+  )
+  for (const { id, weekNo, kind, body } of materials) {
+    const { rows } = await db.query<{ id: number }>(
       `INSERT INTO teaching_materials (course_code, course_year, course_semester, week_no, kind, body, is_published, updated_by)
-       VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7)`,
+       VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7)
+       RETURNING id`,
       [...keyParams(target), weekNo, kind, body, actorId]
     )
+    await copyAttachments(db, id, rows[0].id)
   }
 }
